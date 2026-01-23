@@ -1,9 +1,10 @@
 """Command-line interface for DriveCatalog."""
 
+from datetime import datetime
+from pathlib import Path
+
 import click
 from rich.table import Table
-
-from pathlib import Path
 
 from drivecatalog import __version__
 from drivecatalog.console import console, print_error, print_success
@@ -80,8 +81,71 @@ def add(path: str, name: str | None) -> None:
 @drives.command("list")
 def list_drives():
     """List all registered drives."""
-    # Placeholder - implemented in Phase 2
-    pass
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT d.*, (SELECT COUNT(*) FROM files WHERE drive_id = d.id) as file_count
+            FROM drives d ORDER BY d.name
+            """
+        ).fetchall()
+
+        if not rows:
+            print_error("No drives registered. Use 'drives add <path>' to add one.")
+            return
+
+        table = Table(title="Registered Drives")
+        table.add_column("Name", style="bold")
+        table.add_column("Mount Path")
+        table.add_column("UUID")
+        table.add_column("Files", justify="right")
+        table.add_column("Last Scan")
+
+        for row in rows:
+            uuid_display = row["uuid"][:8] if row["uuid"] else "N/A"
+            last_scan = _format_relative_time(row["last_scan"]) if row["last_scan"] else "Never"
+            table.add_row(
+                row["name"],
+                row["mount_path"] or "",
+                uuid_display,
+                str(row["file_count"]),
+                last_scan,
+            )
+
+        console.print(table)
+    finally:
+        conn.close()
+
+
+def _format_relative_time(timestamp: str) -> str:
+    """Format a timestamp as a relative time string.
+
+    Args:
+        timestamp: ISO format timestamp string from database
+
+    Returns:
+        Human-readable relative time (e.g., "2 hours ago")
+    """
+    dt = datetime.fromisoformat(timestamp)
+    now = datetime.now()
+    delta = now - dt
+
+    if delta.days > 365:
+        years = delta.days // 365
+        return f"{years} year{'s' if years > 1 else ''} ago"
+    elif delta.days > 30:
+        months = delta.days // 30
+        return f"{months} month{'s' if months > 1 else ''} ago"
+    elif delta.days > 0:
+        return f"{delta.days} day{'s' if delta.days > 1 else ''} ago"
+    elif delta.seconds > 3600:
+        hours = delta.seconds // 3600
+        return f"{hours} hour{'s' if hours > 1 else ''} ago"
+    elif delta.seconds > 60:
+        minutes = delta.seconds // 60
+        return f"{minutes} minute{'s' if minutes > 1 else ''} ago"
+    else:
+        return "Just now"
 
 
 @main.command()
