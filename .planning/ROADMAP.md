@@ -14,7 +14,7 @@ None
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Foundation** - Database schema, CLI skeleton, Rich setup
+- [x] **Phase 1: Foundation** - Database schema, CLI skeleton, Rich setup
 - [ ] **Phase 2: Drive Management** - Drive registration, list/add commands
 - [ ] **Phase 3: File Scanner** - Directory traversal, metadata collection, change detection
 - [ ] **Phase 4: Partial Hashing** - xxHash algorithm for duplicate candidates
@@ -104,7 +104,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 3/4 | In progress | - |
+| 1. Foundation | 4/4 | Complete | 2026-01-23 |
 | 2. Drive Management | 0/? | Not started | - |
 | 3. File Scanner | 0/? | Not started | - |
 | 4. Partial Hashing | 0/? | Not started | - |
