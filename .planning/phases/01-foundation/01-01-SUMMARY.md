@@ -23,6 +23,7 @@ key-files:
     - src/drivecatalog/__init__.py
     - src/drivecatalog/__main__.py
     - src/drivecatalog/cli.py
+    - .gitignore
   modified: []
 
 key-decisions:
@@ -68,12 +69,16 @@ Each task was committed atomically:
 1. **Task 1: Create pyproject.toml with project configuration** - `f007dfb` (feat)
 2. **Task 2: Create package structure with entry points** - `88ce6ea` (feat)
 
+**Plan metadata:** `cd6ffd1` (docs: complete plan)
+**Deviation fix:** `4d1962e` (chore: add .gitignore)
+
 ## Files Created/Modified
 
 - `pyproject.toml` - Project configuration with dependencies and entry point
 - `src/drivecatalog/__init__.py` - Package with __version__ = "0.1.0"
 - `src/drivecatalog/__main__.py` - Enables python -m drivecatalog
 - `src/drivecatalog/cli.py` - Click CLI group with version option
+- `.gitignore` - Python project patterns (deviation fix)
 
 ## Decisions Made
 
@@ -82,7 +87,20 @@ Each task was committed atomically:
 
 ## Deviations from Plan
 
-None - plan executed exactly as written.
+### Auto-fixed Issues
+
+**1. [Rule 3 - Blocking] Added .gitignore for clean repository**
+- **Found during:** Post-task verification (untracked files appearing in git status)
+- **Issue:** No .gitignore existed, causing .venv/, __pycache__/, and *.egg-info/ to appear as untracked
+- **Fix:** Created .gitignore with Python project patterns
+- **Files modified:** .gitignore (created)
+- **Verification:** `git status` no longer shows development artifacts
+- **Committed in:** `4d1962e`
+
+---
+
+**Total deviations:** 1 auto-fixed (blocking)
+**Impact on plan:** Essential for clean repository. No scope creep.
 
 ## Issues Encountered
 
