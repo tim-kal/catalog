@@ -44,3 +44,5 @@ class DriveStatusResponse(BaseModel):
     file_count: int
     hashed_count: int
     hash_coverage_percent: float
+    last_scan: datetime | None
+    media_count: int

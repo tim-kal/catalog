@@ -154,3 +154,90 @@ async def delete_drive(
         }
     finally:
         conn.close()
+
+
+@router.get("/{name}", response_model=DriveResponse)
+async def get_drive(name: str) -> DriveResponse:
+    """Get details for a single drive by name."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT d.*, (SELECT COUNT(*) FROM files WHERE drive_id = d.id) as file_count
+            FROM drives d WHERE d.name = ?
+            """,
+            (name,),
+        ).fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
+
+        return DriveResponse(
+            id=row["id"],
+            name=row["name"],
+            uuid=row["uuid"],
+            mount_path=row["mount_path"] or "",
+            total_bytes=row["total_bytes"] or 0,
+            last_scan=row["last_scan"],
+            file_count=row["file_count"],
+        )
+    finally:
+        conn.close()
+
+
+@router.get("/{name}/status", response_model=DriveStatusResponse)
+async def get_drive_status(name: str) -> DriveStatusResponse:
+    """Get status and hash coverage for a drive.
+
+    Returns mounted status, file counts, and hash coverage percentage.
+    """
+    conn = get_connection()
+    try:
+        # Get drive info
+        drive = conn.execute(
+            "SELECT id, name, mount_path, last_scan FROM drives WHERE name = ?", (name,)
+        ).fetchone()
+
+        if not drive:
+            raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
+
+        drive_id = drive["id"]
+        mount_path = drive["mount_path"]
+
+        # Check if drive is mounted (mount_path exists)
+        mounted = Path(mount_path).exists() if mount_path else False
+
+        # Get file statistics
+        stats = conn.execute(
+            """
+            SELECT
+                COUNT(*) as file_count,
+                SUM(CASE WHEN partial_hash IS NOT NULL THEN 1 ELSE 0 END) as hashed_count,
+                SUM(CASE WHEN is_media = 1 THEN 1 ELSE 0 END) as media_count
+            FROM files WHERE drive_id = ?
+            """,
+            (drive_id,),
+        ).fetchone()
+
+        file_count = stats["file_count"] or 0
+        hashed_count = stats["hashed_count"] or 0
+        media_count = stats["media_count"] or 0
+
+        # Calculate hash coverage percentage
+        if file_count > 0:
+            hash_coverage_percent = round((hashed_count / file_count) * 100, 2)
+        else:
+            hash_coverage_percent = 0.0
+
+        return DriveStatusResponse(
+            id=drive_id,
+            name=drive["name"],
+            mounted=mounted,
+            file_count=file_count,
+            hashed_count=hashed_count,
+            hash_coverage_percent=hash_coverage_percent,
+            last_scan=drive["last_scan"],
+            media_count=media_count,
+        )
+    finally:
+        conn.close()
