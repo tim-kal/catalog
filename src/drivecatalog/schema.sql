@@ -33,3 +33,20 @@ CREATE TABLE IF NOT EXISTS files (
 CREATE INDEX IF NOT EXISTS idx_files_partial_hash ON files(partial_hash);
 CREATE INDEX IF NOT EXISTS idx_files_drive_id ON files(drive_id);
 CREATE INDEX IF NOT EXISTS idx_files_filename ON files(filename);
+
+-- Copy operations table
+CREATE TABLE IF NOT EXISTS copy_operations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    dest_drive_id INTEGER NOT NULL REFERENCES drives(id) ON DELETE CASCADE,
+    dest_path TEXT NOT NULL,
+    source_hash TEXT NOT NULL,
+    dest_hash TEXT NOT NULL,
+    verified INTEGER NOT NULL,
+    bytes_copied INTEGER NOT NULL,
+    started_at TEXT NOT NULL,
+    completed_at TEXT NOT NULL
+);
+
+-- Index for querying copy history of a file
+CREATE INDEX IF NOT EXISTS idx_copy_operations_source_file_id ON copy_operations(source_file_id);
