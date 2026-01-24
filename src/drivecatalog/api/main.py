@@ -1,0 +1,44 @@
+"""FastAPI application for DriveCatalog.
+
+Provides HTTP API access to the DriveCatalog CLI functionality.
+"""
+
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from drivecatalog.database import init_db
+
+from . import __version__
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Initialize database on startup."""
+    init_db()
+    yield
+
+
+app = FastAPI(
+    title="DriveCatalog API",
+    description="HTTP API for DriveCatalog - catalog external drives and detect duplicates",
+    version=__version__,
+    lifespan=lifespan,
+)
+
+# Allow CORS for local desktop app access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+async def health() -> dict:
+    """Health check endpoint."""
+    return {"status": "ok"}
