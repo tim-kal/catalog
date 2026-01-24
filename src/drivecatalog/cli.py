@@ -341,16 +341,72 @@ def status():
     table.add_row("Database", str(db_path))
 
     if exists:
-        table.add_row("Status", "[green]✓ Initialized[/green]")
+        table.add_row("Status", "[green]Initialized[/green]")
         conn = get_connection()
         try:
             drives_count = conn.execute("SELECT COUNT(*) FROM drives").fetchone()[0]
             files_count = conn.execute("SELECT COUNT(*) FROM files").fetchone()[0]
             table.add_row("Drives", str(drives_count))
             table.add_row("Files", str(files_count))
+
+            # Hash coverage statistics
+            hashed_count = conn.execute(
+                "SELECT COUNT(*) FROM files WHERE partial_hash IS NOT NULL"
+            ).fetchone()[0]
+            if files_count > 0:
+                hash_pct = (hashed_count / files_count) * 100
+                table.add_row(
+                    "Hash coverage",
+                    f"{hashed_count}/{files_count} files ({hash_pct:.1f}%)",
+                )
+            else:
+                table.add_row("Hash coverage", "No files")
+
+            console.print(table)
+
+            # Per-drive breakdown if drives exist
+            if drives_count > 0:
+                drive_stats = conn.execute(
+                    """
+                    SELECT
+                        d.name,
+                        COUNT(f.id) as total_files,
+                        COUNT(f.partial_hash) as hashed_files
+                    FROM drives d
+                    LEFT JOIN files f ON f.drive_id = d.id
+                    GROUP BY d.id
+                    ORDER BY d.name
+                    """
+                ).fetchall()
+
+                drive_table = Table(title="Per-Drive Hash Status")
+                drive_table.add_column("Drive", style="bold")
+                drive_table.add_column("Files", justify="right")
+                drive_table.add_column("Hashed", justify="right")
+                drive_table.add_column("Coverage", justify="right")
+
+                for row in drive_stats:
+                    total = row["total_files"]
+                    hashed = row["hashed_files"]
+                    if total > 0:
+                        pct = (hashed / total) * 100
+                        coverage_str = f"{pct:.1f}%"
+                        if pct < 100:
+                            coverage_str = f"[yellow]{coverage_str}[/yellow]"
+                        else:
+                            coverage_str = f"[green]{coverage_str}[/green]"
+                    else:
+                        coverage_str = "-"
+                    drive_table.add_row(
+                        row["name"],
+                        str(total),
+                        str(hashed),
+                        coverage_str,
+                    )
+
+                console.print(drive_table)
         finally:
             conn.close()
     else:
         table.add_row("Status", "[red]Not found[/red]")
-
-    console.print(table)
+        console.print(table)
