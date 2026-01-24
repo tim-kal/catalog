@@ -7,9 +7,10 @@ import click
 from rich.table import Table
 
 from drivecatalog import __version__
-from drivecatalog.console import console, print_error, print_success
+from drivecatalog.console import console, get_progress, print_error, print_success
 from drivecatalog.database import get_connection, get_db_path, init_db
 from drivecatalog.drives import get_drive_info, validate_mount_path
+from drivecatalog.scanner import ScanResult, scan_drive
 
 
 @click.group(invoke_without_command=True)
@@ -115,6 +116,78 @@ def list_drives():
         console.print(table)
     finally:
         conn.close()
+
+
+@drives.command()
+@click.argument("name")
+def scan(name: str) -> None:
+    """Scan a drive and catalog all files.
+
+    NAME is the registered name of the drive to scan.
+    """
+    conn = get_connection()
+    try:
+        # Look up drive by name
+        drive = conn.execute(
+            "SELECT id, name, mount_path FROM drives WHERE name = ?",
+            (name,),
+        ).fetchone()
+
+        if not drive:
+            print_error(f"Drive '{name}' not found. Use 'drives list' to see registered drives.")
+            return
+
+        mount_path = drive["mount_path"]
+        if not mount_path:
+            print_error(f"Drive '{name}' has no mount path configured.")
+            return
+
+        # Check if mount path is accessible
+        mount_path_obj = Path(mount_path)
+        if not mount_path_obj.exists():
+            print_error(f"Drive '{name}' is not mounted at '{mount_path}'.")
+            return
+
+        if not mount_path_obj.is_dir():
+            print_error(f"Mount path '{mount_path}' is not a directory.")
+            return
+
+        # Scan with progress display
+        with get_progress() as progress:
+            task = progress.add_task(f"Scanning {name}...", total=None)
+
+            def update_progress(current_dir: str) -> None:
+                progress.update(task, description=f"Scanning: {current_dir}")
+
+            result = scan_drive(drive["id"], mount_path, conn, progress_callback=update_progress)
+
+        # Update last_scan timestamp
+        conn.execute(
+            "UPDATE drives SET last_scan = datetime('now') WHERE id = ?",
+            (drive["id"],),
+        )
+        conn.commit()
+
+        # Print summary
+        _print_scan_summary(result)
+        print_success(f"Scan complete. {result.total_scanned} files cataloged.")
+    finally:
+        conn.close()
+
+
+def _print_scan_summary(result: ScanResult) -> None:
+    """Print a summary table of scan results."""
+    table = Table(title="Scan Summary")
+    table.add_column("Category", style="bold")
+    table.add_column("Count", justify="right")
+
+    table.add_row("New files", str(result.new_files))
+    table.add_row("Modified files", str(result.modified_files))
+    table.add_row("Unchanged files", str(result.unchanged_files))
+    table.add_row("Errors", str(result.errors))
+    table.add_row("Total scanned", str(result.total_scanned), style="bold")
+
+    console.print(table)
 
 
 def _format_relative_time(timestamp: str) -> str:
