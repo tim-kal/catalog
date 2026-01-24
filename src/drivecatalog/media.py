@@ -51,6 +51,14 @@ class MediaMetadata:
     bit_rate: int | None = None
 
 
+@dataclass
+class IntegrityResult:
+    """Result of container integrity verification via ffprobe."""
+
+    is_valid: bool
+    errors: list[str]
+
+
 def extract_metadata(file_path: Path) -> MediaMetadata | None:
     """Extract video metadata from a file using ffprobe.
 
@@ -125,4 +133,59 @@ def extract_metadata(file_path: Path) -> MediaMetadata | None:
     except json.JSONDecodeError:
         return None
     except (KeyError, ValueError, TypeError):
+        return None
+
+
+def check_integrity(file_path: Path) -> IntegrityResult | None:
+    """Check video container integrity using ffprobe error detection.
+
+    Runs ffprobe with error-level logging to detect container corruption,
+    truncation, or other structural issues without fully decoding the video.
+
+    Args:
+        file_path: Path to the video file.
+
+    Returns:
+        IntegrityResult with validity status and any error messages,
+        or None if ffprobe is not installed or the check failed.
+    """
+    if not file_path.exists():
+        return None
+
+    try:
+        # Use -v error to capture corruption messages to stderr
+        # -f null - sends output to null (we only care about errors)
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-i",
+                str(file_path),
+                "-f",
+                "null",
+                "-",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        # Parse stderr for error messages
+        stderr = result.stderr.strip()
+
+        if not stderr:
+            # No errors - file is valid
+            return IntegrityResult(is_valid=True, errors=[])
+        else:
+            # Parse error lines
+            error_lines = [line.strip() for line in stderr.split("\n") if line.strip()]
+            return IntegrityResult(is_valid=False, errors=error_lines)
+
+    except FileNotFoundError:
+        # ffprobe not installed
+        return None
+    except subprocess.TimeoutExpired:
+        return None
+    except (OSError, ValueError):
         return None

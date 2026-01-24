@@ -61,7 +61,9 @@ CREATE TABLE IF NOT EXISTS media_metadata (
     height INTEGER,
     frame_rate TEXT,
     bit_rate INTEGER,
-    extracted_at TEXT NOT NULL DEFAULT (datetime('now'))
+    extracted_at TEXT NOT NULL DEFAULT (datetime('now')),
+    integrity_verified_at TEXT,
+    integrity_errors TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_media_metadata_file_id ON media_metadata(file_id);
