@@ -62,9 +62,18 @@ class DuplicateListResponse(BaseModel):
     stats: DuplicateStatsResponse
 
 
+class SearchFile(BaseModel):
+    """File result from search query (simplified view)."""
+
+    drive_name: str
+    path: str
+    size_bytes: int
+    mtime: str | None
+
+
 class SearchResultResponse(BaseModel):
     """Response model for search results."""
 
-    files: list[FileResponse]
+    files: list[SearchFile]
     total: int
     pattern: str
