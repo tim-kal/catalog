@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from drivecatalog.database import get_connection
 from drivecatalog.drives import get_drive_info, validate_mount_path
@@ -105,5 +105,52 @@ async def create_drive(request: DriveCreateRequest) -> DriveResponse:
             last_scan=None,
             file_count=0,
         )
+    finally:
+        conn.close()
+
+
+@router.delete("/{name}")
+async def delete_drive(
+    name: str,
+    confirm: bool = Query(False, description="Must be true to confirm deletion"),
+) -> dict:
+    """Delete a drive registration and all associated file records.
+
+    This is a destructive operation. Set confirm=true to proceed.
+    """
+    if not confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="Deletion requires confirmation. Add ?confirm=true to proceed.",
+        )
+
+    conn = get_connection()
+    try:
+        # Look up drive by name
+        drive = conn.execute(
+            "SELECT id, name FROM drives WHERE name = ?", (name,)
+        ).fetchone()
+
+        if not drive:
+            raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
+
+        drive_id = drive["id"]
+
+        # Count files to be deleted (for response)
+        file_count = conn.execute(
+            "SELECT COUNT(*) FROM files WHERE drive_id = ?", (drive_id,)
+        ).fetchone()[0]
+
+        # Delete files first (foreign key), then drive
+        # Note: CASCADE would handle this, but being explicit for clarity
+        conn.execute("DELETE FROM files WHERE drive_id = ?", (drive_id,))
+        conn.execute("DELETE FROM drives WHERE id = ?", (drive_id,))
+        conn.commit()
+
+        return {
+            "status": "deleted",
+            "name": name,
+            "files_removed": file_count,
+        }
     finally:
         conn.close()
