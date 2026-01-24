@@ -38,12 +38,15 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 **Goal**: Define Swift↔Python communication pattern and expose existing functionality as API
 **Depends on**: v1.0 complete
-**Research**: Likely (Swift/Python integration patterns)
-**Research topics**: Local HTTP API vs subprocess, Swift URLSession patterns, Python async server options
-**Plans**: TBD
+**Research**: Complete (Swift/Python integration patterns)
+**Status**: In progress (1/5 plans)
 
 Plans:
-- [ ] 12-01: TBD (run /gsd:plan-phase 12 to break down)
+- [x] 12-01: FastAPI foundation with Pydantic models — completed 2026-01-24
+- [ ] 12-02: Drives API routes (CRUD, status)
+- [ ] 12-03: Files, search, and duplicates API routes
+- [ ] 12-04: Background operations (scan, hash)
+- [ ] 12-05: Copy, media metadata, and integrity routes
 
 ### Phase 13: SwiftUI Project Setup
 
@@ -130,4 +133,4 @@ Plans:
 | Milestone | Phases | Plans | Status | Completed |
 |-----------|--------|-------|--------|-----------|
 | v1.0 MVP | 1-11 | 14/14 | Complete | 2026-01-24 |
-| v1.1 UI | 12-20 | 0/? | In progress | - |
+| v1.1 UI | 12-20 | 1/? | In progress | - |
