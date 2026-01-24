@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 
 Milestone: v1.1 UI
 Phase: 12 of 20 (Architecture & Python API)
-Plan: 1 of 4 in current phase
+Plan: 2 of 5 in current phase
 Status: In progress
-Last activity: 2026-01-24 — Completed 12-01-PLAN.md
+Last activity: 2026-01-24 — Completed 12-02-PLAN.md
 
-Progress: █░░░░░░░░░ 11%
+Progress: ██░░░░░░░░ 15%
 
 ## Completed Milestones
 
@@ -36,6 +36,7 @@ Full decision log in PROJECT.md Key Decisions table.
 - SwiftUI native for UI framework (user preference for macOS polish)
 - FastAPI with lifespan context manager for Python API layer
 - CORS allow all origins for local desktop app access
+- DELETE endpoints require ?confirm=true to prevent accidental API deletions
 
 ### Deferred Issues
 
@@ -53,5 +54,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-24
-Stopped at: Completed 12-01-PLAN.md
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None
