@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 from drivecatalog.database import get_connection
 from drivecatalog.drives import get_drive_info, validate_mount_path
+from drivecatalog.hasher import compute_partial_hash
 from drivecatalog.scanner import scan_drive as scanner_scan_drive
 
 from ..models.drive import (
@@ -316,6 +317,116 @@ async def trigger_scan(name: str, background_tasks: BackgroundTasks) -> dict:
         # Create operation and start background task
         op = create_operation("scan", name)
         background_tasks.add_task(_run_scan, op.id, drive["id"], mount_path)
+
+        return {
+            "operation_id": op.id,
+            "status": "started",
+            "poll_url": f"/operations/{op.id}",
+        }
+    finally:
+        conn.close()
+
+
+def _run_hash(operation_id: str, drive_id: int, mount_path: str, force: bool) -> None:
+    """Run hashing in background thread.
+
+    Args:
+        operation_id: ID of the operation to track progress.
+        drive_id: Database ID of the drive.
+        mount_path: Path to the mounted drive.
+        force: If True, re-hash files that already have hashes.
+    """
+    update_operation(operation_id, status=OperationStatus.RUNNING, progress_percent=0.0)
+
+    try:
+        conn = get_connection()
+        mount_path_obj = Path(mount_path)
+
+        try:
+            # Query files needing hashing
+            if force:
+                files = conn.execute(
+                    "SELECT id, path, size_bytes FROM files WHERE drive_id = ?",
+                    (drive_id,),
+                ).fetchall()
+            else:
+                files = conn.execute(
+                    "SELECT id, path, size_bytes FROM files WHERE drive_id = ? AND partial_hash IS NULL",
+                    (drive_id,),
+                ).fetchall()
+
+            total = len(files)
+            hashed = 0
+            errors = 0
+
+            for i, file_row in enumerate(files):
+                full_path = mount_path_obj / file_row["path"]
+                partial_hash = compute_partial_hash(full_path, file_row["size_bytes"])
+
+                if partial_hash:
+                    conn.execute(
+                        "UPDATE files SET partial_hash = ? WHERE id = ?",
+                        (partial_hash, file_row["id"]),
+                    )
+                    hashed += 1
+                else:
+                    errors += 1
+
+                # Update progress every 10 files or at end
+                if (i + 1) % 10 == 0 or i == total - 1:
+                    progress = ((i + 1) / total) * 100 if total > 0 else 100
+                    update_operation(operation_id, progress_percent=progress)
+
+            conn.commit()
+
+            update_operation(
+                operation_id,
+                status=OperationStatus.COMPLETED,
+                progress_percent=100.0,
+                result={"hashed": hashed, "errors": errors, "total": total},
+                completed_at=datetime.now(),
+            )
+        finally:
+            conn.close()
+    except Exception as e:
+        update_operation(
+            operation_id,
+            status=OperationStatus.FAILED,
+            error=str(e),
+            completed_at=datetime.now(),
+        )
+
+
+@router.post("/{name}/hash")
+async def trigger_hash(
+    name: str,
+    background_tasks: BackgroundTasks,
+    force: bool = Query(False, description="Re-hash files that already have hashes"),
+) -> dict:
+    """Trigger partial hash computation for files on the drive.
+
+    Computes partial hashes (first 64KB + last 64KB) for files that don't have them.
+    Returns immediately with an operation_id that can be used to poll for progress.
+    """
+    conn = get_connection()
+    try:
+        # Look up drive by name
+        drive = conn.execute(
+            "SELECT id, name, mount_path FROM drives WHERE name = ?", (name,)
+        ).fetchone()
+
+        if not drive:
+            raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
+
+        mount_path = drive["mount_path"]
+        if not mount_path or not Path(mount_path).exists():
+            raise HTTPException(
+                status_code=400, detail=f"Drive '{name}' is not currently mounted"
+            )
+
+        # Create operation and start background task
+        op = create_operation("hash", name)
+        background_tasks.add_task(_run_hash, op.id, drive["id"], mount_path, force)
 
         return {
             "operation_id": op.id,
