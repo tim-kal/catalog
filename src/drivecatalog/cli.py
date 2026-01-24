@@ -10,6 +10,7 @@ from drivecatalog import __version__
 from drivecatalog.console import console, get_progress, print_error, print_success
 from drivecatalog.database import get_connection, get_db_path, init_db
 from drivecatalog.drives import get_drive_info, validate_mount_path
+from drivecatalog.hasher import compute_partial_hash
 from drivecatalog.scanner import ScanResult, scan_drive
 
 
@@ -181,6 +182,102 @@ def scan(name: str) -> None:
         # Print summary
         _print_scan_summary(result)
         print_success(f"Scan complete. {result.total_scanned} files cataloged.")
+    finally:
+        conn.close()
+
+
+@drives.command()
+@click.argument("name")
+@click.option("--force", is_flag=True, help="Re-hash all files, even those already hashed")
+def hash(name: str, force: bool) -> None:
+    """Compute partial hashes for all files on a drive.
+
+    NAME is the registered name of the drive to hash.
+    """
+    conn = get_connection()
+    try:
+        # Look up drive by name
+        drive = conn.execute(
+            "SELECT id, name, mount_path FROM drives WHERE name = ?",
+            (name,),
+        ).fetchone()
+
+        if not drive:
+            print_error(f"Drive '{name}' not found. Use 'drives list' to see registered drives.")
+            return
+
+        mount_path = drive["mount_path"]
+        if not mount_path:
+            print_error(f"Drive '{name}' has no mount path configured.")
+            return
+
+        # Check if mount path is accessible
+        mount_path_obj = Path(mount_path)
+        if not mount_path_obj.exists():
+            print_error(f"Drive '{name}' is not mounted at '{mount_path}'.")
+            return
+
+        # Query files needing hashing
+        if force:
+            files = conn.execute(
+                "SELECT id, path, size_bytes FROM files WHERE drive_id = ?",
+                (drive["id"],),
+            ).fetchall()
+        else:
+            files = conn.execute(
+                "SELECT id, path, size_bytes FROM files WHERE drive_id = ? AND partial_hash IS NULL",
+                (drive["id"],),
+            ).fetchall()
+
+        total_files = len(files)
+        if total_files == 0:
+            print_success(f"All files on '{name}' already have hashes. Use --force to re-hash.")
+            return
+
+        # Hash files with progress display
+        console.print(f"[bold]Hashing {total_files} files on '{name}'...[/bold]")
+        hashed_count = 0
+        error_count = 0
+
+        with get_progress() as progress:
+            task = progress.add_task("Hashing...", total=total_files)
+
+            for file_row in files:
+                file_id = file_row["id"]
+                rel_path = file_row["path"]
+                size_bytes = file_row["size_bytes"]
+                full_path = mount_path_obj / rel_path
+
+                # Truncate filename for display
+                display_name = rel_path if len(rel_path) <= 50 else "..." + rel_path[-47:]
+                progress.update(task, description=f"[cyan]{display_name}[/cyan]")
+
+                # Compute hash
+                partial_hash = compute_partial_hash(full_path, size_bytes)
+
+                if partial_hash:
+                    conn.execute(
+                        "UPDATE files SET partial_hash = ? WHERE id = ?",
+                        (partial_hash, file_id),
+                    )
+                    hashed_count += 1
+                else:
+                    error_count += 1
+
+                progress.advance(task)
+
+        conn.commit()
+
+        # Print summary
+        table = Table(title="Hash Summary")
+        table.add_column("Category", style="bold")
+        table.add_column("Count", justify="right")
+        table.add_row("Files hashed", str(hashed_count))
+        table.add_row("Errors", str(error_count))
+        table.add_row("Total processed", str(total_files), style="bold")
+        console.print(table)
+
+        print_success(f"Hashing complete. {hashed_count} files hashed.")
     finally:
         conn.close()
 
