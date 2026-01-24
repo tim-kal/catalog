@@ -17,7 +17,7 @@ from drivecatalog.scanner import ScanResult, scan_drive
 from drivecatalog.copier import CopyResult, copy_file_verified, log_copy_operation
 from drivecatalog.search import search_files
 from drivecatalog.watcher import auto_scan_on_mount, get_mounted_volumes, run_watcher
-from drivecatalog.media import MEDIA_EXTENSIONS, extract_metadata
+from drivecatalog.media import MEDIA_EXTENSIONS, IntegrityResult, check_integrity, extract_metadata
 
 
 @click.group(invoke_without_command=True)
@@ -808,6 +808,163 @@ def media(name: str, force: bool) -> None:
             print_error("No metadata extracted. Is ffprobe installed? (brew install ffmpeg)")
         else:
             print_success(f"Metadata extraction complete. {extracted_count} files processed.")
+    finally:
+        conn.close()
+
+
+@drives.command()
+@click.argument("name")
+@click.option("--force", is_flag=True, help="Re-verify all media files")
+@click.option("--show-errors", is_flag=True, help="Display full error messages for corrupted files")
+def verify(name: str, force: bool, show_errors: bool) -> None:
+    """Verify integrity of video files on a drive.
+
+    NAME is the registered name of the drive.
+    Requires ffprobe to be installed (`brew install ffmpeg`).
+
+    Uses ffprobe to detect container corruption, truncation, or other
+    structural issues without fully decoding the video.
+    """
+    conn = get_connection()
+    try:
+        # Look up drive by name
+        drive = conn.execute(
+            "SELECT id, name, mount_path FROM drives WHERE name = ?",
+            (name,),
+        ).fetchone()
+
+        if not drive:
+            print_error(f"Drive '{name}' not found. Use 'drives list' to see registered drives.")
+            return
+
+        mount_path = drive["mount_path"]
+        if not mount_path:
+            print_error(f"Drive '{name}' has no mount path configured.")
+            return
+
+        # Check if mount path is accessible
+        mount_path_obj = Path(mount_path)
+        if not mount_path_obj.exists():
+            print_error(f"Drive '{name}' is not mounted at '{mount_path}'.")
+            return
+
+        # Query media files: files with is_media=1 flag (set by `drives media`)
+        if force:
+            # All media files
+            files = conn.execute(
+                """
+                SELECT f.id, f.path, f.filename
+                FROM files f
+                WHERE f.drive_id = ? AND f.is_media = 1
+                """,
+                (drive["id"],),
+            ).fetchall()
+        else:
+            # Media files without integrity verification yet
+            files = conn.execute(
+                """
+                SELECT f.id, f.path, f.filename
+                FROM files f
+                JOIN media_metadata m ON f.id = m.file_id
+                WHERE f.drive_id = ? AND f.is_media = 1 AND m.integrity_verified_at IS NULL
+                """,
+                (drive["id"],),
+            ).fetchall()
+
+        total_files = len(files)
+        if total_files == 0:
+            # Check if there are any media files at all
+            media_count = conn.execute(
+                "SELECT COUNT(*) FROM files WHERE drive_id = ? AND is_media = 1",
+                (drive["id"],),
+            ).fetchone()[0]
+
+            if media_count == 0:
+                print_error(f"No media files found on '{name}'. Run 'drives media {name}' first.")
+            elif force:
+                print_success(f"No media files found on '{name}'.")
+            else:
+                print_success(f"All media files on '{name}' already verified. Use --force to re-verify.")
+            return
+
+        # Verify files with progress display
+        console.print(f"[bold]Verifying integrity of {total_files} media files on '{name}'...[/bold]")
+        verified_ok = 0
+        verified_errors = 0
+        ffprobe_failed = 0
+        files_with_errors: list[tuple[str, list[str]]] = []
+
+        with get_progress() as progress:
+            task = progress.add_task("Verifying...", total=total_files)
+
+            for file_row in files:
+                file_id = file_row["id"]
+                rel_path = file_row["path"]
+                full_path = mount_path_obj / rel_path
+
+                # Truncate filename for display
+                display_name = rel_path if len(rel_path) <= 50 else "..." + rel_path[-47:]
+                progress.update(task, description=f"[cyan]{display_name}[/cyan]")
+
+                # Check integrity
+                result = check_integrity(full_path)
+
+                if result is None:
+                    ffprobe_failed += 1
+                elif result.is_valid:
+                    verified_ok += 1
+                    # Update database
+                    conn.execute(
+                        """
+                        UPDATE media_metadata
+                        SET integrity_verified_at = datetime('now'), integrity_errors = NULL
+                        WHERE file_id = ?
+                        """,
+                        (file_id,),
+                    )
+                else:
+                    verified_errors += 1
+                    files_with_errors.append((rel_path, result.errors))
+                    # Update database with errors
+                    errors_text = "\n".join(result.errors)
+                    conn.execute(
+                        """
+                        UPDATE media_metadata
+                        SET integrity_verified_at = datetime('now'), integrity_errors = ?
+                        WHERE file_id = ?
+                        """,
+                        (errors_text, file_id),
+                    )
+
+                progress.advance(task)
+
+        conn.commit()
+
+        # Print summary
+        table = Table(title="Integrity Verification Summary")
+        table.add_column("Category", style="bold")
+        table.add_column("Count", justify="right")
+        table.add_row("Verified OK", str(verified_ok), style="green" if verified_ok > 0 else None)
+        table.add_row("Integrity errors", str(verified_errors), style="red" if verified_errors > 0 else None)
+        table.add_row("FFprobe failures", str(ffprobe_failed), style="yellow" if ffprobe_failed > 0 else None)
+        table.add_row("Total processed", str(total_files), style="bold")
+        console.print(table)
+
+        # Show files with errors if requested
+        if verified_errors > 0 and show_errors:
+            console.print()
+            console.print("[bold red]Files with integrity errors:[/bold red]")
+            for path, errors in files_with_errors:
+                console.print(f"\n[bold]{path}[/bold]")
+                for error in errors:
+                    console.print(f"  [red]•[/red] {error}")
+
+        if ffprobe_failed > 0 and verified_ok == 0 and verified_errors == 0:
+            print_error("No files verified. Is ffprobe installed? (brew install ffmpeg)")
+        elif verified_errors > 0:
+            print_error(f"Found {verified_errors} file(s) with integrity issues.")
+        else:
+            print_success(f"Verification complete. {verified_ok} files verified OK.")
     finally:
         conn.close()
 
