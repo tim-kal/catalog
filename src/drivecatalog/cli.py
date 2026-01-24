@@ -15,6 +15,7 @@ from drivecatalog.hasher import compute_partial_hash
 from drivecatalog.scanner import ScanResult, scan_drive
 from drivecatalog.copier import CopyResult, copy_file_verified, log_copy_operation
 from drivecatalog.search import search_files
+from drivecatalog.watcher import get_mounted_volumes, run_watcher
 
 
 @click.group(invoke_without_command=True)
@@ -594,6 +595,74 @@ def copy(source_drive: str, source_path: str, dest_drive: str, dest_path: str | 
         else:
             print_error("VERIFICATION FAILED - hashes do not match!")
 
+    finally:
+        conn.close()
+
+
+@drives.command()
+def watch() -> None:
+    """Monitor /Volumes for drive mount/unmount events.
+
+    Runs as a foreground daemon, detecting when drives are connected
+    or disconnected. Registered drives are identified by name.
+
+    Use Ctrl+C to stop the watcher.
+    """
+    db_path = get_db_path()
+    conn = get_connection()
+
+    try:
+        console.print("[bold]Watching /Volumes for mount/unmount events...[/bold]")
+        console.print("[dim]Press Ctrl+C to stop[/dim]")
+        console.print()
+
+        def on_mount(path):
+            """Handle volume mount event."""
+            # Check if this is a registered drive
+            drive = conn.execute(
+                "SELECT name FROM drives WHERE mount_path = ?",
+                (str(path),),
+            ).fetchone()
+
+            if drive:
+                console.print(f"[green]Mount detected:[/green] {path} (registered as {drive['name']})")
+            else:
+                console.print(f"[yellow]Mount detected:[/yellow] {path} (not registered)")
+
+        def on_unmount(path):
+            """Handle volume unmount event."""
+            # Check if this was a registered drive
+            drive = conn.execute(
+                "SELECT name FROM drives WHERE mount_path = ?",
+                (str(path),),
+            ).fetchone()
+
+            if drive:
+                console.print(f"[red]Unmount detected:[/red] {path} (was {drive['name']})")
+            else:
+                console.print(f"[dim]Unmount detected:[/dim] {path}")
+
+        # Check existing mounts on startup
+        existing_volumes = get_mounted_volumes()
+        if existing_volumes:
+            console.print("[bold]Currently mounted volumes:[/bold]")
+            for vol in existing_volumes:
+                drive = conn.execute(
+                    "SELECT name FROM drives WHERE mount_path = ?",
+                    (str(vol),),
+                ).fetchone()
+
+                if drive:
+                    console.print(f"  [green]●[/green] {vol} (registered as {drive['name']})")
+                else:
+                    console.print(f"  [dim]●[/dim] {vol}")
+            console.print()
+
+        # Run watcher (blocking until interrupted)
+        run_watcher(db_path, on_mount, on_unmount)
+
+    except KeyboardInterrupt:
+        console.print("\n[bold]Watcher stopped.[/bold]")
     finally:
         conn.close()
 
