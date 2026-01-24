@@ -16,7 +16,7 @@ None
 
 - [x] **Phase 1: Foundation** - Database schema, CLI skeleton, Rich setup
 - [x] **Phase 2: Drive Management** - Drive registration, list/add commands
-- [ ] **Phase 3: File Scanner** - Directory traversal, metadata collection, change detection
+- [x] **Phase 3: File Scanner** - Directory traversal, metadata collection, change detection
 - [ ] **Phase 4: Partial Hashing** - xxHash algorithm for duplicate candidates
 - [ ] **Phase 5: Duplicate Detection** - Clustering queries, space analysis
 - [ ] **Phase 6: Search** - Pattern matching, filtering, search command
@@ -106,7 +106,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 |-------|----------------|--------|-----------|
 | 1. Foundation | 4/4 | Complete | 2026-01-23 |
 | 2. Drive Management | 1/1 | Complete | 2026-01-23 |
-| 3. File Scanner | 0/? | Not started | - |
+| 3. File Scanner | 1/1 | Complete | 2026-01-24 |
 | 4. Partial Hashing | 0/? | Not started | - |
 | 5. Duplicate Detection | 0/? | Not started | - |
 | 6. Search | 0/? | Not started | - |
