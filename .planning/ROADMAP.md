@@ -6,7 +6,8 @@ Build a macOS CLI tool for cataloging external drives, detecting duplicates via 
 
 ## Milestones
 
-- [v1.0 MVP](milestones/v1.0-ROADMAP.md) (Phases 1-11) — SHIPPED 2026-01-24
+- ✅ [v1.0 MVP](milestones/v1.0-ROADMAP.md) (Phases 1-11) — SHIPPED 2026-01-24
+- 🚧 **v1.1 UI** — Phases 12-20 (in progress)
 
 ## Completed Milestones
 
@@ -29,8 +30,104 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 </details>
 
+## 🚧 v1.1 UI (In Progress)
+
+**Milestone Goal:** Add a native SwiftUI interface to the existing DriveCatalog CLI, providing a polished macOS desktop experience for drive cataloging, duplicate detection, and verified transfers.
+
+### Phase 12: Architecture & Python API
+
+**Goal**: Define Swift↔Python communication pattern and expose existing functionality as API
+**Depends on**: v1.0 complete
+**Research**: Likely (Swift/Python integration patterns)
+**Research topics**: Local HTTP API vs subprocess, Swift URLSession patterns, Python async server options
+**Plans**: TBD
+
+Plans:
+- [ ] 12-01: TBD (run /gsd:plan-phase 12 to break down)
+
+### Phase 13: SwiftUI Project Setup
+
+**Goal**: Create Xcode project with basic app lifecycle, window structure, and navigation shell
+**Depends on**: Phase 12
+**Research**: Unlikely (standard SwiftUI patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 13-01: TBD
+
+### Phase 14: Swift Data Models
+
+**Goal**: Define Swift types for drives, files, duplicates matching Python database schema
+**Depends on**: Phase 13
+**Research**: Unlikely (internal patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 14-01: TBD
+
+### Phase 15: Drive Management View
+
+**Goal**: List registered drives, add/remove drives, show scan status and last-scanned dates
+**Depends on**: Phase 14
+**Research**: Unlikely (uses Phase 12 API)
+**Plans**: TBD
+
+Plans:
+- [ ] 15-01: TBD
+
+### Phase 16: File Browser
+
+**Goal**: Browse files by drive with tree/list view, show file details, navigate directory structure
+**Depends on**: Phase 15
+**Research**: Unlikely (standard UI patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 16-01: TBD
+
+### Phase 17: Duplicate Dashboard
+
+**Goal**: View duplicate file groups, show reclaimable space, enable group actions (delete, move)
+**Depends on**: Phase 16
+**Research**: Unlikely (uses existing duplicate detection)
+**Plans**: TBD
+
+Plans:
+- [ ] 17-01: TBD
+
+### Phase 18: Search Interface
+
+**Goal**: Search files across drives, filter by type/size/date, display results with navigation
+**Depends on**: Phase 17
+**Research**: Unlikely (standard UI patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 18-01: TBD
+
+### Phase 19: Copy & Verify UI
+
+**Goal**: Copy wizard for verified transfers, progress tracking, verification status display
+**Depends on**: Phase 18
+**Research**: Unlikely (wraps existing copy functionality)
+**Plans**: TBD
+
+Plans:
+- [ ] 19-01: TBD
+
+### Phase 20: Settings & Mount Automation
+
+**Goal**: Preferences window for app config, auto-scan settings, mount notification alerts
+**Depends on**: Phase 19
+**Research**: Unlikely (standard macOS patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 20-01: TBD
+
 ## Progress
 
 | Milestone | Phases | Plans | Status | Completed |
 |-----------|--------|-------|--------|-----------|
 | v1.0 MVP | 1-11 | 14/14 | Complete | 2026-01-24 |
+| v1.1 UI | 12-20 | 0/? | In progress | - |

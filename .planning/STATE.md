@@ -5,18 +5,19 @@
 See: .planning/PROJECT.md (updated 2026-01-24)
 
 **Core value:** Duplicate detection — knowing which files exist across multiple drives and identifying safe deletion candidates.
-**Current focus:** v1.0 MVP shipped — gathering user feedback
+**Current focus:** v1.1 UI — Native SwiftUI interface for existing functionality
 
 ## Current Position
 
-Milestone: v1.0 MVP — SHIPPED 2026-01-24
-Phase: 11 of 11 (all complete)
-Status: Milestone shipped
-Last activity: 2026-01-24 — Completed v1.0 milestone
+Milestone: v1.1 UI
+Phase: 12 of 20 (Architecture & Python API)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-24 — Milestone v1.1 UI created
 
-Progress: v1.0 MVP complete
+Progress: ░░░░░░░░░░ 0%
 
-## Milestone Summary
+## Completed Milestones
 
 **v1.0 MVP (Shipped: 2026-01-24)**
 - 11 phases, 14 plans
@@ -25,34 +26,14 @@ Progress: v1.0 MVP complete
 
 See: .planning/MILESTONES.md for full details.
 
-## Performance Metrics
-
-**Velocity:**
-- Total plans completed: 14
-- Average duration: 2.4 min
-- Total execution time: 34 min
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 1. Foundation | 4 | 8 min | 2 min |
-| 2. Drive Management | 1 | 3 min | 3 min |
-| 3. File Scanner | 1 | 5 min | 5 min |
-| 4. Partial Hashing | 1 | 3 min | 3 min |
-| 5. Duplicate Detection | 1 | 2 min | 2 min |
-| 6. Search | 1 | 1 min | 1 min |
-| 7. Verified Copy | 1 | 2 min | 2 min |
-| 8. Mount Detection | 1 | 3 min | 3 min |
-| 9. Config & Auto-scan | 1 | 3 min | 3 min |
-| 10. Media Metadata | 1 | 2 min | 2 min |
-| 11. Integrity Verification | 1 | 2 min | 2 min |
-
 ## Accumulated Context
 
 ### Decisions
 
 Full decision log in PROJECT.md Key Decisions table.
+
+**v1.1 Decisions:**
+- SwiftUI native for UI framework (user preference for macOS polish)
 
 ### Deferred Issues
 
@@ -62,8 +43,13 @@ None.
 
 None.
 
+### Roadmap Evolution
+
+- v1.0 MVP shipped: 2026-01-24 (11 phases)
+- v1.1 UI created: 2026-01-24 — SwiftUI interface, 9 phases (Phase 12-20)
+
 ## Session Continuity
 
 Last session: 2026-01-24
-Stopped at: v1.0 milestone complete
+Stopped at: Milestone v1.1 UI initialization
 Resume file: None
