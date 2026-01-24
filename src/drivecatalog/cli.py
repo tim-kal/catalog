@@ -10,6 +10,7 @@ from drivecatalog import __version__
 from drivecatalog.console import console, get_progress, print_error, print_success
 from drivecatalog.database import get_connection, get_db_path, init_db
 from drivecatalog.drives import get_drive_info, validate_mount_path
+from drivecatalog.duplicates import get_duplicate_clusters, get_duplicate_stats
 from drivecatalog.hasher import compute_partial_hash
 from drivecatalog.scanner import ScanResult, scan_drive
 
@@ -280,6 +281,101 @@ def hash(name: str, force: bool) -> None:
         print_success(f"Hashing complete. {hashed_count} files hashed.")
     finally:
         conn.close()
+
+
+@drives.command()
+def duplicates() -> None:
+    """Find duplicate files across all drives.
+
+    Shows files with matching partial hashes and calculates reclaimable space.
+    """
+    conn = get_connection()
+    try:
+        # Get duplicate statistics
+        stats = get_duplicate_stats(conn)
+
+        if stats["total_clusters"] == 0:
+            print_success("No duplicates found.")
+            return
+
+        # Get duplicate clusters
+        clusters = get_duplicate_clusters(conn)
+
+        # Stats summary table
+        stats_table = Table(title="Duplicate Statistics", show_header=False)
+        stats_table.add_column("Metric", style="bold")
+        stats_table.add_column("Value")
+        stats_table.add_row("Duplicate groups", str(stats["total_clusters"]))
+        stats_table.add_row("Files with duplicates", str(stats["total_duplicate_files"]))
+        stats_table.add_row("Total size", _format_bytes(stats["total_bytes"]))
+        stats_table.add_row(
+            "Reclaimable space",
+            f"[green]{_format_bytes(stats['reclaimable_bytes'])}[/green]",
+        )
+        console.print(stats_table)
+
+        # Clusters table (top 20)
+        clusters_table = Table(title="Top Duplicate Clusters (by reclaimable space)")
+        clusters_table.add_column("Hash", style="dim")
+        clusters_table.add_column("Copies", justify="right")
+        clusters_table.add_column("Size", justify="right")
+        clusters_table.add_column("Reclaimable", justify="right", style="green")
+        clusters_table.add_column("Files")
+
+        for cluster in clusters[:20]:
+            # Truncate hash to 8 chars
+            hash_display = cluster["partial_hash"][:8]
+
+            # Format files as "drive:path" pairs
+            file_strs = []
+            for f in cluster["files"]:
+                path = f["path"]
+                # Truncate path for display
+                if len(path) > 30:
+                    path = "..." + path[-27:]
+                file_strs.append(f"{f['drive_name']}:{path}")
+
+            files_display = ", ".join(file_strs)
+            # Truncate if too long
+            if len(files_display) > 60:
+                files_display = files_display[:57] + "..."
+
+            clusters_table.add_row(
+                hash_display,
+                str(cluster["count"]),
+                _format_bytes(cluster["size_bytes"]),
+                _format_bytes(cluster["reclaimable_bytes"]),
+                files_display,
+            )
+
+        console.print(clusters_table)
+
+        if len(clusters) > 20:
+            console.print(f"[dim]... and {len(clusters) - 20} more duplicate groups[/dim]")
+
+    finally:
+        conn.close()
+
+
+def _format_bytes(size_bytes: int) -> str:
+    """Format bytes as human-readable string.
+
+    Args:
+        size_bytes: Size in bytes.
+
+    Returns:
+        Human-readable size string (e.g., "1.2 GB", "456 MB").
+    """
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
+    elif size_bytes < 1024 * 1024 * 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+    else:
+        return f"{size_bytes / (1024 * 1024 * 1024 * 1024):.1f} TB"
 
 
 def _print_scan_summary(result: ScanResult) -> None:
