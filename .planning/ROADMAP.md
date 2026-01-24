@@ -20,7 +20,7 @@ None
 - [x] **Phase 4: Partial Hashing** - xxHash algorithm for duplicate candidates
 - [x] **Phase 5: Duplicate Detection** - Clustering queries, space analysis
 - [x] **Phase 6: Search** - Pattern matching, filtering, search command
-- [ ] **Phase 7: Verified Copy** - Streaming copy with SHA256 verification
+- [x] **Phase 7: Verified Copy** - Streaming copy with SHA256 verification
 - [ ] **Phase 8: Mount Detection** - watchdog daemon for /Volumes monitoring
 - [ ] **Phase 9: Config & Auto-scan** - YAML config, auto-scan on mount
 - [ ] **Phase 10: Media Metadata** - ffprobe integration, codec/duration extraction
@@ -110,7 +110,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 4. Partial Hashing | 1/1 | Complete | 2026-01-24 |
 | 5. Duplicate Detection | 1/1 | Complete | 2026-01-24 |
 | 6. Search | 1/1 | Complete | 2026-01-24 |
-| 7. Verified Copy | 0/? | Not started | - |
+| 7. Verified Copy | 1/1 | Complete | 2026-01-24 |
 | 8. Mount Detection | 0/? | Not started | - |
 | 9. Config & Auto-scan | 0/? | Not started | - |
 | 10. Media Metadata | 0/? | Not started | - |
