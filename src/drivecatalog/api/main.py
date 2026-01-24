@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from drivecatalog.database import init_db
 
 from . import __version__
-from .routes import status
+from .routes import drives, status
 
 
 @asynccontextmanager
@@ -41,6 +41,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(status.router)
+app.include_router(drives.router)
 
 
 @app.get("/health")
