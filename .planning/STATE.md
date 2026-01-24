@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-23)
 
 **Core value:** Duplicate detection — knowing which files exist across multiple drives and identifying safe deletion candidates.
-**Current focus:** Phase 9 Complete — Ready for Phase 10
+**Current focus:** Phase 10 Complete — Ready for Phase 11
 
 ## Current Position
 
-Phase: 9 of 11 (Config & Auto-scan) — COMPLETE
+Phase: 10 of 11 (Media Metadata) — COMPLETE
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-24 — Completed 09-01-PLAN.md
+Last activity: 2026-01-24 — Completed 10-01-PLAN.md
 
-Progress: █████████░░ 82% (9/11 phases complete)
+Progress: ██████████░ 91% (10/11 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
+- Total plans completed: 13
 - Average duration: 2.5 min
-- Total execution time: 30 min
+- Total execution time: 32 min
 
 **By Phase:**
 
@@ -36,9 +36,10 @@ Progress: █████████░░ 82% (9/11 phases complete)
 | 7. Verified Copy | 1 | 2 min | 2 min |
 | 8. Mount Detection | 1 | 3 min | 3 min |
 | 9. Config & Auto-scan | 1 | 3 min | 3 min |
+| 10. Media Metadata | 1 | 2 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 06-01 (1 min), 07-01 (2 min), 08-01 (3 min), 09-01 (3 min)
+- Last 5 plans: 07-01 (2 min), 08-01 (3 min), 09-01 (3 min), 10-01 (2 min)
 - Trend: Stable
 
 ## Accumulated Context
@@ -72,6 +73,9 @@ Recent decisions affecting current work:
 - Use pyyaml for config (simpler than ruamel.yaml)
 - Auto-scan only registered drives (skip unregistered mounts)
 - Daemon threads for background scans (watcher stays responsive)
+- Use ffprobe subprocess for metadata (not ffmpeg-python library)
+- Return None on ffprobe errors for graceful degradation
+- Store frame_rate as string fraction to preserve precision
 
 ### Deferred Issues
 
@@ -83,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-24T16:42:32Z
-Stopped at: Completed 09-01-PLAN.md (Config & Auto-scan) — Phase 9 Complete
+Last session: 2026-01-24T16:49:31Z
+Stopped at: Completed 10-01-PLAN.md (Media Metadata) — Phase 10 Complete
 Resume file: None

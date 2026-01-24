@@ -23,7 +23,7 @@ None
 - [x] **Phase 7: Verified Copy** - Streaming copy with SHA256 verification
 - [x] **Phase 8: Mount Detection** - watchdog daemon for /Volumes monitoring
 - [x] **Phase 9: Config & Auto-scan** - YAML config, auto-scan on mount
-- [ ] **Phase 10: Media Metadata** - ffprobe integration, codec/duration extraction
+- [x] **Phase 10: Media Metadata** - ffprobe integration, codec/duration extraction
 - [ ] **Phase 11: Integrity Verification** - Container integrity check via ffprobe
 
 ## Phase Details
@@ -113,5 +113,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 7. Verified Copy | 1/1 | Complete | 2026-01-24 |
 | 8. Mount Detection | 1/1 | Complete | 2026-01-24 |
 | 9. Config & Auto-scan | 1/1 | Complete | 2026-01-24 |
-| 10. Media Metadata | 0/? | Not started | - |
+| 10. Media Metadata | 1/1 | Complete | 2026-01-24 |
 | 11. Integrity Verification | 0/? | Not started | - |
