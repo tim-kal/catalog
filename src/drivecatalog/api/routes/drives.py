@@ -1,11 +1,13 @@
 """Drive management endpoints for DriveCatalog API."""
 
+from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 from drivecatalog.database import get_connection
 from drivecatalog.drives import get_drive_info, validate_mount_path
+from drivecatalog.scanner import scan_drive as scanner_scan_drive
 
 from ..models.drive import (
     DriveCreateRequest,
@@ -13,6 +15,7 @@ from ..models.drive import (
     DriveResponse,
     DriveStatusResponse,
 )
+from ..operations import OperationStatus, create_operation, update_operation
 
 router = APIRouter(prefix="/drives", tags=["drives"])
 
@@ -239,5 +242,85 @@ async def get_drive_status(name: str) -> DriveStatusResponse:
             last_scan=drive["last_scan"],
             media_count=media_count,
         )
+    finally:
+        conn.close()
+
+
+def _run_scan(operation_id: str, drive_id: int, mount_path: str) -> None:
+    """Run scan in background thread.
+
+    Args:
+        operation_id: ID of the operation to track progress.
+        drive_id: Database ID of the drive.
+        mount_path: Path to the mounted drive.
+    """
+    update_operation(operation_id, status=OperationStatus.RUNNING)
+
+    try:
+        conn = get_connection()
+        try:
+            result = scanner_scan_drive(drive_id, mount_path, conn)
+
+            # Update last_scan timestamp
+            conn.execute(
+                "UPDATE drives SET last_scan = datetime('now') WHERE id = ?",
+                (drive_id,),
+            )
+            conn.commit()
+
+            update_operation(
+                operation_id,
+                status=OperationStatus.COMPLETED,
+                result={
+                    "new_files": result.new_files,
+                    "modified_files": result.modified_files,
+                    "unchanged_files": result.unchanged_files,
+                    "errors": result.errors,
+                    "total_scanned": result.total_scanned,
+                },
+                completed_at=datetime.now(),
+            )
+        finally:
+            conn.close()
+    except Exception as e:
+        update_operation(
+            operation_id,
+            status=OperationStatus.FAILED,
+            error=str(e),
+            completed_at=datetime.now(),
+        )
+
+
+@router.post("/{name}/scan")
+async def trigger_scan(name: str, background_tasks: BackgroundTasks) -> dict:
+    """Trigger a scan of the drive as a background task.
+
+    Returns immediately with an operation_id that can be used to poll for status.
+    """
+    conn = get_connection()
+    try:
+        # Look up drive by name
+        drive = conn.execute(
+            "SELECT id, name, mount_path FROM drives WHERE name = ?", (name,)
+        ).fetchone()
+
+        if not drive:
+            raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
+
+        mount_path = drive["mount_path"]
+        if not mount_path or not Path(mount_path).exists():
+            raise HTTPException(
+                status_code=400, detail=f"Drive '{name}' is not currently mounted"
+            )
+
+        # Create operation and start background task
+        op = create_operation("scan", name)
+        background_tasks.add_task(_run_scan, op.id, drive["id"], mount_path)
+
+        return {
+            "operation_id": op.id,
+            "status": "started",
+            "poll_url": f"/operations/{op.id}",
+        }
     finally:
         conn.close()
