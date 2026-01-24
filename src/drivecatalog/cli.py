@@ -13,6 +13,7 @@ from drivecatalog.drives import get_drive_info, validate_mount_path
 from drivecatalog.duplicates import get_duplicate_clusters, get_duplicate_stats
 from drivecatalog.hasher import compute_partial_hash
 from drivecatalog.scanner import ScanResult, scan_drive
+from drivecatalog.search import search_files
 
 
 @click.group(invoke_without_command=True)
@@ -357,6 +358,93 @@ def duplicates() -> None:
         conn.close()
 
 
+@drives.command()
+@click.argument("pattern")
+@click.option("--drive", "-d", help="Filter by drive name")
+@click.option("--min-size", help="Minimum file size (e.g., 10M, 1G)")
+@click.option("--max-size", help="Maximum file size (e.g., 100M, 5G)")
+@click.option("--ext", "-e", help="Filter by extension (without dot, e.g., mp4)")
+@click.option("--limit", "-l", default=100, help="Maximum results (default 100)")
+def search(
+    pattern: str,
+    drive: str | None,
+    min_size: str | None,
+    max_size: str | None,
+    ext: str | None,
+    limit: int,
+) -> None:
+    """Search for files by pattern.
+
+    PATTERN is a glob-style pattern (e.g., "*.mp4", "*vacation*").
+    Use * for any characters, ? for single character.
+
+    Examples:
+        drives search "*.mp4"              # Find all MP4 files
+        drives search "*vacation*" -d MyDrive  # Search specific drive
+        drives search "*" --min-size 100M  # Files over 100MB
+    """
+    conn = get_connection()
+    try:
+        # Parse size filters
+        min_bytes = _parse_size(min_size) if min_size else None
+        max_bytes = _parse_size(max_size) if max_size else None
+
+        # Execute search
+        results = search_files(
+            conn,
+            pattern,
+            drive_name=drive,
+            min_size=min_bytes,
+            max_size=max_bytes,
+            extension=ext,
+            limit=limit,
+        )
+
+        if not results:
+            print_error(f"No files found matching '{pattern}'.")
+            return
+
+        # Display results table
+        table = Table(title=f"Search Results for '{pattern}'")
+        table.add_column("Drive", style="bold")
+        table.add_column("Path")
+        table.add_column("Size", justify="right")
+        table.add_column("Modified")
+
+        for row in results:
+            # Truncate path for display
+            path = row["path"]
+            if len(path) > 50:
+                path = "..." + path[-47:]
+
+            # Format modification time
+            mtime = row["mtime"]
+            if mtime:
+                mtime_display = _format_relative_time(mtime)
+            else:
+                mtime_display = "-"
+
+            table.add_row(
+                row["drive_name"],
+                path,
+                _format_bytes(row["size_bytes"]),
+                mtime_display,
+            )
+
+        console.print(table)
+
+        # Show result count
+        if len(results) >= limit:
+            console.print(
+                f"[dim]Showing {len(results)} results (limit reached, more may exist)[/dim]"
+            )
+        else:
+            console.print(f"[dim]Found {len(results)} file(s)[/dim]")
+
+    finally:
+        conn.close()
+
+
 def _format_bytes(size_bytes: int) -> str:
     """Format bytes as human-readable string.
 
@@ -376,6 +464,45 @@ def _format_bytes(size_bytes: int) -> str:
         return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
     else:
         return f"{size_bytes / (1024 * 1024 * 1024 * 1024):.1f} TB"
+
+
+def _parse_size(size_str: str) -> int:
+    """Parse a size string with optional suffix to bytes.
+
+    Args:
+        size_str: Size string like "10M", "1G", "500K", or "1024".
+
+    Returns:
+        Size in bytes.
+
+    Raises:
+        click.BadParameter: If the size string is invalid.
+    """
+    if not size_str:
+        raise click.BadParameter("Size cannot be empty")
+
+    size_str = size_str.strip().upper()
+
+    suffixes = {
+        "K": 1024,
+        "M": 1024 * 1024,
+        "G": 1024 * 1024 * 1024,
+        "T": 1024 * 1024 * 1024 * 1024,
+    }
+
+    # Check if last character is a suffix
+    if size_str[-1] in suffixes:
+        try:
+            number = float(size_str[:-1])
+            return int(number * suffixes[size_str[-1]])
+        except ValueError:
+            raise click.BadParameter(f"Invalid size: {size_str}")
+    else:
+        # No suffix, assume bytes
+        try:
+            return int(size_str)
+        except ValueError:
+            raise click.BadParameter(f"Invalid size: {size_str}")
 
 
 def _print_scan_summary(result: ScanResult) -> None:
