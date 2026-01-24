@@ -50,3 +50,18 @@ CREATE TABLE IF NOT EXISTS copy_operations (
 
 -- Index for querying copy history of a file
 CREATE INDEX IF NOT EXISTS idx_copy_operations_source_file_id ON copy_operations(source_file_id);
+
+-- Media metadata table (extracted via ffprobe)
+CREATE TABLE IF NOT EXISTS media_metadata (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id INTEGER NOT NULL UNIQUE REFERENCES files(id) ON DELETE CASCADE,
+    duration_seconds REAL,
+    codec_name TEXT,
+    width INTEGER,
+    height INTEGER,
+    frame_rate TEXT,
+    bit_rate INTEGER,
+    extracted_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_media_metadata_file_id ON media_metadata(file_id);
