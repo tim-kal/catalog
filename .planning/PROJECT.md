@@ -12,21 +12,21 @@ Duplicate detection — knowing which files exist across multiple drives and ide
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] SQLite database with drives/files schema and persistent catalog at `~/.drivecatalog/catalog.db` — v1.0
+- [x] File scanner with change detection (size + mtime comparison) — v1.0
+- [x] Partial hash algorithm (xxHash of header + tail + size) for fast duplicate detection — v1.0
+- [x] Duplicate clustering queries and space analysis — v1.0
+- [x] CLI interface with Click: `drives list`, `drives scan`, `search`, `duplicates`, `analyze` — v1.0
+- [x] Verified copy with streaming SHA256 during transfer — v1.0
+- [x] Progress display with Rich (progress bars, tables) — v1.0
+- [x] Mount detection daemon monitoring `/Volumes` via watchdog — v1.0
+- [x] Auto-scan on mount (configurable) — v1.0
+- [x] Media metadata extraction via ffprobe (duration, codec, resolution, framerate) — v1.0
+- [x] Container integrity verification via ffprobe — v1.0
 
 ### Active
 
-- [ ] SQLite database with drives/files schema and persistent catalog at `~/.drivecatalog/catalog.db`
-- [ ] File scanner with change detection (size + mtime comparison)
-- [ ] Partial hash algorithm (xxHash of header + tail + size) for fast duplicate detection
-- [ ] Duplicate clustering queries and space analysis
-- [ ] CLI interface with Click: `drives list`, `drives scan`, `search`, `duplicates`, `analyze`
-- [ ] Verified copy with streaming SHA256 during transfer
-- [ ] Progress display with Rich (progress bars, tables)
-- [ ] Mount detection daemon monitoring `/Volumes` via watchdog
-- [ ] Auto-scan on mount (configurable)
-- [ ] Media metadata extraction via ffprobe (duration, codec, resolution, framerate)
-- [ ] Container integrity verification via ffprobe
+(None currently — v1.0 shipped, gathering feedback)
 
 ### Out of Scope
 
@@ -63,10 +63,22 @@ User context: Video professional with N external drives containing unknown/forgo
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Partial hash over full hash | Reading 128KB vs multi-GB files; collisions astronomically rare for practical use | — Pending |
-| xxHash over SHA256 for dedup | Speed for duplicate detection; SHA256 reserved for verified copy integrity | — Pending |
-| SQLite over filesystem JSON | Query flexibility, ACID guarantees, proven at scale | — Pending |
-| Python over Swift | Faster iteration, rich CLI ecosystem (Click, Rich), ffmpeg-python bindings | — Pending |
+| Partial hash over full hash | Reading 128KB vs multi-GB files; collisions astronomically rare for practical use | ✓ Good — fast and reliable |
+| xxHash over SHA256 for dedup | Speed for duplicate detection; SHA256 reserved for verified copy integrity | ✓ Good — clear separation of concerns |
+| SQLite over filesystem JSON | Query flexibility, ACID guarantees, proven at scale | ✓ Good — simple and powerful |
+| Python over Swift | Faster iteration, rich CLI ecosystem (Click, Rich), ffmpeg-python bindings | ✓ Good — 2 days to MVP |
+| ffprobe subprocess over ffmpeg-python | Simpler, no additional dependency, reliable JSON parsing | ✓ Good — v1.0 |
+| watchdog with FSEvents | Native macOS file system events, no polling overhead | ✓ Good — v1.0 |
+| Foreground daemon design | Let launchd manage lifecycle, simpler implementation | ✓ Good — v1.0 |
+| pyyaml over ruamel.yaml | Simpler, sufficient for config needs | ✓ Good — v1.0 |
+
+## Context
+
+Shipped v1.0 MVP with 2,359 LOC Python.
+Tech stack: Python 3.11+, Click, Rich, SQLite, xxhash, watchdog, pyyaml.
+External dependencies: ffprobe (via brew install ffmpeg).
+
+CLI commands: `drives add`, `drives list`, `drives scan`, `drives hash`, `drives duplicates`, `drives search`, `drives copy`, `drives watch`, `drives media`, `drives verify`, `drives status`.
 
 ---
-*Last updated: 2026-01-23 after initialization*
+*Last updated: 2026-01-24 after v1.0 milestone*

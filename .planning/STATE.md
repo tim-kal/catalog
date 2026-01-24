@@ -2,19 +2,28 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-23)
+See: .planning/PROJECT.md (updated 2026-01-24)
 
 **Core value:** Duplicate detection — knowing which files exist across multiple drives and identifying safe deletion candidates.
-**Current focus:** Phase 11 Ready — Final phase planned
+**Current focus:** v1.0 MVP shipped — gathering user feedback
 
 ## Current Position
 
-Phase: 11 of 11 (Integrity Verification) — COMPLETE
-Plan: 1 of 1 in current phase
-Status: Milestone complete
-Last activity: 2026-01-24 — Completed 11-01-PLAN.md
+Milestone: v1.0 MVP — SHIPPED 2026-01-24
+Phase: 11 of 11 (all complete)
+Status: Milestone shipped
+Last activity: 2026-01-24 — Completed v1.0 milestone
 
-Progress: ███████████ 100% (11/11 phases complete)
+Progress: v1.0 MVP complete
+
+## Milestone Summary
+
+**v1.0 MVP (Shipped: 2026-01-24)**
+- 11 phases, 14 plans
+- 48 files, 2,359 lines Python
+- 2 days from start to ship
+
+See: .planning/MILESTONES.md for full details.
 
 ## Performance Metrics
 
@@ -39,58 +48,22 @@ Progress: ███████████ 100% (11/11 phases complete)
 | 10. Media Metadata | 1 | 2 min | 2 min |
 | 11. Integrity Verification | 1 | 2 min | 2 min |
 
-**Recent Trend:**
-- Last 5 plans: 08-01 (3 min), 09-01 (3 min), 10-01 (2 min), 11-01 (2 min)
-- Trend: Stable
-
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
-
-- Database init on every CLI invocation (idempotent, ensures DB exists)
-- invoke_without_command=True for auto-help when no subcommand
-- Module-level console instance for consistent output
-- Use diskutil -plist for macOS drive UUID extraction
-- Mount path validation requires /Volumes/ prefix
-- Progress callback pattern for decoupled scanner/UI
-- Skip hidden (dot) files and macOS system directories
-- Store paths relative to mount_path for portability
-- Return None from compute_partial_hash on read errors (graceful degradation)
-- Incremental hashing by default, --force for all files
-- Order duplicate clusters by reclaimable_bytes DESC for impact prioritization
-- Show top 20 duplicate clusters in CLI to keep output manageable
-- Use SQL LIKE instead of fnmatch for search efficiency
-- Default search limit of 100 results to prevent overwhelming output
-- Use SHA256 (not xxhash) for copy integrity verification
-- Two-pass verification: hash source while copying, then verify destination
-- Require files to be cataloged before copy (scan-first workflow)
-- Log all copy operations to database for auditability
-- Use watchdog with FSEvents backend for /Volumes monitoring
-- Foreground daemon design for launchd compatibility
-- Filter hidden directories in watcher to ignore system files
-- Use pyyaml for config (simpler than ruamel.yaml)
-- Auto-scan only registered drives (skip unregistered mounts)
-- Daemon threads for background scans (watcher stays responsive)
-- Use ffprobe subprocess for metadata (not ffmpeg-python library)
-- Return None on ffprobe errors for graceful degradation
-- Store frame_rate as string fraction to preserve precision
-- Use ffprobe -v error for integrity checks (stderr empty = valid)
-- 60 second timeout for integrity verification (large files)
-- Require is_media=1 flag before integrity verification
+Full decision log in PROJECT.md Key Decisions table.
 
 ### Deferred Issues
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-None yet.
+None.
 
 ## Session Continuity
 
-Last session: 2026-01-24T18:22:38Z
-Stopped at: Completed 11-01-PLAN.md (Integrity Verification) — Milestone Complete
+Last session: 2026-01-24
+Stopped at: v1.0 milestone complete
 Resume file: None
