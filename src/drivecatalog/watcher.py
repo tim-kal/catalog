@@ -1,12 +1,19 @@
 """Volume mount/unmount detection using watchdog."""
 
 import signal
+import sqlite3
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
+from rich.console import Console
 from watchdog.events import DirCreatedEvent, DirDeletedEvent, FileSystemEventHandler
 from watchdog.observers import Observer
+
+from drivecatalog.config import load_config
+from drivecatalog.drives import get_drive_by_mount_path
+from drivecatalog.scanner import scan_drive
 
 # Path to monitor for mount/unmount events
 VOLUMES_PATH = Path("/Volumes")
@@ -118,3 +125,59 @@ def run_watcher(
     finally:
         observer.stop()
         observer.join()
+
+
+def auto_scan_on_mount(mount_path: Path, conn: sqlite3.Connection) -> None:
+    """Perform automatic scan of a mounted drive if enabled in config.
+
+    This function checks the configuration and database to determine
+    if a scan should be performed, then executes the scan.
+
+    Args:
+        mount_path: Path to the mounted volume.
+        conn: Database connection for lookups and scan operations.
+    """
+    console = Console()
+
+    # Load config and check if auto-scan is enabled
+    config = load_config()
+    if not config.auto_scan_enabled:
+        return
+
+    # Check if volume name is in the allowed list (if set)
+    volume_name = mount_path.name
+    if config.auto_scan_drives is not None:
+        if volume_name not in config.auto_scan_drives:
+            return
+
+    # Look up drive by mount path
+    drive = get_drive_by_mount_path(conn, mount_path)
+    if drive is None:
+        # Not a registered drive, skip
+        return
+
+    # Perform scan
+    console.print(f"[bold blue]Auto-scanning '{drive['name']}'...[/bold blue]")
+
+    try:
+        result = scan_drive(
+            drive["id"],
+            str(mount_path),
+            conn,
+            progress_callback=None,  # No progress for background scan
+        )
+
+        # Update last_scan timestamp
+        conn.execute(
+            "UPDATE drives SET last_scan = datetime('now') WHERE id = ?",
+            (drive["id"],),
+        )
+        conn.commit()
+
+        console.print(
+            f"[green]Auto-scan complete:[/green] {drive['name']} - "
+            f"{result.new_files} new, {result.modified_files} modified, "
+            f"{result.total_scanned} total files"
+        )
+    except Exception as e:
+        console.print(f"[red]Auto-scan failed:[/red] {drive['name']} - {e}")

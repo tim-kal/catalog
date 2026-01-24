@@ -1,5 +1,6 @@
 """Command-line interface for DriveCatalog."""
 
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from drivecatalog.hasher import compute_partial_hash
 from drivecatalog.scanner import ScanResult, scan_drive
 from drivecatalog.copier import CopyResult, copy_file_verified, log_copy_operation
 from drivecatalog.search import search_files
-from drivecatalog.watcher import get_mounted_volumes, run_watcher
+from drivecatalog.watcher import auto_scan_on_mount, get_mounted_volumes, run_watcher
 
 
 @click.group(invoke_without_command=True)
@@ -626,6 +627,17 @@ def watch() -> None:
 
             if drive:
                 console.print(f"[green]Mount detected:[/green] {path} (registered as {drive['name']})")
+                # Trigger auto-scan in background thread to keep watcher responsive
+                # Use a separate connection for thread safety
+                def scan_in_background():
+                    scan_conn = get_connection()
+                    try:
+                        auto_scan_on_mount(path, scan_conn)
+                    finally:
+                        scan_conn.close()
+
+                thread = threading.Thread(target=scan_in_background, daemon=True)
+                thread.start()
             else:
                 console.print(f"[yellow]Mount detected:[/yellow] {path} (not registered)")
 

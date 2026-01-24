@@ -2,6 +2,7 @@
 
 import os
 import plistlib
+import sqlite3
 import subprocess
 from pathlib import Path
 
@@ -91,3 +92,25 @@ def validate_mount_path(path: Path | str) -> bool:
         return True
     except ValueError:
         return False
+
+
+def get_drive_by_mount_path(conn: sqlite3.Connection, mount_path: Path) -> dict | None:
+    """Look up a registered drive by its mount path.
+
+    Args:
+        conn: Database connection.
+        mount_path: Path to the mount point.
+
+    Returns:
+        Dict with drive info (id, name, mount_path, uuid, total_bytes, last_scan)
+        or None if not found.
+    """
+    row = conn.execute(
+        "SELECT id, name, mount_path, uuid, total_bytes, last_scan FROM drives WHERE mount_path = ?",
+        (str(mount_path),),
+    ).fetchone()
+
+    if row is None:
+        return None
+
+    return dict(row)
