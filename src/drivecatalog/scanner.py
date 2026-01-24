@@ -3,6 +3,7 @@
 import os
 import sqlite3
 from collections.abc import Callable
+from typing import Any
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -33,7 +34,7 @@ def scan_drive(
     drive_id: int,
     mount_path: str,
     conn: sqlite3.Connection,
-    progress_callback: Callable[[str], None] | None = None,
+    progress_callback: Callable[[str, dict[str, Any] | None], None] | None = None,
 ) -> ScanResult:
     """Scan a drive and update the files table.
 
@@ -63,13 +64,15 @@ def scan_drive(
             if not d.startswith(".") and d not in SKIP_DIRECTORIES
         ]
 
-        # Call progress callback with current directory
+        # Call progress callback with current directory and stats
         if progress_callback:
             try:
                 rel_dir = current_path.relative_to(mount_path_obj)
-                progress_callback(str(rel_dir) if str(rel_dir) != "." else "/")
+                dir_str = str(rel_dir) if str(rel_dir) != "." else "/"
             except ValueError:
-                progress_callback(str(current_path))
+                dir_str = str(current_path)
+            stats = {"total": result.total_scanned, "new": result.new_files}
+            progress_callback(dir_str, stats)
 
         for filename in filenames:
             # Skip hidden files

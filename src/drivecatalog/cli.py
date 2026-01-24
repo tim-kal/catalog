@@ -153,11 +153,21 @@ def scan(name: str) -> None:
             return
 
         # Scan with progress display
+        console.print(f"[bold]Scanning drive '{name}'...[/bold]")
         with get_progress() as progress:
-            task = progress.add_task(f"Scanning {name}...", total=None)
+            task = progress.add_task("Scanning...", total=None)
+            files_found = 0
 
-            def update_progress(current_dir: str) -> None:
-                progress.update(task, description=f"Scanning: {current_dir}")
+            def update_progress(current_dir: str, stats: dict | None = None) -> None:
+                nonlocal files_found
+                if stats:
+                    files_found = stats.get("total", files_found)
+                # Truncate long directory paths for display
+                display_dir = current_dir if len(current_dir) <= 50 else "..." + current_dir[-47:]
+                progress.update(
+                    task,
+                    description=f"[cyan]{display_dir}[/cyan] ({files_found} files)",
+                )
 
             result = scan_drive(drive["id"], mount_path, conn, progress_callback=update_progress)
 
