@@ -17,6 +17,7 @@ from drivecatalog.scanner import ScanResult, scan_drive
 from drivecatalog.copier import CopyResult, copy_file_verified, log_copy_operation
 from drivecatalog.search import search_files
 from drivecatalog.watcher import auto_scan_on_mount, get_mounted_volumes, run_watcher
+from drivecatalog.media import MEDIA_EXTENSIONS, extract_metadata
 
 
 @click.group(invoke_without_command=True)
@@ -675,6 +676,138 @@ def watch() -> None:
 
     except KeyboardInterrupt:
         console.print("\n[bold]Watcher stopped.[/bold]")
+    finally:
+        conn.close()
+
+
+@drives.command()
+@click.argument("name")
+@click.option("--force", is_flag=True, help="Re-extract metadata for all media files")
+def media(name: str, force: bool) -> None:
+    """Extract metadata for video files on a drive.
+
+    NAME is the registered name of the drive.
+    Requires ffprobe to be installed (`brew install ffmpeg`).
+    """
+    conn = get_connection()
+    try:
+        # Look up drive by name
+        drive = conn.execute(
+            "SELECT id, name, mount_path FROM drives WHERE name = ?",
+            (name,),
+        ).fetchone()
+
+        if not drive:
+            print_error(f"Drive '{name}' not found. Use 'drives list' to see registered drives.")
+            return
+
+        mount_path = drive["mount_path"]
+        if not mount_path:
+            print_error(f"Drive '{name}' has no mount path configured.")
+            return
+
+        # Check if mount path is accessible
+        mount_path_obj = Path(mount_path)
+        if not mount_path_obj.exists():
+            print_error(f"Drive '{name}' is not mounted at '{mount_path}'.")
+            return
+
+        # Build extension list for SQL query
+        ext_list = [ext.lstrip(".") for ext in MEDIA_EXTENSIONS]
+        ext_placeholders = ",".join("?" * len(ext_list))
+
+        # Query media files: either force mode (all media files) or incremental (no metadata yet)
+        if force:
+            # All files with media extensions
+            query = f"""
+                SELECT f.id, f.path, f.filename
+                FROM files f
+                WHERE f.drive_id = ?
+                AND LOWER(SUBSTR(f.filename, INSTR(f.filename, '.') + 1)) IN ({ext_placeholders})
+            """
+            files = conn.execute(query, (drive["id"], *ext_list)).fetchall()
+        else:
+            # Files with media extensions that don't have metadata yet
+            query = f"""
+                SELECT f.id, f.path, f.filename
+                FROM files f
+                LEFT JOIN media_metadata m ON f.id = m.file_id
+                WHERE f.drive_id = ?
+                AND m.id IS NULL
+                AND LOWER(SUBSTR(f.filename, INSTR(f.filename, '.') + 1)) IN ({ext_placeholders})
+            """
+            files = conn.execute(query, (drive["id"], *ext_list)).fetchall()
+
+        total_files = len(files)
+        if total_files == 0:
+            if force:
+                print_success(f"No media files found on '{name}'.")
+            else:
+                print_success(f"All media files on '{name}' already have metadata. Use --force to re-extract.")
+            return
+
+        # Extract metadata with progress display
+        console.print(f"[bold]Extracting metadata for {total_files} media files on '{name}'...[/bold]")
+        extracted_count = 0
+        error_count = 0
+
+        with get_progress() as progress:
+            task = progress.add_task("Extracting...", total=total_files)
+
+            for file_row in files:
+                file_id = file_row["id"]
+                rel_path = file_row["path"]
+                full_path = mount_path_obj / rel_path
+
+                # Truncate filename for display
+                display_name = rel_path if len(rel_path) <= 50 else "..." + rel_path[-47:]
+                progress.update(task, description=f"[cyan]{display_name}[/cyan]")
+
+                # Update is_media flag
+                conn.execute("UPDATE files SET is_media = 1 WHERE id = ?", (file_id,))
+
+                # Extract metadata
+                metadata = extract_metadata(full_path)
+
+                if metadata:
+                    # Insert or replace metadata
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO media_metadata
+                        (file_id, duration_seconds, codec_name, width, height, frame_rate, bit_rate)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            file_id,
+                            metadata.duration_seconds,
+                            metadata.codec_name,
+                            metadata.width,
+                            metadata.height,
+                            metadata.frame_rate,
+                            metadata.bit_rate,
+                        ),
+                    )
+                    extracted_count += 1
+                else:
+                    error_count += 1
+
+                progress.advance(task)
+
+        conn.commit()
+
+        # Print summary
+        table = Table(title="Media Metadata Summary")
+        table.add_column("Category", style="bold")
+        table.add_column("Count", justify="right")
+        table.add_row("Metadata extracted", str(extracted_count))
+        table.add_row("Errors (ffprobe failed)", str(error_count))
+        table.add_row("Total processed", str(total_files), style="bold")
+        console.print(table)
+
+        if error_count > 0 and extracted_count == 0:
+            print_error("No metadata extracted. Is ffprobe installed? (brew install ffmpeg)")
+        else:
+            print_success(f"Metadata extraction complete. {extracted_count} files processed.")
     finally:
         conn.close()
 
