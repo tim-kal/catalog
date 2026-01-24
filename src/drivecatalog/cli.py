@@ -13,6 +13,7 @@ from drivecatalog.drives import get_drive_info, validate_mount_path
 from drivecatalog.duplicates import get_duplicate_clusters, get_duplicate_stats
 from drivecatalog.hasher import compute_partial_hash
 from drivecatalog.scanner import ScanResult, scan_drive
+from drivecatalog.copier import CopyResult, copy_file_verified, log_copy_operation
 from drivecatalog.search import search_files
 
 
@@ -440,6 +441,158 @@ def search(
             )
         else:
             console.print(f"[dim]Found {len(results)} file(s)[/dim]")
+
+    finally:
+        conn.close()
+
+
+@drives.command()
+@click.argument("source_drive")
+@click.argument("source_path")
+@click.argument("dest_drive")
+@click.option("--dest-path", "-d", help="Destination path (defaults to same as source)")
+def copy(source_drive: str, source_path: str, dest_drive: str, dest_path: str | None) -> None:
+    """Copy a file between drives with integrity verification.
+
+    SOURCE_DRIVE is the registered name of the source drive.
+    SOURCE_PATH is the relative path of the file on the source drive.
+    DEST_DRIVE is the registered name of the destination drive.
+
+    The file must already be cataloged (run 'drives scan' first).
+    After copying, verifies the copy matches the source via SHA256.
+    """
+    conn = get_connection()
+    try:
+        # Look up source drive
+        src_drive = conn.execute(
+            "SELECT id, name, mount_path FROM drives WHERE name = ?",
+            (source_drive,),
+        ).fetchone()
+
+        if not src_drive:
+            print_error(f"Source drive '{source_drive}' not found. Use 'drives list' to see registered drives.")
+            return
+
+        # Look up destination drive
+        dst_drive = conn.execute(
+            "SELECT id, name, mount_path FROM drives WHERE name = ?",
+            (dest_drive,),
+        ).fetchone()
+
+        if not dst_drive:
+            print_error(f"Destination drive '{dest_drive}' not found. Use 'drives list' to see registered drives.")
+            return
+
+        # Validate source drive is mounted
+        src_mount = src_drive["mount_path"]
+        if not src_mount:
+            print_error(f"Source drive '{source_drive}' has no mount path configured.")
+            return
+
+        src_mount_path = Path(src_mount)
+        if not src_mount_path.exists():
+            print_error(f"Source drive '{source_drive}' is not mounted at '{src_mount}'.")
+            return
+
+        # Validate source file exists on disk
+        src_full_path = src_mount_path / source_path
+        if not src_full_path.exists():
+            print_error(f"Source file not found: {src_full_path}")
+            return
+
+        if not src_full_path.is_file():
+            print_error(f"Source path is not a file: {src_full_path}")
+            return
+
+        # Validate destination drive is mounted
+        dst_mount = dst_drive["mount_path"]
+        if not dst_mount:
+            print_error(f"Destination drive '{dest_drive}' has no mount path configured.")
+            return
+
+        dst_mount_path = Path(dst_mount)
+        if not dst_mount_path.exists():
+            print_error(f"Destination drive '{dest_drive}' is not mounted at '{dst_mount}'.")
+            return
+
+        # Look up source file in database (must be cataloged)
+        src_file = conn.execute(
+            "SELECT id, path, size_bytes FROM files WHERE drive_id = ? AND path = ?",
+            (src_drive["id"], source_path),
+        ).fetchone()
+
+        if not src_file:
+            print_error(f"File '{source_path}' not found in catalog for drive '{source_drive}'.")
+            print_error("Run 'drives scan' to catalog files first.")
+            return
+
+        # Determine destination path
+        final_dest_path = dest_path if dest_path else source_path
+
+        # Build full destination path
+        dst_full_path = dst_mount_path / final_dest_path
+
+        # Check if destination file already exists
+        if dst_full_path.exists():
+            print_error(f"Destination file already exists: {dst_full_path}")
+            print_error("Use --force to overwrite (not implemented yet).")
+            return
+
+        # Copy with progress display
+        file_size = src_file["size_bytes"]
+        console.print(f"[bold]Copying '{source_path}' from {source_drive} to {dest_drive}...[/bold]")
+
+        started_at = datetime.now()
+
+        with get_progress() as progress:
+            task = progress.add_task(f"Copying {Path(source_path).name}...", total=file_size)
+
+            def update_progress(bytes_written: int) -> None:
+                progress.update(task, completed=bytes_written)
+
+            result = copy_file_verified(src_full_path, dst_full_path, progress_callback=update_progress)
+
+        completed_at = datetime.now()
+
+        # Handle error
+        if result.error:
+            print_error(f"Copy failed: {result.error}")
+            return
+
+        # Log operation to database
+        log_copy_operation(
+            conn,
+            source_file_id=src_file["id"],
+            dest_drive_id=dst_drive["id"],
+            dest_path=final_dest_path,
+            result=result,
+            started_at=started_at,
+            completed_at=completed_at,
+        )
+
+        # Display result table
+        result_table = Table(title="Copy Result")
+        result_table.add_column("Field", style="bold")
+        result_table.add_column("Value")
+
+        result_table.add_row("Source", f"{source_drive}:{source_path}")
+        result_table.add_row("Destination", f"{dest_drive}:{final_dest_path}")
+        result_table.add_row("Bytes copied", _format_bytes(result.bytes_copied))
+        result_table.add_row("Source SHA256", result.source_hash[:16] + "...")
+        result_table.add_row("Dest SHA256", result.dest_hash[:16] + "...")
+
+        if result.verified:
+            result_table.add_row("Verified", "[green]✓ Hashes match[/green]")
+        else:
+            result_table.add_row("Verified", "[red]✗ MISMATCH[/red]")
+
+        console.print(result_table)
+
+        # Final status message
+        if result.verified:
+            print_success("Copy verified successfully.")
+        else:
+            print_error("VERIFICATION FAILED - hashes do not match!")
 
     finally:
         conn.close()
