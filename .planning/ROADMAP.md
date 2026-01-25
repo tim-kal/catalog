@@ -48,15 +48,15 @@ Plans:
 - [x] 12-04: Background operations (scan, hash) — completed 2026-01-24
 - [x] 12-05: Copy, media metadata, and integrity routes — completed 2026-01-25
 
-### Phase 13: SwiftUI Project Setup
+### Phase 13: SwiftUI Project Setup ✅
 
 **Goal**: Create Xcode project with basic app lifecycle, window structure, and navigation shell
 **Depends on**: Phase 12
 **Research**: Unlikely (standard SwiftUI patterns)
-**Plans**: TBD
+**Status**: Complete (1/1 plans)
 
 Plans:
-- [ ] 13-01: TBD
+- [x] 13-01: Xcode project foundation with xcodegen — completed 2026-01-25
 
 ### Phase 14: Swift Data Models
 
@@ -133,4 +133,4 @@ Plans:
 | Milestone | Phases | Plans | Status | Completed |
 |-----------|--------|-------|--------|-----------|
 | v1.0 MVP | 1-11 | 14/14 | Complete | 2026-01-24 |
-| v1.1 UI | 12-20 | 5/? | In progress | - |
+| v1.1 UI | 12-20 | 6/? | In progress | - |
