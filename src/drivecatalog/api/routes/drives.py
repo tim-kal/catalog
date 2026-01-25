@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from drivecatalog.database import get_connection
 from drivecatalog.drives import get_drive_info, validate_mount_path
 from drivecatalog.hasher import compute_partial_hash
+from drivecatalog.media import MEDIA_EXTENSIONS, check_integrity, extract_metadata
 from drivecatalog.scanner import scan_drive as scanner_scan_drive
 
 from ..models.drive import (
@@ -427,6 +428,154 @@ async def trigger_hash(
         # Create operation and start background task
         op = create_operation("hash", name)
         background_tasks.add_task(_run_hash, op.id, drive["id"], mount_path, force)
+
+        return {
+            "operation_id": op.id,
+            "status": "started",
+            "poll_url": f"/operations/{op.id}",
+        }
+    finally:
+        conn.close()
+
+
+def _run_media_extraction(
+    operation_id: str, drive_id: int, mount_path: str, force: bool
+) -> None:
+    """Run media metadata extraction in background thread.
+
+    Args:
+        operation_id: ID of the operation to track progress.
+        drive_id: Database ID of the drive.
+        mount_path: Path to the mounted drive.
+        force: If True, re-extract metadata for files that already have it.
+    """
+    update_operation(operation_id, status=OperationStatus.RUNNING, progress_percent=0.0)
+
+    try:
+        conn = get_connection()
+        mount_path_obj = Path(mount_path)
+
+        try:
+            # Query all files for this drive
+            all_files = conn.execute(
+                "SELECT id, path, filename FROM files WHERE drive_id = ?",
+                (drive_id,),
+            ).fetchall()
+
+            # Filter to media files by extension
+            if force:
+                files = [
+                    f
+                    for f in all_files
+                    if Path(f["filename"]).suffix.lower() in MEDIA_EXTENSIONS
+                ]
+            else:
+                # Get file IDs that already have metadata
+                existing_metadata = set(
+                    row[0]
+                    for row in conn.execute(
+                        "SELECT file_id FROM media_metadata"
+                    ).fetchall()
+                )
+                files = [
+                    f
+                    for f in all_files
+                    if Path(f["filename"]).suffix.lower() in MEDIA_EXTENSIONS
+                    and f["id"] not in existing_metadata
+                ]
+
+            total = len(files)
+            extracted = 0
+            errors = 0
+
+            for i, file_row in enumerate(files):
+                full_path = mount_path_obj / file_row["path"]
+
+                # Mark file as media
+                conn.execute(
+                    "UPDATE files SET is_media = 1 WHERE id = ?", (file_row["id"],)
+                )
+
+                metadata = extract_metadata(full_path)
+                if metadata:
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO media_metadata
+                        (file_id, duration_seconds, codec_name, width, height, frame_rate, bit_rate)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            file_row["id"],
+                            metadata.duration_seconds,
+                            metadata.codec_name,
+                            metadata.width,
+                            metadata.height,
+                            metadata.frame_rate,
+                            metadata.bit_rate,
+                        ),
+                    )
+                    extracted += 1
+                else:
+                    errors += 1
+
+                # Update progress every 10 files or at end
+                if (i + 1) % 10 == 0 or i == total - 1:
+                    progress = ((i + 1) / total) * 100 if total > 0 else 100
+                    update_operation(operation_id, progress_percent=progress)
+
+            conn.commit()
+
+            update_operation(
+                operation_id,
+                status=OperationStatus.COMPLETED,
+                progress_percent=100.0,
+                result={"extracted": extracted, "errors": errors, "total": total},
+                completed_at=datetime.now(),
+            )
+        finally:
+            conn.close()
+    except Exception as e:
+        update_operation(
+            operation_id,
+            status=OperationStatus.FAILED,
+            error=str(e),
+            completed_at=datetime.now(),
+        )
+
+
+@router.post("/{name}/media")
+async def trigger_media_extraction(
+    name: str,
+    background_tasks: BackgroundTasks,
+    force: bool = Query(False, description="Re-extract metadata for all media files"),
+) -> dict:
+    """Trigger media metadata extraction for video files on the drive.
+
+    Extracts metadata (duration, codec, resolution, etc.) using ffprobe for media files
+    that don't have metadata yet.
+    Returns immediately with an operation_id that can be used to poll for progress.
+    """
+    conn = get_connection()
+    try:
+        # Look up drive by name
+        drive = conn.execute(
+            "SELECT id, name, mount_path FROM drives WHERE name = ?", (name,)
+        ).fetchone()
+
+        if not drive:
+            raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
+
+        mount_path = drive["mount_path"]
+        if not mount_path or not Path(mount_path).exists():
+            raise HTTPException(
+                status_code=400, detail=f"Drive '{name}' is not currently mounted"
+            )
+
+        # Create operation and start background task
+        op = create_operation("media", name)
+        background_tasks.add_task(
+            _run_media_extraction, op.id, drive["id"], mount_path, force
+        )
 
         return {
             "operation_id": op.id,
