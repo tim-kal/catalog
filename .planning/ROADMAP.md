@@ -59,15 +59,15 @@ Plans:
 - [x] 13-01: Xcode project foundation with xcodegen — completed 2026-01-25
 - [x] 13-02: Navigation shell with sidebar and placeholder views — completed 2026-01-25
 
-### Phase 14: Swift Data Models
+### Phase 14: Swift Data Models ✅
 
 **Goal**: Define Swift types for drives, files, duplicates matching Python database schema
 **Depends on**: Phase 13
 **Research**: Unlikely (internal patterns)
-**Plans**: TBD
+**Status**: Complete (1/1 plans)
 
 Plans:
-- [ ] 14-01: TBD
+- [x] 14-01: Codable Swift structs mirroring Python Pydantic models — completed 2026-01-25
 
 ### Phase 15: Drive Management View
 
@@ -134,4 +134,4 @@ Plans:
 | Milestone | Phases | Plans | Status | Completed |
 |-----------|--------|-------|--------|-----------|
 | v1.0 MVP | 1-11 | 14/14 | Complete | 2026-01-24 |
-| v1.1 UI | 12-20 | 7/? | In progress | - |
+| v1.1 UI | 12-20 | 8/? | In progress | - |

@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 ## Current Position
 
 Milestone: v1.1 UI
-Phase: 13 of 20 (SwiftUI Project Setup)
-Plan: 2 of 2 in current phase
+Phase: 14 of 20 (Swift Data Models)
+Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-25 — Completed 13-02-PLAN.md
+Last activity: 2026-01-25 — Completed 14-01-PLAN.md
 
-Progress: ███████░░░ 38%
+Progress: ████████░░ 44%
 
 ## Completed Milestones
 
@@ -39,6 +39,7 @@ Full decision log in PROJECT.md Key Decisions table.
 - DELETE endpoints require ?confirm=true to prevent accidental API deletions
 - xcodegen for reproducible Xcode project generation
 - macOS 14.0 deployment target for NavigationSplitView improvements
+- Omit OperationResponse.result dict for simplicity - UI queries specific endpoints
 
 ### Deferred Issues
 
@@ -56,5 +57,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 13-02-PLAN.md (Phase 13 complete)
+Stopped at: Completed 14-01-PLAN.md (Phase 14 complete)
 Resume file: None
