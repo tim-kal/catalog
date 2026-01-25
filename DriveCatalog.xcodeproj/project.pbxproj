@@ -22,9 +22,11 @@
 		A9D6E18C13CD944C02049828 /* Operation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4AC7A455F19FCEFE67D3921 /* Operation.swift */; };
 		BD995CCFF98EB91211004674 /* AddDriveSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DFF6064BB756B23FF9F9E98 /* AddDriveSheet.swift */; };
 		DFF3E38475A73F6A26F5FCB7 /* File.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82AE5130560ED479C235C231 /* File.swift */; };
+		FDF434AAA90F236D0ED2144F /* DriveDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09B9C40A0DF1EA4466FC09D1 /* DriveDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		09B9C40A0DF1EA4466FC09D1 /* DriveDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveDetailView.swift; sourceTree = "<group>"; };
 		0DFF6064BB756B23FF9F9E98 /* AddDriveSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddDriveSheet.swift; sourceTree = "<group>"; };
 		166288762D5E2F39B2996279 /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
 		2018F3E2F8DCA71372D42638 /* DrivesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivesView.swift; sourceTree = "<group>"; };
@@ -57,6 +59,7 @@
 			isa = PBXGroup;
 			children = (
 				0DFF6064BB756B23FF9F9E98 /* AddDriveSheet.swift */,
+				09B9C40A0DF1EA4466FC09D1 /* DriveDetailView.swift */,
 				53902CDF319D7764F0E0E3FC /* DriveListView.swift */,
 			);
 			path = Drives;
@@ -188,6 +191,7 @@
 				487AAA39EFB63294F77633B7 /* ContentView.swift in Sources */,
 				3D162F5D9CC2441BEE04EF08 /* Drive.swift in Sources */,
 				1347420AEBC0CF95D25A717F /* DriveCatalogApp.swift in Sources */,
+				FDF434AAA90F236D0ED2144F /* DriveDetailView.swift in Sources */,
 				5BD1906366BA5415075194BC /* DriveListView.swift in Sources */,
 				0FBB65F286084A8FBC388E48 /* DrivesView.swift in Sources */,
 				A9C67C3364B99B2134DB3666 /* DuplicatesView.swift in Sources */,
