@@ -74,10 +74,10 @@ Plans:
 **Goal**: List registered drives, add/remove drives, show scan status and last-scanned dates
 **Depends on**: Phase 14
 **Research**: Unlikely (uses Phase 12 API)
-**Status**: Planned (3 plans)
+**Status**: In progress (1/3 plans)
 
 Plans:
-- [ ] 15-01: API Service Foundation (networking layer)
+- [x] 15-01: API Service Foundation (networking layer) — completed 2026-01-25
 - [ ] 15-02: Drive List View with add/delete
 - [ ] 15-03: Drive Detail View with status and actions
 

@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 ## Current Position
 
 Milestone: v1.1 UI
-Phase: 14 of 20 (Swift Data Models)
-Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-01-25 — Completed 14-01-PLAN.md
+Phase: 15 of 20 (Drive Management View)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-25 — Completed 15-01-PLAN.md
 
-Progress: ████████░░ 44%
+Progress: ████████░░ 45%
 
 ## Completed Milestones
 
@@ -40,6 +40,7 @@ Full decision log in PROJECT.md Key Decisions table.
 - xcodegen for reproducible Xcode project generation
 - macOS 14.0 deployment target for NavigationSplitView improvements
 - Omit OperationResponse.result dict for simplicity - UI queries specific endpoints
+- Actor-based APIService for thread-safe networking from concurrent SwiftUI views
 
 ### Deferred Issues
 
@@ -57,5 +58,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 14-01-PLAN.md (Phase 14 complete)
+Stopped at: Completed 15-01-PLAN.md (Plan 1 of 3)
 Resume file: None
