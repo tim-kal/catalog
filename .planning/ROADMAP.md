@@ -34,19 +34,19 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 **Milestone Goal:** Add a native SwiftUI interface to the existing DriveCatalog CLI, providing a polished macOS desktop experience for drive cataloging, duplicate detection, and verified transfers.
 
-### Phase 12: Architecture & Python API
+### Phase 12: Architecture & Python API ✅
 
 **Goal**: Define Swift↔Python communication pattern and expose existing functionality as API
 **Depends on**: v1.0 complete
 **Research**: Complete (Swift/Python integration patterns)
-**Status**: In progress (4/5 plans)
+**Status**: Complete (5/5 plans)
 
 Plans:
 - [x] 12-01: FastAPI foundation with Pydantic models — completed 2026-01-24
 - [x] 12-02: Drives API routes (CRUD, status) — completed 2026-01-24
 - [x] 12-03: Files, search, and duplicates API routes — completed 2026-01-24
 - [x] 12-04: Background operations (scan, hash) — completed 2026-01-24
-- [ ] 12-05: Copy, media metadata, and integrity routes
+- [x] 12-05: Copy, media metadata, and integrity routes — completed 2026-01-25
 
 ### Phase 13: SwiftUI Project Setup
 
@@ -133,4 +133,4 @@ Plans:
 | Milestone | Phases | Plans | Status | Completed |
 |-----------|--------|-------|--------|-----------|
 | v1.0 MVP | 1-11 | 14/14 | Complete | 2026-01-24 |
-| v1.1 UI | 12-20 | 4/? | In progress | - |
+| v1.1 UI | 12-20 | 5/? | In progress | - |
