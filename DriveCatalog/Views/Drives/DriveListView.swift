@@ -61,6 +61,8 @@ struct DriveListView: View {
     @State private var isLoading = true
     @State private var errorMessage: String? = nil
     @State private var showAddSheet = false
+    @State private var driveToDelete: DriveResponse? = nil
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         Group {
@@ -112,6 +114,22 @@ struct DriveListView: View {
                 List {
                     ForEach(drives) { drive in
                         DriveRow(drive: drive)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    driveToDelete = drive
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    driveToDelete = drive
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                     }
                 }
             }
@@ -137,6 +155,19 @@ struct DriveListView: View {
         .task {
             await loadDrives()
         }
+        .sheet(isPresented: $showAddSheet) {
+            AddDriveSheet(onAdded: loadDrives)
+        }
+        .alert("Delete Drive", isPresented: $showDeleteConfirmation, presenting: driveToDelete) { drive in
+            Button("Cancel", role: .cancel) {
+                driveToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                Task { await deleteDrive(drive) }
+            }
+        } message: { drive in
+            Text("Are you sure you want to delete \"\(drive.name)\"? This will remove the drive registration and all associated file records.")
+        }
     }
 
     private func loadDrives() async {
@@ -149,6 +180,16 @@ struct DriveListView: View {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    private func deleteDrive(_ drive: DriveResponse) async {
+        do {
+            try await APIService.shared.deleteDrive(name: drive.name)
+            await loadDrives()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        driveToDelete = nil
     }
 }
 

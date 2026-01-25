@@ -20,10 +20,12 @@
 		A16E6ECBAC4EE224A58D508E /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 166288762D5E2F39B2996279 /* APIService.swift */; };
 		A9C67C3364B99B2134DB3666 /* DuplicatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6A692D92D326C9FD7C2CE75 /* DuplicatesView.swift */; };
 		A9D6E18C13CD944C02049828 /* Operation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4AC7A455F19FCEFE67D3921 /* Operation.swift */; };
+		BD995CCFF98EB91211004674 /* AddDriveSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DFF6064BB756B23FF9F9E98 /* AddDriveSheet.swift */; };
 		DFF3E38475A73F6A26F5FCB7 /* File.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82AE5130560ED479C235C231 /* File.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0DFF6064BB756B23FF9F9E98 /* AddDriveSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddDriveSheet.swift; sourceTree = "<group>"; };
 		166288762D5E2F39B2996279 /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
 		2018F3E2F8DCA71372D42638 /* DrivesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivesView.swift; sourceTree = "<group>"; };
 		3A992EDEB4EBB4554F6F9A84 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
@@ -54,6 +56,7 @@
 		2963640239A3FB97AC02FCD7 /* Drives */ = {
 			isa = PBXGroup;
 			children = (
+				0DFF6064BB756B23FF9F9E98 /* AddDriveSheet.swift */,
 				53902CDF319D7764F0E0E3FC /* DriveListView.swift */,
 			);
 			path = Drives;
@@ -180,6 +183,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A16E6ECBAC4EE224A58D508E /* APIService.swift in Sources */,
+				BD995CCFF98EB91211004674 /* AddDriveSheet.swift in Sources */,
 				3C6EEC5AD0E385960CCE94A3 /* BrowserView.swift in Sources */,
 				487AAA39EFB63294F77633B7 /* ContentView.swift in Sources */,
 				3D162F5D9CC2441BEE04EF08 /* Drive.swift in Sources */,
