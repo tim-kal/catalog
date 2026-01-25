@@ -1,5 +1,19 @@
 import Foundation
 
+/// Response model when starting an async operation.
+/// Used by scan, hash, media, and verify endpoints.
+struct OperationStartResponse: Codable {
+    let operationId: String
+    let status: String
+    let pollUrl: String
+
+    enum CodingKeys: String, CodingKey {
+        case operationId = "operation_id"
+        case status
+        case pollUrl = "poll_url"
+    }
+}
+
 /// Response model for scan results.
 struct ScanResultResponse: Codable {
     let newFiles: Int

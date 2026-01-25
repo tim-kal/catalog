@@ -108,6 +108,38 @@ actor APIService {
         return try await get(url: url)
     }
 
+    // MARK: - Operation Endpoints
+
+    /// Trigger a scan of the drive's filesystem.
+    /// - Parameter driveName: Name of the drive to scan.
+    /// - Returns: Operation start response with poll URL.
+    func triggerScan(driveName: String) async throws -> OperationStartResponse {
+        let url = try buildURL(path: "/drives/\(driveName)/scan")
+        return try await postEmpty(url: url)
+    }
+
+    /// Trigger partial hash computation for files on the drive.
+    /// - Parameters:
+    ///   - driveName: Name of the drive to hash.
+    ///   - force: If true, re-hash files that already have hashes.
+    /// - Returns: Operation start response with poll URL.
+    func triggerHash(driveName: String, force: Bool = false) async throws -> OperationStartResponse {
+        var queryItems: [URLQueryItem]? = nil
+        if force {
+            queryItems = [URLQueryItem(name: "force", value: "true")]
+        }
+        let url = try buildURL(path: "/drives/\(driveName)/hash", queryItems: queryItems)
+        return try await postEmpty(url: url)
+    }
+
+    /// Fetch the status of an async operation.
+    /// - Parameter id: The operation ID to check.
+    /// - Returns: Operation response with status and progress.
+    func fetchOperation(id: String) async throws -> OperationResponse {
+        let url = try buildURL(path: "/operations/\(id)")
+        return try await get(url: url)
+    }
+
     // MARK: - Private Helpers
 
     /// Build a URL with the given path and optional query items.
@@ -135,6 +167,14 @@ actor APIService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try encoder.encode(body)
+
+        return try await perform(request: request)
+    }
+
+    /// Perform a POST request without a body and decode the response.
+    private func postEmpty<T: Decodable>(url: URL) async throws -> T {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
 
         return try await perform(request: request)
     }
