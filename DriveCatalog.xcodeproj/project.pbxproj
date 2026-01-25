@@ -15,6 +15,7 @@
 		3C6EEC5AD0E385960CCE94A3 /* BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A992EDEB4EBB4554F6F9A84 /* BrowserView.swift */; };
 		3D162F5D9CC2441BEE04EF08 /* Drive.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3F74C98E8A8E2268777050 /* Drive.swift */; };
 		487AAA39EFB63294F77633B7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 694FF2E26CDFC2C5F91E7BD5 /* ContentView.swift */; };
+		5BD1906366BA5415075194BC /* DriveListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53902CDF319D7764F0E0E3FC /* DriveListView.swift */; };
 		86FC264B2FA1C6D1570EEC89 /* NavigationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 716EA4D4C6A507FB8A1815BF /* NavigationModel.swift */; };
 		A16E6ECBAC4EE224A58D508E /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 166288762D5E2F39B2996279 /* APIService.swift */; };
 		A9C67C3364B99B2134DB3666 /* DuplicatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6A692D92D326C9FD7C2CE75 /* DuplicatesView.swift */; };
@@ -27,6 +28,7 @@
 		2018F3E2F8DCA71372D42638 /* DrivesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivesView.swift; sourceTree = "<group>"; };
 		3A992EDEB4EBB4554F6F9A84 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
 		487489378D0D49107F0A3F8B /* DriveCatalog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DriveCatalog.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		53902CDF319D7764F0E0E3FC /* DriveListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveListView.swift; sourceTree = "<group>"; };
 		5B9FB7DE6CF1ECBE13C2ACC0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		5C440DA49341AAFA03CE26CA /* Sidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar.swift; sourceTree = "<group>"; };
 		694FF2E26CDFC2C5F91E7BD5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -47,6 +49,14 @@
 				90874549670A464D8240079B /* DriveCatalog */,
 				9004813217471C99BCF3FF4C /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		2963640239A3FB97AC02FCD7 /* Drives */ = {
+			isa = PBXGroup;
+			children = (
+				53902CDF319D7764F0E0E3FC /* DriveListView.swift */,
+			);
+			path = Drives;
 			sourceTree = "<group>";
 		};
 		523E544BBDE86B8C3EC1B277 /* Models */ = {
@@ -106,6 +116,7 @@
 				C6A692D92D326C9FD7C2CE75 /* DuplicatesView.swift */,
 				6E89525366E6DF28CEC8FFBA /* SearchView.swift */,
 				6CA9F7CB368D4C493E50EC3C /* SettingsView.swift */,
+				2963640239A3FB97AC02FCD7 /* Drives */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -173,6 +184,7 @@
 				487AAA39EFB63294F77633B7 /* ContentView.swift in Sources */,
 				3D162F5D9CC2441BEE04EF08 /* Drive.swift in Sources */,
 				1347420AEBC0CF95D25A717F /* DriveCatalogApp.swift in Sources */,
+				5BD1906366BA5415075194BC /* DriveListView.swift in Sources */,
 				0FBB65F286084A8FBC388E48 /* DrivesView.swift in Sources */,
 				A9C67C3364B99B2134DB3666 /* DuplicatesView.swift in Sources */,
 				DFF3E38475A73F6A26F5FCB7 /* File.swift in Sources */,
