@@ -7,7 +7,17 @@ struct DriveDetailView: View {
     @State private var status: DriveStatusResponse?
     @State private var isLoadingStatus = true
     @State private var statusError: String?
+
+    // Operation tracking
     @State private var activeOperation: OperationResponse?
+    @State private var activeOperationType: String?  // "scan" or "hash"
+    @State private var operationResult: OperationResult?
+
+    /// Tracks the result of a completed operation for brief display.
+    private enum OperationResult {
+        case success(String)
+        case failure(String)
+    }
 
     var body: some View {
         ScrollView {
@@ -143,6 +153,98 @@ struct DriveDetailView: View {
                     }
                 }
 
+                // Actions Section
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Active operation progress
+                        if let operation = activeOperation {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                    Text(operationStatusText(operation))
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    if let progress = operation.progressPercent {
+                                        Text("\(Int(progress))%")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                if let progress = operation.progressPercent {
+                                    ProgressView(value: progress / 100)
+                                        .tint(.blue)
+                                }
+                            }
+                        }
+
+                        // Operation result message
+                        if let result = operationResult {
+                            HStack {
+                                switch result {
+                                case .success(let message):
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                    Text(message)
+                                        .foregroundStyle(.green)
+                                case .failure(let message):
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.red)
+                                    Text(message)
+                                        .foregroundStyle(.red)
+                                }
+                            }
+                            .font(.callout)
+                        }
+
+                        // Action buttons
+                        HStack(spacing: 12) {
+                            Button {
+                                Task { await triggerScan() }
+                            } label: {
+                                HStack {
+                                    if activeOperationType == "scan" {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                    } else {
+                                        Image(systemName: "magnifyingglass")
+                                    }
+                                    Text("Scan Drive")
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(!isMounted || activeOperation != nil)
+
+                            Button {
+                                Task { await triggerHash() }
+                            } label: {
+                                HStack {
+                                    if activeOperationType == "hash" {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                    } else {
+                                        Image(systemName: "number")
+                                    }
+                                    Text("Compute Hashes")
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(!isMounted || activeOperation != nil)
+                        }
+
+                        if !isMounted {
+                            Text("Drive must be mounted to perform actions")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } label: {
+                    Label("Actions", systemImage: "play.circle.fill")
+                }
+
                 Spacer()
             }
             .padding()
@@ -151,6 +253,11 @@ struct DriveDetailView: View {
         .task {
             await loadStatus()
         }
+    }
+
+    /// Whether the drive is currently mounted.
+    private var isMounted: Bool {
+        status?.mounted ?? false
     }
 
     // MARK: - Helpers
@@ -180,6 +287,92 @@ struct DriveDetailView: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    // MARK: - Operations
+
+    private func triggerScan() async {
+        operationResult = nil
+        activeOperationType = "scan"
+
+        do {
+            let startResponse = try await APIService.shared.triggerScan(driveName: drive.name)
+            await pollOperation(id: startResponse.operationId, type: "scan")
+        } catch {
+            activeOperationType = nil
+            operationResult = .failure("Scan failed: \(error.localizedDescription)")
+            clearResultAfterDelay()
+        }
+    }
+
+    private func triggerHash() async {
+        operationResult = nil
+        activeOperationType = "hash"
+
+        do {
+            let startResponse = try await APIService.shared.triggerHash(driveName: drive.name)
+            await pollOperation(id: startResponse.operationId, type: "hash")
+        } catch {
+            activeOperationType = nil
+            operationResult = .failure("Hash failed: \(error.localizedDescription)")
+            clearResultAfterDelay()
+        }
+    }
+
+    private func pollOperation(id: String, type: String) async {
+        // Poll every 2 seconds until complete
+        while true {
+            do {
+                let operation = try await APIService.shared.fetchOperation(id: id)
+                activeOperation = operation
+
+                if operation.status == "completed" {
+                    // Success
+                    activeOperation = nil
+                    activeOperationType = nil
+                    operationResult = .success("\(type.capitalized) completed successfully")
+                    clearResultAfterDelay()
+                    // Refresh status to show updated file count/hash coverage
+                    await loadStatus()
+                    break
+                } else if operation.status == "failed" {
+                    // Failure
+                    activeOperation = nil
+                    activeOperationType = nil
+                    operationResult = .failure(operation.error ?? "\(type.capitalized) failed")
+                    clearResultAfterDelay()
+                    break
+                }
+
+                // Still running, wait and poll again
+                try await Task.sleep(for: .seconds(2))
+            } catch {
+                // Polling error
+                activeOperation = nil
+                activeOperationType = nil
+                operationResult = .failure("Lost connection: \(error.localizedDescription)")
+                clearResultAfterDelay()
+                break
+            }
+        }
+    }
+
+    private func operationStatusText(_ operation: OperationResponse) -> String {
+        switch operation.status {
+        case "pending":
+            return "Waiting to start..."
+        case "running":
+            return "\(operation.type.capitalized) in progress..."
+        default:
+            return operation.status.capitalized
+        }
+    }
+
+    private func clearResultAfterDelay() {
+        Task {
+            try await Task.sleep(for: .seconds(5))
+            operationResult = nil
+        }
     }
 }
 

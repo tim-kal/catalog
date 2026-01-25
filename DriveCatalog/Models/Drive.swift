@@ -1,7 +1,7 @@
 import Foundation
 
 /// Response model for a single drive.
-struct DriveResponse: Codable, Identifiable {
+struct DriveResponse: Codable, Identifiable, Hashable {
     let id: Int
     let name: String
     let uuid: String?

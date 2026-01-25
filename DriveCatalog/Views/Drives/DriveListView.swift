@@ -113,24 +113,29 @@ struct DriveListView: View {
             } else {
                 List {
                     ForEach(drives) { drive in
-                        DriveRow(drive: drive)
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    driveToDelete = drive
-                                    showDeleteConfirmation = true
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+                        NavigationLink(value: drive) {
+                            DriveRow(drive: drive)
+                        }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                driveToDelete = drive
+                                showDeleteConfirmation = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    driveToDelete = drive
-                                    showDeleteConfirmation = true
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                driveToDelete = drive
+                                showDeleteConfirmation = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
+                        }
                     }
+                }
+                .navigationDestination(for: DriveResponse.self) { drive in
+                    DriveDetailView(drive: drive)
                 }
             }
         }
