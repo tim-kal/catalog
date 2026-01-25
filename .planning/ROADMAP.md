@@ -53,10 +53,11 @@ Plans:
 **Goal**: Create Xcode project with basic app lifecycle, window structure, and navigation shell
 **Depends on**: Phase 12
 **Research**: Unlikely (standard SwiftUI patterns)
-**Status**: Complete (1/1 plans)
+**Status**: Complete (2/2 plans)
 
 Plans:
 - [x] 13-01: Xcode project foundation with xcodegen — completed 2026-01-25
+- [x] 13-02: Navigation shell with sidebar and placeholder views — completed 2026-01-25
 
 ### Phase 14: Swift Data Models
 
@@ -133,4 +134,4 @@ Plans:
 | Milestone | Phases | Plans | Status | Completed |
 |-----------|--------|-------|--------|-----------|
 | v1.0 MVP | 1-11 | 14/14 | Complete | 2026-01-24 |
-| v1.1 UI | 12-20 | 6/? | In progress | - |
+| v1.1 UI | 12-20 | 7/? | In progress | - |
