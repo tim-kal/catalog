@@ -1,0 +1,24 @@
+name: DriveCatalog
+options:
+  bundleIdPrefix: com.drivecatalog
+  deploymentTarget:
+    macOS: "14.0"
+
+settings:
+  SWIFT_VERSION: "5.9"
+  CODE_SIGN_STYLE: Automatic
+  MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+targets:
+  DriveCatalog:
+    type: application
+    platform: macOS
+    sources:
+      - DriveCatalog
+    info:
+      path: DriveCatalog/Info.plist
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.drivecatalog.app
+      INFOPLIST_FILE: DriveCatalog/Info.plist
+      PRODUCT_NAME: DriveCatalog
+      GENERATE_INFOPLIST_FILE: false
