@@ -584,3 +584,148 @@ async def trigger_media_extraction(
         }
     finally:
         conn.close()
+
+
+def _run_verify(
+    operation_id: str, drive_id: int, mount_path: str, force: bool
+) -> None:
+    """Run integrity verification in background thread.
+
+    Args:
+        operation_id: ID of the operation to track progress.
+        drive_id: Database ID of the drive.
+        mount_path: Path to the mounted drive.
+        force: If True, re-verify files that have already been verified.
+    """
+    update_operation(operation_id, status=OperationStatus.RUNNING, progress_percent=0.0)
+
+    try:
+        conn = get_connection()
+        mount_path_obj = Path(mount_path)
+
+        try:
+            # Query media files that need verification
+            if force:
+                files = conn.execute(
+                    """
+                    SELECT f.id, f.path, f.filename FROM files f
+                    WHERE f.drive_id = ? AND f.is_media = 1
+                    """,
+                    (drive_id,),
+                ).fetchall()
+            else:
+                files = conn.execute(
+                    """
+                    SELECT f.id, f.path, f.filename FROM files f
+                    JOIN media_metadata m ON f.id = m.file_id
+                    WHERE f.drive_id = ? AND f.is_media = 1
+                    AND m.integrity_verified_at IS NULL
+                    """,
+                    (drive_id,),
+                ).fetchall()
+
+            total = len(files)
+            verified_ok = 0
+            verified_errors = 0
+            ffprobe_failed = 0
+
+            for i, file_row in enumerate(files):
+                full_path = mount_path_obj / file_row["path"]
+
+                integrity_result = check_integrity(full_path)
+
+                if integrity_result is None:
+                    # ffprobe failed (not installed or timeout)
+                    ffprobe_failed += 1
+                elif integrity_result.is_valid:
+                    verified_ok += 1
+                    conn.execute(
+                        """
+                        UPDATE media_metadata
+                        SET integrity_verified_at = datetime('now'),
+                            integrity_errors = NULL
+                        WHERE file_id = ?
+                        """,
+                        (file_row["id"],),
+                    )
+                else:
+                    verified_errors += 1
+                    error_text = "; ".join(integrity_result.errors[:5])  # Limit errors
+                    conn.execute(
+                        """
+                        UPDATE media_metadata
+                        SET integrity_verified_at = datetime('now'),
+                            integrity_errors = ?
+                        WHERE file_id = ?
+                        """,
+                        (error_text, file_row["id"]),
+                    )
+
+                # Update progress every 10 files or at end
+                if (i + 1) % 10 == 0 or i == total - 1:
+                    progress = ((i + 1) / total) * 100 if total > 0 else 100
+                    update_operation(operation_id, progress_percent=progress)
+
+            conn.commit()
+
+            update_operation(
+                operation_id,
+                status=OperationStatus.COMPLETED,
+                progress_percent=100.0,
+                result={
+                    "verified_ok": verified_ok,
+                    "verified_errors": verified_errors,
+                    "ffprobe_failed": ffprobe_failed,
+                    "total": total,
+                },
+                completed_at=datetime.now(),
+            )
+        finally:
+            conn.close()
+    except Exception as e:
+        update_operation(
+            operation_id,
+            status=OperationStatus.FAILED,
+            error=str(e),
+            completed_at=datetime.now(),
+        )
+
+
+@router.post("/{name}/verify")
+async def trigger_verify(
+    name: str,
+    background_tasks: BackgroundTasks,
+    force: bool = Query(False, description="Re-verify files that have already been verified"),
+) -> dict:
+    """Trigger integrity verification for media files on the drive.
+
+    Uses ffprobe to check for container corruption, truncation, or other structural issues.
+    Returns immediately with an operation_id that can be used to poll for progress.
+    """
+    conn = get_connection()
+    try:
+        # Look up drive by name
+        drive = conn.execute(
+            "SELECT id, name, mount_path FROM drives WHERE name = ?", (name,)
+        ).fetchone()
+
+        if not drive:
+            raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
+
+        mount_path = drive["mount_path"]
+        if not mount_path or not Path(mount_path).exists():
+            raise HTTPException(
+                status_code=400, detail=f"Drive '{name}' is not currently mounted"
+            )
+
+        # Create operation and start background task
+        op = create_operation("verify", name)
+        background_tasks.add_task(_run_verify, op.id, drive["id"], mount_path, force)
+
+        return {
+            "operation_id": op.id,
+            "status": "started",
+            "poll_url": f"/operations/{op.id}",
+        }
+    finally:
+        conn.close()

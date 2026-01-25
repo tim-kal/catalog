@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query
 from drivecatalog.database import get_connection
 
 from ..models.file import FileListResponse, FileResponse
+from ..models.scan import MediaMetadataResponse
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -18,6 +19,9 @@ async def list_files(
     max_size: int | None = Query(None, ge=0, description="Maximum file size in bytes"),
     has_hash: bool | None = Query(None, description="Filter by hash presence"),
     is_media: bool | None = Query(None, description="Filter by media flag"),
+    has_integrity_errors: bool | None = Query(
+        None, description="Filter to files with integrity errors (requires is_media)"
+    ),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(100, ge=1, le=1000, description="Results per page"),
 ) -> FileListResponse:
@@ -57,6 +61,16 @@ async def list_files(
         if is_media is not None:
             conditions.append("f.is_media = ?")
             params.append(1 if is_media else 0)
+
+        if has_integrity_errors is not None:
+            if has_integrity_errors:
+                conditions.append(
+                    "EXISTS (SELECT 1 FROM media_metadata m WHERE m.file_id = f.id AND m.integrity_errors IS NOT NULL)"
+                )
+            else:
+                conditions.append(
+                    "NOT EXISTS (SELECT 1 FROM media_metadata m WHERE m.file_id = f.id AND m.integrity_errors IS NOT NULL)"
+                )
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
@@ -131,6 +145,55 @@ async def get_file(file_id: int) -> FileResponse:
             mtime=row["mtime"],
             partial_hash=row["partial_hash"],
             is_media=bool(row["is_media"]),
+        )
+    finally:
+        conn.close()
+
+
+@router.get("/{file_id}/media", response_model=MediaMetadataResponse)
+async def get_file_media_metadata(file_id: int) -> MediaMetadataResponse:
+    """Get media metadata for a specific file.
+
+    Returns video metadata (duration, codec, resolution, etc.) if available.
+    Returns 404 if the file doesn't exist or has no media metadata.
+    """
+    conn = get_connection()
+    try:
+        # Check file exists
+        file_row = conn.execute(
+            "SELECT id FROM files WHERE id = ?", (file_id,)
+        ).fetchone()
+
+        if not file_row:
+            raise HTTPException(status_code=404, detail=f"File with ID {file_id} not found")
+
+        # Get media metadata
+        row = conn.execute(
+            """
+            SELECT file_id, duration_seconds, codec_name, width, height,
+                   frame_rate, bit_rate, integrity_verified_at, integrity_errors
+            FROM media_metadata
+            WHERE file_id = ?
+            """,
+            (file_id,),
+        ).fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No media metadata found for file ID {file_id}",
+            )
+
+        return MediaMetadataResponse(
+            file_id=row["file_id"],
+            duration_seconds=row["duration_seconds"],
+            codec_name=row["codec_name"],
+            width=row["width"],
+            height=row["height"],
+            frame_rate=row["frame_rate"],
+            bit_rate=row["bit_rate"],
+            integrity_verified_at=row["integrity_verified_at"],
+            integrity_errors=row["integrity_errors"],
         )
     finally:
         conn.close()
