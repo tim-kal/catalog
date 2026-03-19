@@ -1,6 +1,7 @@
 """File browsing endpoints for DriveCatalog API."""
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from drivecatalog.database import get_connection
 
@@ -114,6 +115,142 @@ async def list_files(
         ]
 
         return FileListResponse(files=files, total=total, page=page, page_size=page_size)
+    finally:
+        conn.close()
+
+
+
+
+
+class DirectoryEntry(BaseModel):
+    """A directory in the browse response."""
+    name: str
+    path: str
+    file_count: int
+    total_bytes: int
+
+
+class BrowseResponse(BaseModel):
+    """Response for directory browsing - lists directories and files at a path level."""
+    drive: str
+    current_path: str
+    directories: list[DirectoryEntry]
+    files: list[FileResponse]
+
+
+@router.get("/browse", response_model=BrowseResponse)
+async def browse_directory(
+    drive: str = Query(..., description="Drive name (required)"),
+    path: str = Query("", description="Directory path relative to drive root (empty = root)"),
+) -> BrowseResponse:
+    """Browse files like Finder — list directories and files at a specific path level.
+
+    Returns immediate children only (not recursive). Directories show
+    aggregated file count and total size.
+    """
+    conn = get_connection()
+    try:
+        # Verify drive exists
+        drive_row = conn.execute(
+            "SELECT id FROM drives WHERE name = ?", (drive,)
+        ).fetchone()
+        if not drive_row:
+            raise HTTPException(status_code=404, detail=f"Drive {drive} not found")
+
+        drive_id = drive_row["id"]
+
+        # Normalize path: strip trailing slash, ensure no leading slash
+        current_path = path.strip("/")
+        prefix = f"{current_path}/" if current_path else ""
+
+        # Get all files under this path prefix
+        rows = conn.execute(
+            """
+            SELECT f.id, f.drive_id, ? as drive_name, f.path, f.filename,
+                   f.size_bytes, f.mtime, f.partial_hash, f.is_media
+            FROM files f
+            WHERE f.drive_id = ? AND f.path LIKE ?
+            ORDER BY f.path
+            """,
+            (drive, drive_id, f"{prefix}%"),
+        ).fetchall()
+
+        # Separate into direct files and subdirectories
+        direct_files = []
+        dir_stats: dict[str, dict] = {}  # dirname -> {count, bytes}
+
+        for row in rows:
+            rel_path = row["path"]
+            # Strip the current prefix to get the remainder
+            remainder = rel_path[len(prefix):]
+
+            if "/" in remainder:
+                # This file is in a subdirectory
+                dir_name = remainder.split("/", 1)[0]
+                if dir_name not in dir_stats:
+                    dir_stats[dir_name] = {"count": 0, "bytes": 0}
+                dir_stats[dir_name]["count"] += 1
+                dir_stats[dir_name]["bytes"] += row["size_bytes"]
+            else:
+                # Direct child file
+                direct_files.append(
+                    FileResponse(
+                        id=row["id"],
+                        drive_id=row["drive_id"],
+                        drive_name=row["drive_name"],
+                        path=row["path"],
+                        filename=row["filename"],
+                        size_bytes=row["size_bytes"],
+                        mtime=row["mtime"],
+                        partial_hash=row["partial_hash"],
+                        is_media=bool(row["is_media"]),
+                    )
+                )
+
+        # Build directory entries
+        directories = sorted([
+            DirectoryEntry(
+                name=name,
+                path=f"{prefix}{name}" if prefix else name,
+                file_count=stats["count"],
+                total_bytes=stats["bytes"],
+            )
+            for name, stats in dir_stats.items()
+        ], key=lambda d: d.name.lower())
+
+        # Also handle root level (no prefix) — files at drive root
+        if not prefix:
+            root_rows = conn.execute(
+                """
+                SELECT f.id, f.drive_id, ? as drive_name, f.path, f.filename,
+                       f.size_bytes, f.mtime, f.partial_hash, f.is_media
+                FROM files f
+                WHERE f.drive_id = ? AND f.path NOT LIKE '%/%'
+                ORDER BY f.path
+                """,
+                (drive, drive_id),
+            ).fetchall()
+            direct_files = [
+                FileResponse(
+                    id=r["id"],
+                    drive_id=r["drive_id"],
+                    drive_name=r["drive_name"],
+                    path=r["path"],
+                    filename=r["filename"],
+                    size_bytes=r["size_bytes"],
+                    mtime=r["mtime"],
+                    partial_hash=r["partial_hash"],
+                    is_media=bool(r["is_media"]),
+                )
+                for r in root_rows
+            ]
+
+        return BrowseResponse(
+            drive=drive,
+            current_path=current_path,
+            directories=directories,
+            files=direct_files,
+        )
     finally:
         conn.close()
 

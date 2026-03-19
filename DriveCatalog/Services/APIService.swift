@@ -182,6 +182,15 @@ actor APIService {
         return try await get(url: url)
     }
 
+    /// Browse a directory like Finder — returns subdirectories and files at a path level.
+    func browseDirectory(drive: String, path: String = "") async throws -> BrowseResponse {
+        let url = try buildURL(path: "/files/browse", queryItems: [
+            URLQueryItem(name: "drive", value: drive),
+            URLQueryItem(name: "path", value: path)
+        ])
+        return try await get(url: url)
+    }
+
     // MARK: - Duplicate Endpoints
 
     /// Fetch duplicate clusters with stats.
