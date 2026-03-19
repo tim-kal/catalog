@@ -25,6 +25,7 @@ class ScanResult:
     new_files: int = 0
     modified_files: int = 0
     unchanged_files: int = 0
+    removed_files: int = 0
     errors: int = 0
     total_scanned: int = 0
 
@@ -124,6 +125,20 @@ def scan_drive(
                 result.errors += 1
             except OSError:
                 result.errors += 1
+
+    # Remove files that no longer exist on disk (deleted since last scan)
+    existing_paths = conn.execute(
+        "SELECT id, path FROM files WHERE drive_id = ?",
+        (drive_id,),
+    ).fetchall()
+
+    for row in existing_paths:
+        full_path = mount_path_obj / row["path"]
+        if not full_path.exists():
+            conn.execute("DELETE FROM files WHERE id = ?", (row["id"],))
+            # Also clean up associated media metadata
+            conn.execute("DELETE FROM media_metadata WHERE file_id = ?", (row["id"],))
+            result.removed_files += 1
 
     conn.commit()
     return result
