@@ -140,6 +140,108 @@ actor APIService {
         return try await get(url: url)
     }
 
+    // MARK: - File Endpoints
+
+    /// Fetch paginated file list with optional filters.
+    func fetchFiles(
+        drive: String? = nil,
+        pathPrefix: String? = nil,
+        extension ext: String? = nil,
+        minSize: Int? = nil,
+        maxSize: Int? = nil,
+        hasHash: Bool? = nil,
+        isMedia: Bool? = nil,
+        page: Int = 1,
+        pageSize: Int = 100
+    ) async throws -> FileListResponse {
+        var queryItems = [
+            URLQueryItem(name: "page", value: String(page)),
+            URLQueryItem(name: "page_size", value: String(pageSize))
+        ]
+        if let drive { queryItems.append(URLQueryItem(name: "drive", value: drive)) }
+        if let pathPrefix { queryItems.append(URLQueryItem(name: "path_prefix", value: pathPrefix)) }
+        if let ext { queryItems.append(URLQueryItem(name: "extension", value: ext)) }
+        if let minSize { queryItems.append(URLQueryItem(name: "min_size", value: String(minSize))) }
+        if let maxSize { queryItems.append(URLQueryItem(name: "max_size", value: String(maxSize))) }
+        if let hasHash { queryItems.append(URLQueryItem(name: "has_hash", value: String(hasHash))) }
+        if let isMedia { queryItems.append(URLQueryItem(name: "is_media", value: String(isMedia))) }
+
+        let url = try buildURL(path: "/files", queryItems: queryItems)
+        return try await get(url: url)
+    }
+
+    /// Fetch a single file by ID.
+    func fetchFile(id: Int) async throws -> FileResponse {
+        let url = try buildURL(path: "/files/\(id)")
+        return try await get(url: url)
+    }
+
+    /// Fetch media metadata for a file.
+    func fetchFileMedia(fileId: Int) async throws -> MediaMetadataResponse {
+        let url = try buildURL(path: "/files/\(fileId)/media")
+        return try await get(url: url)
+    }
+
+    // MARK: - Duplicate Endpoints
+
+    /// Fetch duplicate clusters with stats.
+    func fetchDuplicates(limit: Int = 100, minSize: Int? = nil, sortBy: String = "reclaimable") async throws -> DuplicateListResponse {
+        var queryItems = [
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "sort_by", value: sortBy)
+        ]
+        if let minSize { queryItems.append(URLQueryItem(name: "min_size", value: String(minSize))) }
+
+        let url = try buildURL(path: "/duplicates", queryItems: queryItems)
+        return try await get(url: url)
+    }
+
+    /// Fetch duplicate stats only.
+    func fetchDuplicateStats() async throws -> DuplicateStatsResponse {
+        let url = try buildURL(path: "/duplicates/stats")
+        return try await get(url: url)
+    }
+
+    // MARK: - Search Endpoints
+
+    /// Search files by glob pattern.
+    func searchFiles(
+        query: String,
+        drive: String? = nil,
+        minSize: Int? = nil,
+        maxSize: Int? = nil,
+        extension ext: String? = nil,
+        limit: Int = 100
+    ) async throws -> SearchResultResponse {
+        var queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "limit", value: String(limit))
+        ]
+        if let drive { queryItems.append(URLQueryItem(name: "drive", value: drive)) }
+        if let minSize { queryItems.append(URLQueryItem(name: "min_size", value: String(minSize))) }
+        if let maxSize { queryItems.append(URLQueryItem(name: "max_size", value: String(maxSize))) }
+        if let ext { queryItems.append(URLQueryItem(name: "extension", value: ext)) }
+
+        let url = try buildURL(path: "/search", queryItems: queryItems)
+        return try await get(url: url)
+    }
+
+    // MARK: - Copy Endpoints
+
+    /// Trigger a verified file copy operation.
+    func triggerCopy(request: CopyRequest) async throws -> OperationStartResponse {
+        let url = try buildURL(path: "/copy")
+        return try await post(url: url, body: request)
+    }
+
+    // MARK: - Status Endpoints
+
+    /// Fetch API health status and database stats.
+    func fetchHealthStatus() async throws -> HealthStatusResponse {
+        let url = try buildURL(path: "/status")
+        return try await get(url: url)
+    }
+
     // MARK: - Private Helpers
 
     /// Build a URL with the given path and optional query items.
