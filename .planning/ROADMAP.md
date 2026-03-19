@@ -69,19 +69,19 @@ Plans:
 Plans:
 - [x] 14-01: Codable Swift structs mirroring Python Pydantic models — completed 2026-01-25
 
-### Phase 15: Drive Management View
+### Phase 15: Drive Management View ✅
 
 **Goal**: List registered drives, add/remove drives, show scan status and last-scanned dates
 **Depends on**: Phase 14
 **Research**: Unlikely (uses Phase 12 API)
-**Status**: In progress (2/3 plans)
+**Status**: Complete (3/3 plans)
 
 Plans:
 - [x] 15-01: API Service Foundation (networking layer) — completed 2026-01-25
 - [x] 15-02: Drive List View with add/delete — completed 2026-01-25
-- [ ] 15-03: Drive Detail View with status and actions
+- [x] 15-03: Drive Detail View with status and actions — completed 2026-03-19
 
-### Phase 16: File Browser
+### Phase 16: File Browser ✅
 
 **Goal**: Browse files by drive with tree/list view, show file details, navigate directory structure
 **Depends on**: Phase 15
@@ -89,9 +89,9 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 16-01: TBD
+- [x] 16-01: File browser with drive picker, pagination, file detail sheet — completed 2026-03-19
 
-### Phase 17: Duplicate Dashboard
+### Phase 17: Duplicate Dashboard ✅
 
 **Goal**: View duplicate file groups, show reclaimable space, enable group actions (delete, move)
 **Depends on**: Phase 16
@@ -99,9 +99,9 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 17-01: TBD
+- [x] 17-01: Duplicate dashboard with stats, expandable clusters — completed 2026-03-19
 
-### Phase 18: Search Interface
+### Phase 18: Search Interface ✅
 
 **Goal**: Search files across drives, filter by type/size/date, display results with navigation
 **Depends on**: Phase 17
@@ -109,9 +109,9 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 18-01: TBD
+- [x] 18-01: Search with glob patterns, filters, results — completed 2026-03-19
 
-### Phase 19: Copy & Verify UI
+### Phase 19: Copy & Verify UI ✅
 
 **Goal**: Copy wizard for verified transfers, progress tracking, verification status display
 **Depends on**: Phase 18
@@ -119,9 +119,9 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 19-01: TBD
+- [x] 19-01: Copy wizard with polling, context menu integration — completed 2026-03-19
 
-### Phase 20: Settings & Mount Automation
+### Phase 20: Settings & Mount Automation ✅
 
 **Goal**: Preferences window for app config, auto-scan settings, mount notification alerts
 **Depends on**: Phase 19
@@ -129,11 +129,11 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 20-01: TBD
+- [x] 20-01: Settings with health check, DB stats, app info — completed 2026-03-19
 
 ## Progress
 
 | Milestone | Phases | Plans | Status | Completed |
 |-----------|--------|-------|--------|-----------|
 | v1.0 MVP | 1-11 | 14/14 | Complete | 2026-01-24 |
-| v1.1 UI | 12-20 | 12/? | In progress | - |
+| v1.1 UI | 12-20 | 18/18 | Complete | 2026-03-19 |
