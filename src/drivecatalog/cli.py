@@ -9,15 +9,15 @@ from rich.table import Table
 
 from drivecatalog import __version__
 from drivecatalog.console import console, get_progress, print_error, print_success
+from drivecatalog.copier import copy_file_verified, log_copy_operation
 from drivecatalog.database import get_connection, get_db_path, init_db
 from drivecatalog.drives import get_drive_info, validate_mount_path
 from drivecatalog.duplicates import get_duplicate_clusters, get_duplicate_stats
 from drivecatalog.hasher import compute_partial_hash
+from drivecatalog.media import MEDIA_EXTENSIONS, check_integrity, extract_metadata
 from drivecatalog.scanner import ScanResult, scan_drive
-from drivecatalog.copier import CopyResult, copy_file_verified, log_copy_operation
 from drivecatalog.search import search_files
 from drivecatalog.watcher import auto_scan_on_mount, get_mounted_volumes, run_watcher
-from drivecatalog.media import MEDIA_EXTENSIONS, IntegrityResult, check_integrity, extract_metadata
 
 
 @click.group(invoke_without_command=True)
@@ -231,7 +231,8 @@ def hash(name: str, force: bool) -> None:
             ).fetchall()
         else:
             files = conn.execute(
-                "SELECT id, path, size_bytes FROM files WHERE drive_id = ? AND partial_hash IS NULL",
+                "SELECT id, path, size_bytes FROM files "
+                "WHERE drive_id = ? AND partial_hash IS NULL",
                 (drive["id"],),
             ).fetchall()
 
@@ -423,10 +424,7 @@ def search(
 
             # Format modification time
             mtime = row["mtime"]
-            if mtime:
-                mtime_display = _format_relative_time(mtime)
-            else:
-                mtime_display = "-"
+            mtime_display = _format_relative_time(mtime) if mtime else "-"
 
             table.add_row(
                 row["drive_name"],
@@ -473,7 +471,10 @@ def copy(source_drive: str, source_path: str, dest_drive: str, dest_path: str | 
         ).fetchone()
 
         if not src_drive:
-            print_error(f"Source drive '{source_drive}' not found. Use 'drives list' to see registered drives.")
+            print_error(
+                f"Source drive '{source_drive}' not found. "
+                "Use 'drives list' to see registered drives."
+            )
             return
 
         # Look up destination drive
@@ -483,7 +484,10 @@ def copy(source_drive: str, source_path: str, dest_drive: str, dest_path: str | 
         ).fetchone()
 
         if not dst_drive:
-            print_error(f"Destination drive '{dest_drive}' not found. Use 'drives list' to see registered drives.")
+            print_error(
+                f"Destination drive '{dest_drive}' not found. "
+                "Use 'drives list' to see registered drives."
+            )
             return
 
         # Validate source drive is mounted
@@ -543,7 +547,9 @@ def copy(source_drive: str, source_path: str, dest_drive: str, dest_path: str | 
 
         # Copy with progress display
         file_size = src_file["size_bytes"]
-        console.print(f"[bold]Copying '{source_path}' from {source_drive} to {dest_drive}...[/bold]")
+        console.print(
+            f"[bold]Copying '{source_path}' from {source_drive} to {dest_drive}...[/bold]"
+        )
 
         started_at = datetime.now()
 
@@ -553,7 +559,9 @@ def copy(source_drive: str, source_path: str, dest_drive: str, dest_path: str | 
             def update_progress(bytes_written: int) -> None:
                 progress.update(task, completed=bytes_written)
 
-            result = copy_file_verified(src_full_path, dst_full_path, progress_callback=update_progress)
+            result = copy_file_verified(
+                src_full_path, dst_full_path, progress_callback=update_progress
+            )
 
         completed_at = datetime.now()
 
@@ -627,7 +635,10 @@ def watch() -> None:
             ).fetchone()
 
             if drive:
-                console.print(f"[green]Mount detected:[/green] {path} (registered as {drive['name']})")
+                console.print(
+                    f"[green]Mount detected:[/green] {path} "
+                    f"(registered as {drive['name']})"
+                )
                 # Trigger auto-scan in background thread to keep watcher responsive
                 # Use a separate connection for thread safety
                 def scan_in_background():
@@ -743,11 +754,16 @@ def media(name: str, force: bool) -> None:
             if force:
                 print_success(f"No media files found on '{name}'.")
             else:
-                print_success(f"All media files on '{name}' already have metadata. Use --force to re-extract.")
+                print_success(
+                    f"All media files on '{name}' already have metadata. "
+                    "Use --force to re-extract."
+                )
             return
 
         # Extract metadata with progress display
-        console.print(f"[bold]Extracting metadata for {total_files} media files on '{name}'...[/bold]")
+        console.print(
+            f"[bold]Extracting metadata for {total_files} media files on '{name}'...[/bold]"
+        )
         extracted_count = 0
         error_count = 0
 
@@ -884,11 +900,17 @@ def verify(name: str, force: bool, show_errors: bool) -> None:
             elif force:
                 print_success(f"No media files found on '{name}'.")
             else:
-                print_success(f"All media files on '{name}' already verified. Use --force to re-verify.")
+                print_success(
+                    f"All media files on '{name}' already verified. "
+                    "Use --force to re-verify."
+                )
             return
 
         # Verify files with progress display
-        console.print(f"[bold]Verifying integrity of {total_files} media files on '{name}'...[/bold]")
+        console.print(
+            f"[bold]Verifying integrity of {total_files} media files "
+            f"on '{name}'...[/bold]"
+        )
         verified_ok = 0
         verified_errors = 0
         ffprobe_failed = 0
@@ -944,9 +966,12 @@ def verify(name: str, force: bool, show_errors: bool) -> None:
         table = Table(title="Integrity Verification Summary")
         table.add_column("Category", style="bold")
         table.add_column("Count", justify="right")
-        table.add_row("Verified OK", str(verified_ok), style="green" if verified_ok > 0 else None)
-        table.add_row("Integrity errors", str(verified_errors), style="red" if verified_errors > 0 else None)
-        table.add_row("FFprobe failures", str(ffprobe_failed), style="yellow" if ffprobe_failed > 0 else None)
+        ok_style = "green" if verified_ok > 0 else None
+        err_style = "red" if verified_errors > 0 else None
+        warn_style = "yellow" if ffprobe_failed > 0 else None
+        table.add_row("Verified OK", str(verified_ok), style=ok_style)
+        table.add_row("Integrity errors", str(verified_errors), style=err_style)
+        table.add_row("FFprobe failures", str(ffprobe_failed), style=warn_style)
         table.add_row("Total processed", str(total_files), style="bold")
         console.print(table)
 
@@ -1019,14 +1044,14 @@ def _parse_size(size_str: str) -> int:
         try:
             number = float(size_str[:-1])
             return int(number * suffixes[size_str[-1]])
-        except ValueError:
-            raise click.BadParameter(f"Invalid size: {size_str}")
+        except ValueError as err:
+            raise click.BadParameter(f"Invalid size: {size_str}") from err
     else:
         # No suffix, assume bytes
         try:
             return int(size_str)
-        except ValueError:
-            raise click.BadParameter(f"Invalid size: {size_str}")
+        except ValueError as err:
+            raise click.BadParameter(f"Invalid size: {size_str}") from err
 
 
 def _print_scan_summary(result: ScanResult) -> None:

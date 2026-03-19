@@ -1,6 +1,6 @@
 """Duplicate detection endpoints for DriveCatalog API."""
 
-from enum import Enum
+from enum import StrEnum
 
 from fastapi import APIRouter, Query
 
@@ -17,7 +17,7 @@ from ..models.file import (
 router = APIRouter(prefix="/duplicates", tags=["duplicates"])
 
 
-class SortBy(str, Enum):
+class SortBy(StrEnum):
     """Sort options for duplicate clusters."""
 
     reclaimable = "reclaimable"
@@ -29,7 +29,9 @@ class SortBy(str, Enum):
 async def list_duplicates(
     limit: int = Query(100, ge=1, le=1000, description="Maximum clusters to return"),
     min_size: int | None = Query(None, ge=0, description="Minimum file size to consider"),
-    sort_by: SortBy = Query(SortBy.reclaimable, description="Sort by: reclaimable, count, or size"),
+    sort_by: SortBy = Query(  # noqa: B008
+        SortBy.reclaimable, description="Sort by: reclaimable, count, or size"
+    ),
 ) -> DuplicateListResponse:
     """List duplicate file clusters with optional filtering.
 

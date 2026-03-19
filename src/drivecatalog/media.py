@@ -5,7 +5,6 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-
 # Video file extensions to process for metadata extraction
 MEDIA_EXTENSIONS = {
     # Common formats

@@ -33,10 +33,9 @@ async def get_status() -> dict:
             "SELECT COUNT(*) FROM files WHERE partial_hash IS NOT NULL"
         ).fetchone()[0]
 
-        if files_count > 0:
-            hash_coverage_percent = (hashed_count / files_count) * 100
-        else:
-            hash_coverage_percent = 0.0
+        hash_coverage_percent = (
+            (hashed_count / files_count) * 100 if files_count > 0 else 0.0
+        )
 
         return {
             "db_path": str(db_path),

@@ -2,10 +2,10 @@
 
 import hashlib
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
 # Chunk size for streaming reads (64KB)
 CHUNK_SIZE = 64 * 1024

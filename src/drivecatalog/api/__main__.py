@@ -4,6 +4,7 @@ Usage: python -m drivecatalog.api [--port PORT] [--host HOST]
 """
 
 import argparse
+
 import uvicorn
 
 

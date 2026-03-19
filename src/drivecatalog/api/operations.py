@@ -7,10 +7,10 @@ so the frontend can poll for status updates.
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 
-class OperationStatus(str, Enum):
+class OperationStatus(StrEnum):
     """Status of a background operation."""
 
     PENDING = "pending"

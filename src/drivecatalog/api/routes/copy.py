@@ -142,7 +142,10 @@ async def trigger_copy(
         if not src_file:
             raise HTTPException(
                 status_code=404,
-                detail=f"Source file '{request.source_path}' not found in catalog for drive '{request.source_drive}'",
+                detail=(
+                    f"Source file '{request.source_path}' not found in catalog "
+                    f"for drive '{request.source_drive}'"
+                ),
             )
 
         # Build full paths
@@ -161,7 +164,10 @@ async def trigger_copy(
         if dst_full_path.exists():
             raise HTTPException(
                 status_code=400,
-                detail=f"Destination file '{dest_relative}' already exists on drive '{request.dest_drive}'",
+                detail=(
+                    f"Destination file '{dest_relative}' already exists "
+                    f"on drive '{request.dest_drive}'"
+                ),
             )
 
         # Create operation and start background task

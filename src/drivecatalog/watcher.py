@@ -3,9 +3,8 @@
 import signal
 import sqlite3
 import sys
-from datetime import datetime
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from rich.console import Console
 from watchdog.events import DirCreatedEvent, DirDeletedEvent, FileSystemEventHandler
@@ -146,9 +145,11 @@ def auto_scan_on_mount(mount_path: Path, conn: sqlite3.Connection) -> None:
 
     # Check if volume name is in the allowed list (if set)
     volume_name = mount_path.name
-    if config.auto_scan_drives is not None:
-        if volume_name not in config.auto_scan_drives:
-            return
+    if (
+        config.auto_scan_drives is not None
+        and volume_name not in config.auto_scan_drives
+    ):
+        return
 
     # Look up drive by mount path
     drive = get_drive_by_mount_path(conn, mount_path)

@@ -3,11 +3,10 @@
 import os
 import sqlite3
 from collections.abc import Callable
-from typing import Any
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-
+from typing import Any
 
 # System directories to skip during scanning
 SKIP_DIRECTORIES = {

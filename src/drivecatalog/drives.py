@@ -106,7 +106,8 @@ def get_drive_by_mount_path(conn: sqlite3.Connection, mount_path: Path) -> dict 
         or None if not found.
     """
     row = conn.execute(
-        "SELECT id, name, mount_path, uuid, total_bytes, last_scan FROM drives WHERE mount_path = ?",
+        "SELECT id, name, mount_path, uuid, total_bytes, last_scan "
+        "FROM drives WHERE mount_path = ?",
         (str(mount_path),),
     ).fetchone()
 

@@ -228,11 +228,9 @@ async def get_drive_status(name: str) -> DriveStatusResponse:
         hashed_count = stats["hashed_count"] or 0
         media_count = stats["media_count"] or 0
 
-        # Calculate hash coverage percentage
-        if file_count > 0:
-            hash_coverage_percent = round((hashed_count / file_count) * 100, 2)
-        else:
-            hash_coverage_percent = 0.0
+        hash_coverage_percent = (
+            round((hashed_count / file_count) * 100, 2) if file_count > 0 else 0.0
+        )
 
         return DriveStatusResponse(
             id=drive_id,
@@ -352,7 +350,8 @@ def _run_hash(operation_id: str, drive_id: int, mount_path: str, force: bool) ->
                 ).fetchall()
             else:
                 files = conn.execute(
-                    "SELECT id, path, size_bytes FROM files WHERE drive_id = ? AND partial_hash IS NULL",
+                    "SELECT id, path, size_bytes FROM files "
+                    "WHERE drive_id = ? AND partial_hash IS NULL",
                     (drive_id,),
                 ).fetchall()
 

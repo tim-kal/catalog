@@ -4,7 +4,6 @@ from pathlib import Path
 
 import xxhash
 
-
 # Chunk size for partial hashing (64KB)
 CHUNK_SIZE = 64 * 1024
 

@@ -3,8 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ..operations import get_operation, list_operations, OperationStatus
-
+from ..operations import OperationStatus, get_operation, list_operations
 
 router = APIRouter(prefix="/operations", tags=["operations"])
 

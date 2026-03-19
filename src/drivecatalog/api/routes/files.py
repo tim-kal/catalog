@@ -65,11 +65,13 @@ async def list_files(
         if has_integrity_errors is not None:
             if has_integrity_errors:
                 conditions.append(
-                    "EXISTS (SELECT 1 FROM media_metadata m WHERE m.file_id = f.id AND m.integrity_errors IS NOT NULL)"
+                    "EXISTS (SELECT 1 FROM media_metadata m "
+                    "WHERE m.file_id = f.id AND m.integrity_errors IS NOT NULL)"
                 )
             else:
                 conditions.append(
-                    "NOT EXISTS (SELECT 1 FROM media_metadata m WHERE m.file_id = f.id AND m.integrity_errors IS NOT NULL)"
+                    "NOT EXISTS (SELECT 1 FROM media_metadata m "
+                    "WHERE m.file_id = f.id AND m.integrity_errors IS NOT NULL)"
                 )
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
