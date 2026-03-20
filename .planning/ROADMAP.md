@@ -6,8 +6,9 @@ Build a macOS CLI tool for cataloging external drives, detecting duplicates via 
 
 ## Milestones
 
-- ✅ [v1.0 MVP](milestones/v1.0-ROADMAP.md) (Phases 1-11) — SHIPPED 2026-01-24
-- 🚧 **v1.1 UI** — Phases 12-20 (in progress)
+- [v1.0 MVP](milestones/v1.0-ROADMAP.md) (Phases 1-11) — SHIPPED 2026-01-24
+- **v1.1 UI** (Phases 12-20) — SHIPPED 2026-03-21
+- **v2.0 Drive Consolidation Optimizer** — Phases 21-23 (in progress)
 
 ## Completed Milestones
 
@@ -30,110 +31,79 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 </details>
 
-## 🚧 v1.1 UI (In Progress)
+<details>
+<summary>v1.1 UI (Phases 12-20) — SHIPPED 2026-03-21</summary>
 
-**Milestone Goal:** Add a native SwiftUI interface to the existing DriveCatalog CLI, providing a polished macOS desktop experience for drive cataloging, duplicate detection, and verified transfers.
+- [x] Phase 12: Architecture & Python API (5/5 plans) — completed 2026-01-25
+- [x] Phase 13: SwiftUI Project Setup (2/2 plans) — completed 2026-01-25
+- [x] Phase 14: Swift Data Models (1/1 plan) — completed 2026-01-25
+- [x] Phase 15: Drive Management View (3/3 plans) — completed 2026-03-19
+- [x] Phase 16: File Browser (1/1 plan) — completed 2026-03-19
+- [x] Phase 17: Duplicate Dashboard (1/1 plan) — completed 2026-03-19
+- [x] Phase 18: Search Interface (1/1 plan) — completed 2026-03-19
+- [x] Phase 19: Copy & Verify UI (1/1 plan) — completed 2026-03-19
+- [x] Phase 20: Settings & Mount Automation (1/1 plan) — completed 2026-03-19
 
-### Phase 12: Architecture & Python API ✅
+</details>
 
-**Goal**: Define Swift↔Python communication pattern and expose existing functionality as API
-**Depends on**: v1.0 complete
-**Research**: Complete (Swift/Python integration patterns)
-**Status**: Complete (5/5 plans)
+## v2.0 Drive Consolidation Optimizer
 
-Plans:
-- [x] 12-01: FastAPI foundation with Pydantic models — completed 2026-01-24
-- [x] 12-02: Drives API routes (CRUD, status) — completed 2026-01-24
-- [x] 12-03: Files, search, and duplicates API routes — completed 2026-01-24
-- [x] 12-04: Background operations (scan, hash) — completed 2026-01-24
-- [x] 12-05: Copy, media metadata, and integrity routes — completed 2026-01-25
+**Milestone Goal:** Analyze all cataloged drives to find which files can be moved to free entire drives, generate optimal migration plans, execute with hash-verified transfers and safe deletion, and track the whole process through a SwiftUI migration wizard.
 
-### Phase 13: SwiftUI Project Setup ✅
+### Phase 21: Consolidation Analysis Engine
 
-**Goal**: Create Xcode project with basic app lifecycle, window structure, and navigation shell
-**Depends on**: Phase 12
-**Research**: Unlikely (standard SwiftUI patterns)
-**Status**: Complete (2/2 plans)
-
-Plans:
-- [x] 13-01: Xcode project foundation with xcodegen — completed 2026-01-25
-- [x] 13-02: Navigation shell with sidebar and placeholder views — completed 2026-01-25
-
-### Phase 14: Swift Data Models ✅
-
-**Goal**: Define Swift types for drives, files, duplicates matching Python database schema
-**Depends on**: Phase 13
-**Research**: Unlikely (internal patterns)
-**Status**: Complete (1/1 plans)
-
-Plans:
-- [x] 14-01: Codable Swift structs mirroring Python Pydantic models — completed 2026-01-25
-
-### Phase 15: Drive Management View ✅
-
-**Goal**: List registered drives, add/remove drives, show scan status and last-scanned dates
-**Depends on**: Phase 14
-**Research**: Unlikely (uses Phase 12 API)
-**Status**: Complete (3/3 plans)
-
-Plans:
-- [x] 15-01: API Service Foundation (networking layer) — completed 2026-01-25
-- [x] 15-02: Drive List View with add/delete — completed 2026-01-25
-- [x] 15-03: Drive Detail View with status and actions — completed 2026-03-19
-
-### Phase 16: File Browser ✅
-
-**Goal**: Browse files by drive with tree/list view, show file details, navigate directory structure
-**Depends on**: Phase 15
-**Research**: Unlikely (standard UI patterns)
+**Goal**: User can analyze their drive collection to understand file distribution and identify which drives can be consolidated
+**Depends on**: v1.1 complete (existing duplicate detection, file catalog, API layer)
+**Requirements**: ANAL-01, ANAL-02, ANAL-03, ANAL-04, ANAL-05
+**Success Criteria** (what must be TRUE):
+  1. User can hit an API endpoint and see a per-drive breakdown showing unique file count, duplicated file count, total size, and reclaimable space
+  2. User can see which drives are candidates for consolidation (all unique files fit on other connected drives with sufficient free space)
+  3. User can view target drive capacity information showing which drives can absorb files from a source drive
+  4. System produces an optimal consolidation strategy that minimizes total bytes transferred when moving unique files off a source drive
 **Plans**: TBD
 
 Plans:
-- [x] 16-01: File browser with drive picker, pagination, file detail sheet — completed 2026-03-19
+- [ ] 21-01: TBD
+- [ ] 21-02: TBD
 
-### Phase 17: Duplicate Dashboard ✅
+### Phase 22: Migration Planning & Execution
 
-**Goal**: View duplicate file groups, show reclaimable space, enable group actions (delete, move)
-**Depends on**: Phase 16
-**Research**: Unlikely (uses existing duplicate detection)
+**Goal**: User can generate, review, and execute a verified migration plan that safely moves files off a source drive with hash verification and safe deletion
+**Depends on**: Phase 21 (consolidation analysis provides the data for planning)
+**Requirements**: MIGR-01, MIGR-02, MIGR-03, MIGR-04, MIGR-05, EXEC-01, EXEC-02, EXEC-03, EXEC-04, EXEC-05, EXEC-06, PROG-01, PROG-02, PROG-03, PROG-04
+**Success Criteria** (what must be TRUE):
+  1. User can generate a migration plan for a source drive that lists every file to copy, its target drive, and distinguishes files needing copy from files already backed up elsewhere
+  2. User can review a plan showing files to copy, target drives, estimated transfer size, and confirm the plan validates sufficient free space on targets before allowing execution
+  3. User can execute a migration as a background operation where each copied file is hash-verified before the source is deleted, with per-file status tracking (pending/copying/verifying/verified/deleted/failed)
+  4. User can cancel a running migration safely (copied files kept, remaining untouched), and failed copies are retried once then skipped with error logged
+  5. User can poll progress (files completed, bytes transferred, ETA), migration state persists across API restarts, and completed migrations produce a summary with files moved, space freed, and errors
 **Plans**: TBD
 
 Plans:
-- [x] 17-01: Duplicate dashboard with stats, expandable clusters — completed 2026-03-19
+- [ ] 22-01: TBD
+- [ ] 22-02: TBD
+- [ ] 22-03: TBD
 
-### Phase 18: Search Interface ✅
+### Phase 23: Migration Wizard UI
 
-**Goal**: Search files across drives, filter by type/size/date, display results with navigation
-**Depends on**: Phase 17
-**Research**: Unlikely (standard UI patterns)
+**Goal**: User can drive the entire consolidation workflow from a SwiftUI wizard -- from analysis through execution to completion
+**Depends on**: Phase 22 (all backend APIs must exist for the UI to consume)
+**Requirements**: UI-01, UI-02, UI-03, UI-04, UI-05
+**Success Criteria** (what must be TRUE):
+  1. User can access consolidation analysis from the drives view and see which drives are consolidation candidates
+  2. User can select a source drive and view a migration plan with target drive assignments and file breakdown before confirming
+  3. User can step through the wizard flow (analyze, review plan, confirm, execute, done) with real-time progress showing file-level detail during execution
+  4. User sees a completion summary with total space freed, files moved, and any errors encountered
 **Plans**: TBD
 
 Plans:
-- [x] 18-01: Search with glob patterns, filters, results — completed 2026-03-19
-
-### Phase 19: Copy & Verify UI ✅
-
-**Goal**: Copy wizard for verified transfers, progress tracking, verification status display
-**Depends on**: Phase 18
-**Research**: Unlikely (wraps existing copy functionality)
-**Plans**: TBD
-
-Plans:
-- [x] 19-01: Copy wizard with polling, context menu integration — completed 2026-03-19
-
-### Phase 20: Settings & Mount Automation ✅
-
-**Goal**: Preferences window for app config, auto-scan settings, mount notification alerts
-**Depends on**: Phase 19
-**Research**: Unlikely (standard macOS patterns)
-**Plans**: TBD
-
-Plans:
-- [x] 20-01: Settings with health check, DB stats, app info — completed 2026-03-19
+- [ ] 23-01: TBD
+- [ ] 23-02: TBD
 
 ## Progress
 
 | Milestone | Phases | Plans | Status | Completed |
 |-----------|--------|-------|--------|-----------|
 | v1.0 MVP | 1-11 | 14/14 | Complete | 2026-01-24 |
-| v1.1 UI | 12-20 | 18/18 | Complete | 2026-03-19 |
+| v1.1 UI | 12-20 | 18/18 | Complete | 2026-03-21 |
+| v2.0 Consolidation | 21-23 | 0/TBD | Not started | - |

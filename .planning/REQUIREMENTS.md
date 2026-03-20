@@ -74,13 +74,37 @@ Requirements for the Drive Consolidation Optimizer. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated during roadmap creation) | | |
+| ANAL-01 | Phase 21 | Pending |
+| ANAL-02 | Phase 21 | Pending |
+| ANAL-03 | Phase 21 | Pending |
+| ANAL-04 | Phase 21 | Pending |
+| ANAL-05 | Phase 21 | Pending |
+| MIGR-01 | Phase 22 | Pending |
+| MIGR-02 | Phase 22 | Pending |
+| MIGR-03 | Phase 22 | Pending |
+| MIGR-04 | Phase 22 | Pending |
+| MIGR-05 | Phase 22 | Pending |
+| EXEC-01 | Phase 22 | Pending |
+| EXEC-02 | Phase 22 | Pending |
+| EXEC-03 | Phase 22 | Pending |
+| EXEC-04 | Phase 22 | Pending |
+| EXEC-05 | Phase 22 | Pending |
+| EXEC-06 | Phase 22 | Pending |
+| PROG-01 | Phase 22 | Pending |
+| PROG-02 | Phase 22 | Pending |
+| PROG-03 | Phase 22 | Pending |
+| PROG-04 | Phase 22 | Pending |
+| UI-01 | Phase 23 | Pending |
+| UI-02 | Phase 23 | Pending |
+| UI-03 | Phase 23 | Pending |
+| UI-04 | Phase 23 | Pending |
+| UI-05 | Phase 23 | Pending |
 
 **Coverage:**
-- v2.0 requirements: 20 total
-- Mapped to phases: 0
-- Unmapped: 20
+- v2.0 requirements: 25 total
+- Mapped to phases: 25
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-21*
-*Last updated: 2026-03-21 after initial definition*
+*Last updated: 2026-03-21 after roadmap creation*

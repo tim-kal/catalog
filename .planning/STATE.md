@@ -5,15 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-03-21)
 
 **Core value:** Duplicate detection — knowing which files exist across multiple drives and identifying safe deletion candidates.
-**Current focus:** v2.0 Drive Consolidation Optimizer
+**Current focus:** v2.0 Drive Consolidation Optimizer — Phase 21 (Consolidation Analysis Engine)
 
 ## Current Position
 
 Milestone: v2.0 Drive Consolidation Optimizer
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-21 — Milestone v2.0 started
+Phase: 21 of 23 (Consolidation Analysis Engine)
+Plan: — (not yet planned)
+Status: Ready to plan
+Last activity: 2026-03-21 — Roadmap created for v2.0 (3 phases, 25 requirements mapped)
 
 Progress: [░░░░░░░░░░░░░░░░░░░░░░░░] 0%
 
@@ -37,18 +37,10 @@ See: .planning/MILESTONES.md for full details.
 
 Full decision log in PROJECT.md Key Decisions table.
 
-**v1.1 Decisions:**
-- SwiftUI native for UI framework (user preference for macOS polish)
-- FastAPI with lifespan context manager for Python API layer
-- CORS allow all origins for local desktop app access
-- DELETE endpoints require ?confirm=true to prevent accidental API deletions
-- xcodegen for reproducible Xcode project generation
-- macOS 14.0 deployment target for NavigationSplitView improvements
-- Omit OperationResponse.result dict for simplicity - UI queries specific endpoints
-- Actor-based APIService for thread-safe networking from concurrent SwiftUI views
-
 **v2.0 Decisions:**
-- (none yet)
+- 3-phase structure: analysis engine, migration planner+executor, wizard UI
+- Phase 22 combines planner and executor (tightly coupled, can't test independently)
+- Partial hash (xxHash) for migration verification (consistent with existing dedup approach)
 
 ### Deferred Issues
 
@@ -58,14 +50,8 @@ None.
 
 None.
 
-### Roadmap Evolution
-
-- v1.0 MVP shipped: 2026-01-24 (11 phases)
-- v1.1 UI shipped: 2026-03-21 (9 phases, Phases 12-20)
-- v2.0 Consolidation Optimizer started: 2026-03-21
-
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Defining v2.0 milestone requirements
+Stopped at: Roadmap created for v2.0 milestone, ready to plan Phase 21
 Resume file: None
