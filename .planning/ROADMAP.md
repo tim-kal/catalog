@@ -60,11 +60,11 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
   2. User can see which drives are candidates for consolidation (all unique files fit on other connected drives with sufficient free space)
   3. User can view target drive capacity information showing which drives can absorb files from a source drive
   4. System produces an optimal consolidation strategy that minimizes total bytes transferred when moving unique files off a source drive
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 21-01: TBD
-- [ ] 21-02: TBD
+- [ ] 21-01-PLAN.md — Consolidation analysis module (pure Python engine with distribution, candidates, and strategy algorithms)
+- [ ] 21-02-PLAN.md — Consolidation analysis API (FastAPI routes, Pydantic models, router registration)
 
 ### Phase 22: Migration Planning & Execution
 
@@ -106,4 +106,4 @@ Plans:
 |-----------|--------|-------|--------|-----------|
 | v1.0 MVP | 1-11 | 14/14 | Complete | 2026-01-24 |
 | v1.1 UI | 12-20 | 18/18 | Complete | 2026-03-21 |
-| v2.0 Consolidation | 21-23 | 0/TBD | Not started | - |
+| v2.0 Consolidation | 21-23 | 2/TBD | In progress | - |
