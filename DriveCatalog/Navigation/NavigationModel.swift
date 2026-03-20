@@ -3,8 +3,7 @@ import Foundation
 enum SidebarItem: String, CaseIterable, Identifiable {
     case drives
     case browser
-    case duplicates
-    case search
+    case backups
     case settings
 
     var id: Self { self }
@@ -13,8 +12,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .drives: return "Drives"
         case .browser: return "Browser"
-        case .duplicates: return "Duplicates"
-        case .search: return "Search"
+        case .backups: return "Backups"
         case .settings: return "Settings"
         }
     }
@@ -23,8 +21,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .drives: return "externaldrive"
         case .browser: return "folder"
-        case .duplicates: return "doc.on.doc"
-        case .search: return "magnifyingglass"
+        case .backups: return "shield.lefthalf.filled"
         case .settings: return "gear"
         }
     }

@@ -1,29 +1,76 @@
+import AppKit
 import SwiftUI
 
-/// Finder-style file browser — navigate directories, not paginated lists.
+// MARK: - Sort Options
+
+enum SortField: String, CaseIterable {
+    case name = "Name"
+    case size = "Size"
+    case date = "Date"
+    case type = "Type"
+}
+
+enum SortDirection {
+    case ascending, descending
+    mutating func toggle() {
+        self = self == .ascending ? .descending : .ascending
+    }
+}
+
+// MARK: - Column Data
+
+/// One column in the browser — the browse response at a specific depth.
+private struct ColumnData: Identifiable {
+    let id = UUID()
+    let depth: Int
+    let path: String       // relative path for this column
+    let response: BrowseResponse
+    var selectedDir: String?  // which directory is selected (highlighted) in this column
+}
+
+// MARK: - Browser View
+
 struct BrowserView: View {
     @State private var drives: [DriveResponse] = []
     @State private var selectedDrive: DriveResponse?
-    @State private var browseData: BrowseResponse?
+    @State private var columns: [ColumnData] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var pathStack: [String] = []  // breadcrumb trail
     @State private var selectedFile: FileResponse?
     @State private var fileToCopy: FileResponse?
     @State private var showCopySheet = false
+    @State private var backupCache: [String: BackupStatusResponse] = [:]
+
+    // Sort
+    @State private var sortField: SortField = .name
+    @State private var sortDirection: SortDirection = .ascending
+
+    // Search
+    @State private var searchQuery: String = ""
+    @State private var searchResults: [SearchFile] = []
+    @State private var searchTotal = 0
+    @State private var isSearching = false
+    @State private var hasSearched = false
+
+    // Keyboard navigation
+    @FocusState private var browserFocused: Bool
+    @State private var kbColumn: Int = 0
+    @State private var kbRow: Int = -1
 
     var body: some View {
         NavigationStack {
             HSplitView {
-                // Left: Drive list (like Finder sidebar)
                 driveList
-                    .frame(minWidth: 160, idealWidth: 200, maxWidth: 250)
+                    .frame(minWidth: 120, idealWidth: 140, maxWidth: 180)
 
-                // Right: Directory contents
                 VStack(spacing: 0) {
-                    breadcrumbBar
+                    toolBar
                     Divider()
-                    directoryContent
+                    if hasSearched {
+                        searchContent
+                    } else {
+                        columnContent
+                    }
                 }
             }
             .navigationTitle("Browser")
@@ -32,7 +79,11 @@ struct BrowserView: View {
             }
             .sheet(isPresented: $showCopySheet) {
                 if let file = fileToCopy {
-                    CopySheet(sourceFile: file, onComplete: { await browse() })
+                    CopySheet(sourceFile: file, onComplete: {
+                        if let last = columns.last {
+                            await loadColumn(path: last.path, depth: last.depth)
+                        }
+                    })
                 }
             }
             .task {
@@ -48,8 +99,11 @@ struct BrowserView: View {
             get: { selectedDrive?.name },
             set: { name in
                 selectedDrive = drives.first { $0.name == name }
-                pathStack = []
-                Task { await browse() }
+                columns = []
+                kbColumn = 0
+                kbRow = -1
+                clearSearch()
+                Task { await loadColumn(path: "", depth: 0) }
             }
         )) {
             Section("Drives") {
@@ -73,60 +127,148 @@ struct BrowserView: View {
         .listStyle(.sidebar)
     }
 
-    // MARK: - Breadcrumb Navigation
+    // MARK: - Toolbar (search + sort + breadcrumb)
 
-    private var breadcrumbBar: some View {
-        HStack(spacing: 4) {
-            if let drive = selectedDrive {
-                Button(drive.name) {
-                    pathStack = []
-                    Task { await browse() }
-                }
-                .buttonStyle(.plain)
-                .fontWeight(.medium)
+    private var toolBar: some View {
+        VStack(spacing: 0) {
+            // Search bar
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField(
+                    selectedDrive.map { "Search \($0.name)..." } ?? "Search all drives...",
+                    text: $searchQuery
+                )
+                .textFieldStyle(.plain)
+                .onSubmit { Task { await performSearch() } }
 
-                ForEach(Array(pathStack.enumerated()), id: \.offset) { index, component in
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-
-                    Button(component) {
-                        pathStack = Array(pathStack.prefix(index + 1))
-                        Task { await browse() }
+                if !searchQuery.isEmpty {
+                    Button {
+                        clearSearch()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                 }
-            } else {
-                Text("Select a drive")
-                    .foregroundStyle(.secondary)
-            }
 
-            Spacer()
-
-            if let data = browseData {
-                Text("\(data.directories.count) folders, \(data.files.count) files")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if isSearching {
+                    ProgressView().controlSize(.small)
+                }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
 
-            Button {
-                Task { await browse() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
+            Divider()
+
+            // Breadcrumb + sort
+            HStack(spacing: 4) {
+                if hasSearched {
+                    Image(systemName: "magnifyingglass")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("\(searchTotal) results")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    breadcrumbs
+                }
+
+                Spacer()
+
+                // Sort picker
+                if !hasSearched {
+                    sortControls
+                }
+
+                Button {
+                    Task {
+                        columns = []
+                        await loadColumn(path: "", depth: 0)
+                    }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .help("Refresh")
+                .disabled(selectedDrive == nil)
             }
-            .buttonStyle(.borderless)
-            .help("Refresh")
-            .disabled(selectedDrive == nil)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
         .background(.bar)
     }
 
-    // MARK: - Directory Content
+    @ViewBuilder
+    private var breadcrumbs: some View {
+        if let drive = selectedDrive {
+            Button(drive.name) {
+                columns = []
+                Task { await loadColumn(path: "", depth: 0) }
+            }
+            .buttonStyle(.plain)
+            .fontWeight(.medium)
+            .font(.callout)
+
+            ForEach(columns.dropFirst(), id: \.id) { col in
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+
+                let name = col.path.components(separatedBy: "/").last ?? col.path
+                Button(name) {
+                    // Trim columns to this depth
+                    columns = Array(columns.prefix(col.depth + 1))
+                    // Clear selection on the last column
+                    if !columns.isEmpty {
+                        columns[columns.count - 1].selectedDir = nil
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.callout)
+            }
+        } else {
+            Text("Select a drive")
+                .foregroundStyle(.secondary)
+                .font(.callout)
+        }
+    }
+
+    private var sortControls: some View {
+        HStack(spacing: 2) {
+            ForEach(SortField.allCases, id: \.self) { field in
+                Button {
+                    if sortField == field {
+                        sortDirection.toggle()
+                    } else {
+                        sortField = field
+                        sortDirection = .ascending
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Text(field.rawValue)
+                        if sortField == field {
+                            Image(systemName: sortDirection == .ascending
+                                  ? "chevron.up" : "chevron.down")
+                                .font(.caption2)
+                        }
+                    }
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(sortField == field
+                                ? Color.accentColor.opacity(0.15) : Color.clear)
+                    .cornerRadius(4)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: - Column Content
 
     @ViewBuilder
-    private var directoryContent: some View {
+    private var columnContent: some View {
         if selectedDrive == nil {
             VStack(spacing: 16) {
                 Image(systemName: "externaldrive")
@@ -137,97 +279,347 @@ struct BrowserView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if isLoading {
+        } else if isLoading && columns.isEmpty {
             VStack(spacing: 16) {
-                ProgressView()
-                    .controlSize(.large)
-                Text("Loading...")
-                    .foregroundStyle(.secondary)
+                ProgressView().controlSize(.large)
+                Text("Loading...").foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let errorMessage {
+        } else if let errorMessage, columns.isEmpty {
             VStack(spacing: 16) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.largeTitle)
                     .foregroundStyle(.orange)
-                Text(errorMessage)
-                    .foregroundStyle(.secondary)
+                Text(errorMessage).foregroundStyle(.secondary)
                 Button("Retry") {
-                    Task { await browse() }
+                    Task { await loadColumn(path: "", depth: 0) }
                 }
                 .buttonStyle(.borderedProminent)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let data = browseData, data.directories.isEmpty && data.files.isEmpty {
+        } else {
+            ScrollViewReader { scrollProxy in
+                ScrollView(.horizontal, showsIndicators: true) {
+                    HStack(alignment: .top, spacing: 0) {
+                        ForEach(Array(columns.enumerated()), id: \.element.id) { index, col in
+                            columnView(col: col, index: index)
+                                .frame(minWidth: 260, idealWidth: 300, maxWidth: 400)
+                                .id(col.id)
+
+                            if index < columns.count - 1 {
+                                Divider()
+                            }
+                        }
+                    }
+                }
+                .onChange(of: columns.count) { _, _ in
+                    if let lastId = columns.last?.id {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            scrollProxy.scrollTo(lastId, anchor: .trailing)
+                        }
+                    }
+                }
+                .focusable()
+                .focused($browserFocused)
+                .onKeyPress(.downArrow) { navigateKeyboard(.down) }
+                .onKeyPress(.upArrow) { navigateKeyboard(.up) }
+                .onKeyPress(.leftArrow) { navigateKeyboard(.left) }
+                .onKeyPress(.rightArrow) { navigateKeyboard(.right) }
+                .onKeyPress(.return) { navigateKeyboard(.activate) }
+            }
+        }
+    }
+
+    private func columnView(col: ColumnData, index: Int) -> some View {
+        let dirs = sortedDirectories(col.response.directories)
+        let files = sortedFiles(col.response.files)
+
+        return List {
+            ForEach(Array(dirs.enumerated()), id: \.element.id) { dirIdx, dir in
+                dirRow(dir: dir, col: col, index: index)
+                    .listRowBackground(
+                        kbRow >= 0 && kbColumn == index && kbRow == dirIdx
+                            ? Color.accentColor.opacity(0.15) : nil
+                    )
+            }
+            ForEach(Array(files.enumerated()), id: \.element.id) { fileIdx, file in
+                fileRow(file: file)
+                    .listRowBackground(
+                        kbRow >= 0 && kbColumn == index && kbRow == (dirs.count + fileIdx)
+                            ? Color.accentColor.opacity(0.15) : nil
+                    )
+            }
+        }
+        .listStyle(.plain)
+    }
+
+    private func dirRow(dir: DirectoryEntry, col: ColumnData, index: Int) -> some View {
+        let isSelected = col.selectedDir == dir.name
+
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Image(systemName: "folder.fill")
+                    .foregroundStyle(.blue)
+                    .frame(width: 18)
+                    .onTapGesture {
+                        revealInFinder(relativePath: dir.path, isDirectory: true)
+                    }
+                    .help("Open in Finder")
+                Text(dir.name)
+                    .lineLimit(1)
+
+                if let backup = backupCache[dir.path], !backup.backupDrives.isEmpty {
+                    backupBadge(backup)
+                }
+
+                Spacer()
+                Text("\(dir.fileCount)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 2)
+
+            // Expanded folder info when selected
+            if isSelected {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 10) {
+                        Label(formattedBrowseSize(dir.totalBytes), systemImage: "internaldisk.fill")
+                        if dir.childDirCount > 0 {
+                            Label("\(dir.childDirCount) folders", systemImage: "folder.fill")
+                        }
+                        Label("\(dir.fileCount) files", systemImage: "doc.fill")
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                    // Backup info
+                    if let backup = backupCache[dir.path] {
+                        if backup.backupDrives.isEmpty {
+                            if backup.hashedFiles == 0 {
+                                Label("Not hashed yet", systemImage: "questionmark.circle")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            } else {
+                                Label("No backups found", systemImage: "exclamationmark.triangle")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                            }
+                        } else {
+                            ForEach(backup.backupDrives, id: \.driveName) { bd in
+                                HStack(spacing: 4) {
+                                    Image(systemName: bd.percentCoverage >= 100
+                                          ? "checkmark.circle.fill" : "circle.lefthalf.filled")
+                                        .foregroundStyle(bd.percentCoverage >= 100 ? .green : .orange)
+                                    Text("\(bd.driveName) — \(Int(bd.percentCoverage))%")
+                                }
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                .padding(.leading, 22)
+                .padding(.vertical, 2)
+            }
+        }
+        .contentShape(Rectangle())
+        .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
+        .cornerRadius(4)
+        .onTapGesture {
+            selectDirectory(dir.name, atColumn: index)
+        }
+        .contextMenu {
+            Button {
+                revealInFinder(relativePath: dir.path, isDirectory: true)
+            } label: {
+                Label("Reveal in Finder", systemImage: "arrow.right.circle")
+            }
+        }
+    }
+
+    private func fileRow(file: FileResponse) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: file.isMedia ? "film.fill" : "doc.fill")
+                .foregroundStyle(file.isMedia ? .orange : .secondary)
+                .frame(width: 18)
+                .onTapGesture {
+                    revealInFinder(relativePath: file.path, isDirectory: false)
+                }
+                .help("Open in Finder")
+            Text(file.filename)
+                .lineLimit(1)
+
+            Spacer()
+
+            Text(ByteCountFormatter.string(fromByteCount: file.sizeBytes, countStyle: .file))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if file.partialHash != nil {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            }
+        }
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            selectedFile = file
+        }
+        .contextMenu {
+            Button {
+                revealInFinder(relativePath: file.path, isDirectory: false)
+            } label: {
+                Label("Reveal in Finder", systemImage: "arrow.right.circle")
+            }
+            Button {
+                fileToCopy = file
+                showCopySheet = true
+            } label: {
+                Label("Copy to...", systemImage: "doc.on.doc")
+            }
+        }
+    }
+
+    // MARK: - Search Results
+
+    @ViewBuilder
+    private var searchContent: some View {
+        if isSearching {
             VStack(spacing: 16) {
-                Image(systemName: "folder")
+                ProgressView().controlSize(.large)
+                Text("Searching...").foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if searchResults.isEmpty {
+            VStack(spacing: 16) {
+                Image(systemName: "doc.questionmark")
                     .font(.system(size: 48))
                     .foregroundStyle(.secondary)
-                Text("Empty folder")
+                Text("No files matching '\(searchQuery)'")
                     .font(.headline)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let data = browseData {
+        } else {
             List {
-                // Back button if not at root
-                if !pathStack.isEmpty {
-                    Button {
-                        pathStack.removeLast()
-                        Task { await browse() }
-                    } label: {
-                        Label {
-                            Text("..")
-                                .foregroundStyle(.primary)
-                        } icon: {
-                            Image(systemName: "arrow.turn.up.left")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                // Directories first (like Finder)
-                ForEach(data.directories) { dir in
-                    Button {
-                        pathStack.append(dir.name)
-                        Task { await browse() }
-                    } label: {
-                        HStack {
-                            Image(systemName: "folder.fill")
-                                .foregroundStyle(.blue)
-                                .frame(width: 20)
-                            Text(dir.name)
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            Text("\(dir.fileCount) items")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(ByteCountFormatter.string(fromByteCount: dir.totalBytes, countStyle: .file))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .frame(width: 80, alignment: .trailing)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                // Then files
-                ForEach(data.files) { file in
-                    FileRow(file: file)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedFile = file
-                        }
+                ForEach(searchResults) { file in
+                    SearchResultRow(file: file)
                         .contextMenu {
-                            Button {
-                                fileToCopy = file
-                                showCopySheet = true
-                            } label: {
-                                Label("Copy to...", systemImage: "doc.on.doc")
+                            if let drive = drives.first(where: { $0.name == file.driveName }) {
+                                Button {
+                                    let fullPath = "\(drive.mountPath)/\(file.path)"
+                                    let url = URL(fileURLWithPath: fullPath)
+                                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                                } label: {
+                                    Label("Reveal in Finder", systemImage: "arrow.right.circle")
+                                }
                             }
                         }
                 }
+            }
+        }
+    }
+
+    // MARK: - Keyboard Navigation
+
+    private enum KeyDirection {
+        case up, down, left, right, activate
+    }
+
+    private func navigateKeyboard(_ direction: KeyDirection) -> KeyPress.Result {
+        guard !columns.isEmpty else { return .ignored }
+        let colIdx = min(kbColumn, columns.count - 1)
+        kbColumn = colIdx
+
+        let col = columns[colIdx]
+        let dirs = sortedDirectories(col.response.directories)
+        let files = sortedFiles(col.response.files)
+        let total = dirs.count + files.count
+
+        guard total > 0 else { return .ignored }
+
+        switch direction {
+        case .down:
+            if kbRow < total - 1 { kbRow += 1 }
+            else if kbRow < 0 { kbRow = 0 }
+
+        case .up:
+            if kbRow > 0 { kbRow -= 1 }
+            else if kbRow < 0 { kbRow = 0 }
+
+        case .right:
+            if kbRow >= 0 && kbRow < dirs.count {
+                selectDirectory(dirs[kbRow].name, atColumn: colIdx)
+            } else if colIdx < columns.count - 1 {
+                kbColumn = colIdx + 1
+                kbRow = 0
+            }
+
+        case .left:
+            if colIdx > 0 {
+                kbColumn = colIdx - 1
+                if let sel = columns[kbColumn].selectedDir {
+                    let parentDirs = sortedDirectories(columns[kbColumn].response.directories)
+                    kbRow = parentDirs.firstIndex(where: { $0.name == sel }) ?? 0
+                } else {
+                    kbRow = 0
+                }
+            }
+
+        case .activate:
+            if kbRow >= 0 && kbRow < dirs.count {
+                selectDirectory(dirs[kbRow].name, atColumn: colIdx)
+            } else if kbRow >= dirs.count {
+                let fileIdx = kbRow - dirs.count
+                if fileIdx < files.count {
+                    selectedFile = files[fileIdx]
+                }
+            }
+        }
+
+        return .handled
+    }
+
+    // MARK: - Sorting
+
+    private func sortedDirectories(_ dirs: [DirectoryEntry]) -> [DirectoryEntry] {
+        dirs.sorted { a, b in
+            let asc = sortDirection == .ascending
+            switch sortField {
+            case .name, .type, .date:
+                let cmp = a.name.localizedCaseInsensitiveCompare(b.name)
+                return asc ? cmp == .orderedAscending : cmp == .orderedDescending
+            case .size:
+                return asc ? a.totalBytes < b.totalBytes : a.totalBytes > b.totalBytes
+            }
+        }
+    }
+
+    private func sortedFiles(_ files: [FileResponse]) -> [FileResponse] {
+        files.sorted { a, b in
+            let asc = sortDirection == .ascending
+            switch sortField {
+            case .name:
+                let cmp = a.filename.localizedCaseInsensitiveCompare(b.filename)
+                return asc ? cmp == .orderedAscending : cmp == .orderedDescending
+            case .size:
+                return asc ? a.sizeBytes < b.sizeBytes : a.sizeBytes > b.sizeBytes
+            case .date:
+                let aTime = a.mtime ?? ""
+                let bTime = b.mtime ?? ""
+                return asc ? aTime < bTime : aTime > bTime
+            case .type:
+                let aExt = (a.filename as NSString).pathExtension.lowercased()
+                let bExt = (b.filename as NSString).pathExtension.lowercased()
+                if aExt != bExt {
+                    return asc ? aExt < bExt : aExt > bExt
+                }
+                let cmp = a.filename.localizedCaseInsensitiveCompare(b.filename)
+                return asc ? cmp == .orderedAscending : cmp == .orderedDescending
             }
         }
     }
@@ -238,33 +630,219 @@ struct BrowserView: View {
         do {
             let response = try await APIService.shared.fetchDrives()
             drives = response.drives
-            // Auto-select first drive
             if let first = drives.first {
                 selectedDrive = first
-                await browse()
+                await loadColumn(path: "", depth: 0)
             }
         } catch {
             // Non-critical
         }
     }
 
-    private var currentPath: String {
-        pathStack.joined(separator: "/")
+    private func selectDirectory(_ name: String, atColumn index: Int) {
+        // Toggle: clicking already-selected folder collapses it
+        if columns[index].selectedDir == name {
+            columns[index].selectedDir = nil
+            columns = Array(columns.prefix(index + 1))
+            kbColumn = index
+            return
+        }
+
+        columns[index].selectedDir = name
+        columns = Array(columns.prefix(index + 1))
+        let parentPath = columns[index].path
+        let newPath = parentPath.isEmpty ? name : "\(parentPath)/\(name)"
+        kbColumn = index + 1
+        kbRow = 0
+        Task { await loadColumn(path: newPath, depth: index + 1) }
     }
 
-    private func browse() async {
+    private func loadColumn(path: String, depth: Int) async {
         guard let drive = selectedDrive else { return }
-        isLoading = true
+        if depth == 0 { isLoading = true }
         errorMessage = nil
+
         do {
-            browseData = try await APIService.shared.browseDirectory(
+            let response = try await APIService.shared.browseDirectory(
                 drive: drive.name,
-                path: currentPath
+                path: path
             )
+
+            let newCol = ColumnData(depth: depth, path: path, response: response)
+
+            if depth == 0 {
+                columns = [newCol]
+            } else {
+                // Replace or append
+                if columns.count > depth {
+                    columns = Array(columns.prefix(depth)) + [newCol]
+                } else {
+                    columns.append(newCol)
+                }
+            }
+
+            // Load backup statuses for directories in background
+            Task {
+                for dir in response.directories {
+                    if let status = try? await APIService.shared.fetchBackupStatus(
+                        drive: drive.name, path: dir.path
+                    ) {
+                        backupCache[dir.path] = status
+                    }
+                }
+            }
         } catch {
-            errorMessage = error.localizedDescription
+            if depth == 0 {
+                errorMessage = error.localizedDescription
+            }
         }
-        isLoading = false
+        if depth == 0 { isLoading = false }
+    }
+
+    // MARK: - Search
+
+    private func performSearch() async {
+        let trimmed = searchQuery.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        isSearching = true
+        hasSearched = true
+        do {
+            let response = try await APIService.shared.searchFiles(
+                query: trimmed, drive: selectedDrive?.name
+            )
+            searchResults = response.files
+            searchTotal = response.total
+        } catch {
+            searchResults = []
+            searchTotal = 0
+        }
+        isSearching = false
+    }
+
+    private func clearSearch() {
+        searchQuery = ""
+        searchResults = []
+        searchTotal = 0
+        hasSearched = false
+    }
+
+    // MARK: - Reveal in Finder
+
+    private func revealInFinder(relativePath: String, isDirectory: Bool) {
+        guard let drive = selectedDrive else { return }
+        let fullPath = "\(drive.mountPath)/\(relativePath)"
+        let url = URL(fileURLWithPath: fullPath)
+
+        if FileManager.default.fileExists(atPath: fullPath) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func formattedBrowseSize(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    @ViewBuilder
+    private func backupBadge(_ backup: BackupStatusResponse) -> some View {
+        BackupBadgeView(backup: backup)
+    }
+
+}
+
+/// Backup badge with hover popover — needs its own View for @State.
+private struct BackupBadgeView: View {
+    let backup: BackupStatusResponse
+    @State private var isHovered = false
+
+    private var allFull: Bool {
+        backup.backupDrives.allSatisfy { $0.percentCoverage >= 100 }
+    }
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: allFull ? "checkmark.shield.fill" : "shield.lefthalf.filled")
+                .font(.caption2)
+            Text("\(backup.backupDrives.count)")
+                .font(.caption2)
+                .fontWeight(.medium)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(allFull ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+        .foregroundStyle(allFull ? .green : .orange)
+        .clipShape(Capsule())
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .popover(isPresented: $isHovered, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "shield.lefthalf.filled")
+                        .foregroundStyle(.blue)
+                    Text("Backup Status")
+                        .font(.callout)
+                        .fontWeight(.medium)
+                }
+
+                Divider()
+
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading) {
+                        Text("\(backup.totalFiles)")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                        Text("Total files")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    VStack(alignment: .leading) {
+                        Text("\(backup.hashedFiles)")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                        Text("Hashed")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    VStack(alignment: .leading) {
+                        Text("\(backup.backedUpFiles)")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                        Text("Backed up")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+
+                if !backup.backupDrives.isEmpty {
+                    Divider()
+                    Text("Copies on:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(backup.backupDrives, id: \.driveName) { bd in
+                        HStack(spacing: 6) {
+                            Image(systemName: "externaldrive.fill")
+                                .font(.caption)
+                                .foregroundStyle(bd.percentCoverage >= 100 ? .green : .orange)
+                            Text(bd.driveName)
+                                .font(.callout)
+                            Spacer()
+                            Text("\(bd.fileCount) files")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("\(Int(bd.percentCoverage))%")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundStyle(bd.percentCoverage >= 100 ? .green : .orange)
+                        }
+                    }
+                }
+            }
+            .padding(12)
+            .frame(minWidth: 220)
+        }
     }
 }
 

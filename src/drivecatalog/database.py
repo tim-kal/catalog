@@ -35,9 +35,10 @@ def get_connection() -> sqlite3.Connection:
     - Row factory set to sqlite3.Row for dict-like access
     """
     db_path = get_db_path()
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(str(db_path), timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
     return conn
 
 
@@ -54,5 +55,11 @@ def init_db() -> None:
         schema_sql = schema_path.read_text()
         conn.executescript(schema_sql)
         conn.commit()
+
+        # Auto-migrate: add used_bytes column if missing
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(drives)").fetchall()}
+        if "used_bytes" not in cols:
+            conn.execute("ALTER TABLE drives ADD COLUMN used_bytes INTEGER")
+            conn.commit()
     finally:
         conn.close()

@@ -1,5 +1,7 @@
 """Pydantic models for drive-related API responses."""
 
+from __future__ import annotations
+
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
@@ -42,7 +44,17 @@ class DriveStatusResponse(BaseModel):
     name: str
     mounted: bool
     file_count: int
+    folder_count: int
     hashed_count: int
     hash_coverage_percent: float
     last_scan: datetime | None
-    media_count: int
+    first_seen: datetime | None
+    video_count: int
+    image_count: int
+    audio_count: int
+    # Disk usage (persisted — available even when disconnected)
+    used_bytes: int | None = None
+    # Drive health
+    smart_status: str | None = None  # "Verified", "Failing", "Not Supported"
+    media_type: str | None = None  # "SSD", "HDD"
+    device_protocol: str | None = None  # "USB", "SATA", etc.

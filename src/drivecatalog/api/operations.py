@@ -17,6 +17,7 @@ class OperationStatus(StrEnum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 @dataclass
@@ -28,9 +29,14 @@ class Operation:
     drive_name: str
     status: OperationStatus = OperationStatus.PENDING
     progress_percent: float | None = None
+    eta_seconds: float | None = None
+    files_processed: int = 0
+    files_total: int = 0
     result: dict | None = None
     error: str | None = None
+    cancel_requested: bool = False
     created_at: datetime = field(default_factory=datetime.now)
+    started_at: datetime | None = None
     completed_at: datetime | None = None
 
 
@@ -39,53 +45,60 @@ _operations: dict[str, Operation] = {}
 
 
 def create_operation(op_type: str, drive_name: str) -> Operation:
-    """Create and store a new operation.
-
-    Args:
-        op_type: Type of operation (scan, hash, etc.)
-        drive_name: Name of the drive being operated on.
-
-    Returns:
-        The created Operation object.
-    """
+    """Create and store a new operation."""
     op = Operation(id=str(uuid.uuid4())[:8], type=op_type, drive_name=drive_name)
     _operations[op.id] = op
     return op
 
 
 def get_operation(op_id: str) -> Operation | None:
-    """Get an operation by ID.
-
-    Args:
-        op_id: The operation ID.
-
-    Returns:
-        The Operation if found, None otherwise.
-    """
+    """Get an operation by ID."""
     return _operations.get(op_id)
 
 
-def update_operation(op_id: str, **kwargs) -> None:
-    """Update an operation's fields.
+def cancel_operation(op_id: str) -> bool:
+    """Request cancellation of an operation. Returns True if operation was found and running."""
+    op = _operations.get(op_id)
+    if op and op.status in (OperationStatus.PENDING, OperationStatus.RUNNING):
+        op.cancel_requested = True
+        return True
+    return False
 
-    Args:
-        op_id: The operation ID.
-        **kwargs: Fields to update (status, progress_percent, result, error, etc.)
-    """
+
+def is_cancelled(op_id: str) -> bool:
+    """Check if cancellation was requested for an operation."""
+    op = _operations.get(op_id)
+    return op.cancel_requested if op else False
+
+
+def update_operation(op_id: str, **kwargs) -> None:
+    """Update an operation's fields."""
     if op := _operations.get(op_id):
         for k, v in kwargs.items():
             setattr(op, k, v)
 
 
+def update_progress(op_id: str, files_processed: int, files_total: int) -> None:
+    """Update operation progress with ETA calculation."""
+    op = _operations.get(op_id)
+    if not op or not op.started_at:
+        return
+
+    op.files_processed = files_processed
+    op.files_total = files_total
+    op.progress_percent = (files_processed / files_total * 100) if files_total > 0 else 0
+
+    elapsed = (datetime.now() - op.started_at).total_seconds()
+    if elapsed > 0 and files_processed > 0:
+        rate = files_processed / elapsed
+        remaining = files_total - files_processed
+        op.eta_seconds = round(remaining / rate, 1) if rate > 0 else None
+    else:
+        op.eta_seconds = None
+
+
 def list_operations(limit: int = 20) -> list[Operation]:
-    """List recent operations, most recent first.
-
-    Args:
-        limit: Maximum number of operations to return.
-
-    Returns:
-        List of Operation objects sorted by created_at descending.
-    """
+    """List recent operations, most recent first."""
     return sorted(_operations.values(), key=lambda o: o.created_at, reverse=True)[
         :limit
     ]

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS drives (
     uuid TEXT UNIQUE,
     mount_path TEXT,
     total_bytes INTEGER,
+    used_bytes INTEGER,
     first_seen TEXT NOT NULL DEFAULT (datetime('now')),
     last_scan TEXT,
     notes TEXT
@@ -67,3 +68,19 @@ CREATE TABLE IF NOT EXISTS media_metadata (
 );
 
 CREATE INDEX IF NOT EXISTS idx_media_metadata_file_id ON media_metadata(file_id);
+
+-- Folder-level stats for incremental (smart) scanning.
+-- Stores per-directory metadata so auto-scan can skip unchanged subtrees.
+CREATE TABLE IF NOT EXISTS folder_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    drive_id INTEGER NOT NULL REFERENCES drives(id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    file_count INTEGER NOT NULL DEFAULT 0,
+    total_size_bytes INTEGER NOT NULL DEFAULT 0,
+    child_dir_count INTEGER NOT NULL DEFAULT 0,
+    dir_mtime TEXT NOT NULL,
+    last_updated TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(drive_id, path)
+);
+
+CREATE INDEX IF NOT EXISTS idx_folder_stats_drive_id ON folder_stats(drive_id);

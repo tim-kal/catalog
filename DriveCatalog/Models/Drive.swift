@@ -39,19 +39,37 @@ struct DriveStatusResponse: Codable, Identifiable {
     let name: String
     let mounted: Bool
     let fileCount: Int
+    let folderCount: Int
     let hashedCount: Int
     let hashCoveragePercent: Double
     let lastScan: Date?
-    let mediaCount: Int
+    let firstSeen: Date?
+    let videoCount: Int
+    let imageCount: Int
+    let audioCount: Int
+    // Disk usage (persisted — available even when disconnected)
+    let usedBytes: Int64?
+    // Drive health
+    let smartStatus: String?
+    let mediaType: String?
+    let deviceProtocol: String?
 
     enum CodingKeys: String, CodingKey {
         case id
         case name
         case mounted
         case fileCount = "file_count"
+        case folderCount = "folder_count"
         case hashedCount = "hashed_count"
         case hashCoveragePercent = "hash_coverage_percent"
         case lastScan = "last_scan"
-        case mediaCount = "media_count"
+        case firstSeen = "first_seen"
+        case videoCount = "video_count"
+        case imageCount = "image_count"
+        case audioCount = "audio_count"
+        case usedBytes = "used_bytes"
+        case smartStatus = "smart_status"
+        case mediaType = "media_type"
+        case deviceProtocol = "device_protocol"
     }
 }

@@ -17,7 +17,10 @@ struct DriveDetailView: View {
     private enum OperationResult {
         case success(String)
         case failure(String)
+        case cancelled(String)
     }
+
+    @State private var currentOperationId: String?
 
     var body: some View {
         ScrollView {
@@ -121,10 +124,23 @@ struct DriveDetailView: View {
                             }
 
                             // Media files
-                            HStack {
-                                Image(systemName: "film.fill")
-                                    .foregroundStyle(.orange)
-                                Text("\(status.mediaCount.formatted()) media files")
+                            HStack(spacing: 12) {
+                                if status.videoCount > 0 {
+                                    Label("\(status.videoCount.formatted()) videos", systemImage: "film.fill")
+                                        .foregroundStyle(.orange)
+                                }
+                                if status.imageCount > 0 {
+                                    Label("\(status.imageCount.formatted()) images", systemImage: "photo.fill")
+                                        .foregroundStyle(.blue)
+                                }
+                                if status.audioCount > 0 {
+                                    Label("\(status.audioCount.formatted()) audio", systemImage: "waveform")
+                                        .foregroundStyle(.purple)
+                                }
+                                if status.videoCount == 0 && status.imageCount == 0 && status.audioCount == 0 {
+                                    Text("No media files")
+                                        .foregroundStyle(.secondary)
+                                }
                             }
 
                             Divider()
@@ -165,15 +181,29 @@ struct DriveDetailView: View {
                                     Text(operationStatusText(operation))
                                         .foregroundStyle(.secondary)
                                     Spacer()
-                                    if let progress = operation.progressPercent {
-                                        Text("\(Int(progress))%")
+
+                                    if let eta = operation.etaSeconds, eta > 0 {
+                                        Text(formatETA(eta))
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
+
+                                    if let progress = operation.progressPercent {
+                                        Text("\(Int(progress))%")
+                                            .font(.system(.caption, design: .monospaced))
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
+
                                 if let progress = operation.progressPercent {
                                     ProgressView(value: progress / 100)
                                         .tint(.blue)
+                                }
+
+                                if operation.filesTotal > 0 {
+                                    Text("\(operation.filesProcessed.formatted()) / \(operation.filesTotal.formatted()) files")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
                                 }
                             }
                         }
@@ -192,6 +222,11 @@ struct DriveDetailView: View {
                                         .foregroundStyle(.red)
                                     Text(message)
                                         .foregroundStyle(.red)
+                                case .cancelled(let message):
+                                    Image(systemName: "stop.circle.fill")
+                                        .foregroundStyle(.orange)
+                                    Text(message)
+                                        .foregroundStyle(.orange)
                                 }
                             }
                             .font(.callout)
@@ -199,39 +234,30 @@ struct DriveDetailView: View {
 
                         // Action buttons
                         HStack(spacing: 12) {
-                            Button {
-                                Task { await triggerScan() }
-                            } label: {
-                                HStack {
-                                    if activeOperationType == "scan" {
-                                        ProgressView()
-                                            .controlSize(.small)
-                                    } else {
+                            if activeOperation != nil {
+                                Button(role: .destructive) {
+                                    Task { await cancelCurrentOperation() }
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "stop.fill")
+                                        Text("Cancel")
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+                            } else {
+                                Button {
+                                    Task { await triggerScan() }
+                                } label: {
+                                    HStack {
                                         Image(systemName: "magnifyingglass")
+                                        Text("Scan & Hash")
                                     }
-                                    Text("Scan Drive")
+                                    .frame(maxWidth: .infinity)
                                 }
-                                .frame(maxWidth: .infinity)
+                                .buttonStyle(.borderedProminent)
+                                .disabled(!isMounted)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(!isMounted || activeOperation != nil)
-
-                            Button {
-                                Task { await triggerHash() }
-                            } label: {
-                                HStack {
-                                    if activeOperationType == "hash" {
-                                        ProgressView()
-                                            .controlSize(.small)
-                                    } else {
-                                        Image(systemName: "number")
-                                    }
-                                    Text("Compute Hashes")
-                                }
-                                .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
-                            .disabled(!isMounted || activeOperation != nil)
                         }
 
                         if !isMounted {
@@ -252,6 +278,9 @@ struct DriveDetailView: View {
         .navigationTitle(drive.name)
         .task {
             await loadStatus()
+            if activeOperation == nil {
+                await resumeRunningOperation()
+            }
         }
     }
 
@@ -291,65 +320,84 @@ struct DriveDetailView: View {
 
     // MARK: - Operations
 
+    private func resumeRunningOperation() async {
+        do {
+            let opList = try await APIService.shared.fetchOperations()
+            if let running = opList.operations.first(where: {
+                $0.driveName == drive.name &&
+                ($0.status == "running" || $0.status == "pending")
+            }) {
+                currentOperationId = running.id
+                activeOperationType = running.type
+                activeOperation = running
+                await pollOperation(id: running.id)
+            }
+        } catch {
+            // Silently ignore
+        }
+    }
+
     private func triggerScan() async {
         operationResult = nil
         activeOperationType = "scan"
 
         do {
             let startResponse = try await APIService.shared.triggerScan(driveName: drive.name)
-            await pollOperation(id: startResponse.operationId, type: "scan")
+            currentOperationId = startResponse.operationId
+            await pollOperation(id: startResponse.operationId)
         } catch {
             activeOperationType = nil
+            currentOperationId = nil
             operationResult = .failure("Scan failed: \(error.localizedDescription)")
             clearResultAfterDelay()
         }
     }
 
-    private func triggerHash() async {
-        operationResult = nil
-        activeOperationType = "hash"
-
+    private func cancelCurrentOperation() async {
+        guard let opId = currentOperationId else { return }
         do {
-            let startResponse = try await APIService.shared.triggerHash(driveName: drive.name)
-            await pollOperation(id: startResponse.operationId, type: "hash")
+            try await APIService.shared.cancelOperation(id: opId)
         } catch {
-            activeOperationType = nil
-            operationResult = .failure("Hash failed: \(error.localizedDescription)")
-            clearResultAfterDelay()
+            // Cancellation request failed — polling will handle final state
         }
     }
 
-    private func pollOperation(id: String, type: String) async {
-        // Poll every 2 seconds until complete
+    private func pollOperation(id: String) async {
         while true {
             do {
                 let operation = try await APIService.shared.fetchOperation(id: id)
                 activeOperation = operation
 
                 if operation.status == "completed" {
-                    // Success
                     activeOperation = nil
                     activeOperationType = nil
-                    operationResult = .success("\(type.capitalized) completed successfully")
+                    currentOperationId = nil
+                    operationResult = .success("Scan & hash completed")
                     clearResultAfterDelay()
-                    // Refresh status to show updated file count/hash coverage
                     await loadStatus()
                     break
                 } else if operation.status == "failed" {
-                    // Failure
                     activeOperation = nil
                     activeOperationType = nil
-                    operationResult = .failure(operation.error ?? "\(type.capitalized) failed")
+                    currentOperationId = nil
+                    operationResult = .failure(operation.error ?? "Operation failed")
                     clearResultAfterDelay()
+                    break
+                } else if operation.status == "cancelled" {
+                    activeOperation = nil
+                    activeOperationType = nil
+                    currentOperationId = nil
+                    operationResult = .cancelled("Cancelled — progress saved, resume anytime")
+                    clearResultAfterDelay()
+                    await loadStatus()
                     break
                 }
 
-                // Still running, wait and poll again
-                try await Task.sleep(for: .seconds(2))
+                try await Task.sleep(for: .seconds(1))
             } catch {
-                // Polling error
                 activeOperation = nil
                 activeOperationType = nil
+                currentOperationId = nil
                 operationResult = .failure("Lost connection: \(error.localizedDescription)")
                 clearResultAfterDelay()
                 break
@@ -360,11 +408,25 @@ struct DriveDetailView: View {
     private func operationStatusText(_ operation: OperationResponse) -> String {
         switch operation.status {
         case "pending":
-            return "Waiting to start..."
+            return "Counting files..."
         case "running":
-            return "\(operation.type.capitalized) in progress..."
+            return "Scanning & hashing..."
         default:
             return operation.status.capitalized
+        }
+    }
+
+    private func formatETA(_ seconds: Double) -> String {
+        if seconds < 60 {
+            return "\(Int(seconds))s remaining"
+        } else if seconds < 3600 {
+            let mins = Int(seconds) / 60
+            let secs = Int(seconds) % 60
+            return "\(mins)m \(secs)s remaining"
+        } else {
+            let hrs = Int(seconds) / 3600
+            let mins = (Int(seconds) % 3600) / 60
+            return "\(hrs)h \(mins)m remaining"
         }
     }
 

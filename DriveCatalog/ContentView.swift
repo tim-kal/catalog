@@ -12,10 +12,8 @@ struct ContentView: View {
                 DrivesView()
             case .browser:
                 BrowserView()
-            case .duplicates:
-                DuplicatesView()
-            case .search:
-                SearchView()
+            case .backups:
+                BackupsView()
             case .settings:
                 SettingsView()
             case nil:

@@ -1,15 +1,21 @@
 """Drive management endpoints for DriveCatalog API."""
 
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 from drivecatalog.database import get_connection
-from drivecatalog.drives import get_drive_info, validate_mount_path
+from drivecatalog.drives import get_drive_info, get_smart_status, recognize_drive, validate_mount_path
 from drivecatalog.hasher import compute_partial_hash
 from drivecatalog.media import MEDIA_EXTENSIONS, check_integrity, extract_metadata
-from drivecatalog.scanner import scan_drive as scanner_scan_drive
+from drivecatalog.scanner import (
+    count_files,
+    scan_drive as scanner_scan_drive,
+    smart_scan_drive as scanner_smart_scan,
+)
+from drivecatalog.verifier import verify_drive
 
 from ..models.drive import (
     DriveCreateRequest,
@@ -17,7 +23,13 @@ from ..models.drive import (
     DriveResponse,
     DriveStatusResponse,
 )
-from ..operations import OperationStatus, create_operation, update_operation
+from ..operations import (
+    OperationStatus,
+    create_operation,
+    is_cancelled,
+    update_operation,
+    update_progress,
+)
 
 router = APIRouter(prefix="/drives", tags=["drives"])
 
@@ -161,6 +173,130 @@ async def delete_drive(
         conn.close()
 
 
+@router.post("/{name}/clear-scan")
+async def clear_scan_data(
+    name: str,
+    confirm: bool = Query(False, description="Must be true to confirm clearing"),
+) -> dict:
+    """Clear all scan data (files, hashes, media metadata) for a drive.
+
+    Keeps the drive registration intact so it can be re-scanned.
+    This is a destructive operation. Set confirm=true to proceed.
+    """
+    if not confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="Clearing scan data requires confirmation. Add ?confirm=true to proceed.",
+        )
+
+    conn = get_connection()
+    try:
+        drive = conn.execute(
+            "SELECT id, name FROM drives WHERE name = ?", (name,)
+        ).fetchone()
+
+        if not drive:
+            raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
+
+        drive_id = drive["id"]
+
+        file_count = conn.execute(
+            "SELECT COUNT(*) FROM files WHERE drive_id = ?", (drive_id,)
+        ).fetchone()[0]
+
+        # Delete all files (CASCADE removes media_metadata)
+        conn.execute("DELETE FROM files WHERE drive_id = ?", (drive_id,))
+        # Reset last_scan timestamp
+        conn.execute(
+            "UPDATE drives SET last_scan = NULL WHERE id = ?", (drive_id,)
+        )
+        conn.commit()
+
+        return {
+            "status": "cleared",
+            "name": name,
+            "files_removed": file_count,
+        }
+    finally:
+        conn.close()
+
+
+@router.get("/mounted", response_model=DriveListResponse)
+async def list_mounted_drives() -> DriveListResponse:
+    """Return all registered drives that are currently mounted.
+
+    A drive is considered mounted when its mount_path exists on the filesystem.
+    """
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT d.*, (SELECT COUNT(*) FROM files WHERE drive_id = d.id) as file_count
+            FROM drives d ORDER BY d.name
+            """
+        ).fetchall()
+
+        mounted = []
+        for row in rows:
+            mount_path = row["mount_path"]
+            if mount_path and Path(mount_path).exists():
+                mounted.append(
+                    DriveResponse(
+                        id=row["id"],
+                        name=row["name"],
+                        uuid=row["uuid"],
+                        mount_path=mount_path,
+                        total_bytes=row["total_bytes"] or 0,
+                        last_scan=row["last_scan"],
+                        file_count=row["file_count"],
+                    )
+                )
+
+        return DriveListResponse(drives=mounted, total=len(mounted))
+    finally:
+        conn.close()
+
+
+@router.post("/recognize")
+async def recognize_mounted_drive(mount_path: str = Query(..., description="Mount path of the volume")) -> dict:
+    """Recognize a mounted volume against registered drives using UUID.
+
+    Matches by UUID first (survives renames), then falls back to mount_path.
+    If the drive was renamed, automatically updates the registration.
+
+    Returns the recognized drive info or a 'not_found' status.
+    """
+    path_obj = Path(mount_path)
+    if not path_obj.exists():
+        raise HTTPException(status_code=400, detail=f"Path '{mount_path}' does not exist")
+
+    conn = get_connection()
+    try:
+        drive = recognize_drive(conn, path_obj)
+
+        if drive is None:
+            return {"status": "not_found", "mount_path": mount_path}
+
+        file_count = conn.execute(
+            "SELECT COUNT(*) FROM files WHERE drive_id = ?", (drive["id"],)
+        ).fetchone()[0]
+
+        return {
+            "status": "recognized",
+            "drive": DriveResponse(
+                id=drive["id"],
+                name=drive["name"],
+                uuid=drive["uuid"],
+                mount_path=drive["mount_path"],
+                total_bytes=drive["total_bytes"] or 0,
+                last_scan=drive["last_scan"],
+                file_count=file_count,
+            ).model_dump(),
+        }
+    finally:
+        conn.close()
+
+
 @router.get("/{name}", response_model=DriveResponse)
 async def get_drive(name: str) -> DriveResponse:
     """Get details for a single drive by name."""
@@ -200,7 +336,7 @@ async def get_drive_status(name: str) -> DriveStatusResponse:
     try:
         # Get drive info
         drive = conn.execute(
-            "SELECT id, name, mount_path, last_scan FROM drives WHERE name = ?", (name,)
+            "SELECT id, name, mount_path, total_bytes, used_bytes, last_scan, first_seen FROM drives WHERE name = ?", (name,)
         ).fetchone()
 
         if not drive:
@@ -212,13 +348,21 @@ async def get_drive_status(name: str) -> DriveStatusResponse:
         # Check if drive is mounted (mount_path exists)
         mounted = Path(mount_path).exists() if mount_path else False
 
-        # Get file statistics
+        # Get file statistics with media type breakdown by extension
         stats = conn.execute(
             """
             SELECT
                 COUNT(*) as file_count,
                 SUM(CASE WHEN partial_hash IS NOT NULL THEN 1 ELSE 0 END) as hashed_count,
-                SUM(CASE WHEN is_media = 1 THEN 1 ELSE 0 END) as media_count
+                SUM(CASE WHEN LOWER(SUBSTR(filename, INSTR(filename, '.') + 1))
+                    IN ('mp4','mov','mkv','avi','wmv','webm','m4v','mxf','r3d','braw','ari','prores','mpg','mpeg','ts','flv')
+                    THEN 1 ELSE 0 END) as video_count,
+                SUM(CASE WHEN LOWER(SUBSTR(filename, INSTR(filename, '.') + 1))
+                    IN ('jpg','jpeg','png','gif','webp','tiff','tif','bmp','heic','heif','raw','cr2','nef','arw','dng','psd','svg')
+                    THEN 1 ELSE 0 END) as image_count,
+                SUM(CASE WHEN LOWER(SUBSTR(filename, INSTR(filename, '.') + 1))
+                    IN ('mp3','wav','flac','aac','ogg','m4a','wma','aiff','aif','opus','alac')
+                    THEN 1 ELSE 0 END) as audio_count
             FROM files WHERE drive_id = ?
             """,
             (drive_id,),
@@ -226,40 +370,120 @@ async def get_drive_status(name: str) -> DriveStatusResponse:
 
         file_count = stats["file_count"] or 0
         hashed_count = stats["hashed_count"] or 0
-        media_count = stats["media_count"] or 0
+        video_count = stats["video_count"] or 0
+        image_count = stats["image_count"] or 0
+        audio_count = stats["audio_count"] or 0
+
+        # Count distinct folders (parent directories of files)
+        folder_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT
+                CASE WHEN INSTR(path, '/') > 0
+                THEN SUBSTR(path, 1, LENGTH(path) - LENGTH(filename) - 1)
+                ELSE NULL END
+            ) as folder_count
+            FROM files WHERE drive_id = ?
+            """,
+            (drive_id,),
+        ).fetchone()
+        folder_count = folder_row["folder_count"] or 0
 
         hash_coverage_percent = (
             round((hashed_count / file_count) * 100, 2) if file_count > 0 else 0.0
         )
+
+        # Get SMART health and persist disk usage if drive is mounted
+        smart_status = None
+        media_type = None
+        device_protocol = None
+        used_bytes: int | None = drive["used_bytes"]  # last-known from DB
+
+        if mounted and mount_path:
+            health = get_smart_status(Path(mount_path))
+            smart_status = health["smart_status"]
+            media_type = health["media_type"]
+            device_protocol = health["device_protocol"]
+
+            # Read live disk usage and persist for when drive is disconnected
+            import os
+            try:
+                stat = os.statvfs(mount_path)
+                total = stat.f_frsize * stat.f_blocks
+                free = stat.f_frsize * stat.f_bavail
+                used_bytes = total - free
+                conn.execute(
+                    "UPDATE drives SET total_bytes = ?, used_bytes = ? WHERE id = ?",
+                    (total, used_bytes, drive_id),
+                )
+                conn.commit()
+            except OSError:
+                pass
 
         return DriveStatusResponse(
             id=drive_id,
             name=drive["name"],
             mounted=mounted,
             file_count=file_count,
+            folder_count=folder_count,
             hashed_count=hashed_count,
             hash_coverage_percent=hash_coverage_percent,
             last_scan=drive["last_scan"],
-            media_count=media_count,
+            first_seen=drive["first_seen"],
+            video_count=video_count,
+            image_count=image_count,
+            audio_count=audio_count,
+            smart_status=smart_status,
+            media_type=media_type,
+            device_protocol=device_protocol,
+            used_bytes=used_bytes,
         )
     finally:
         conn.close()
 
 
 def _run_scan(operation_id: str, drive_id: int, mount_path: str) -> None:
-    """Run scan in background thread.
-
-    Args:
-        operation_id: ID of the operation to track progress.
-        drive_id: Database ID of the drive.
-        mount_path: Path to the mounted drive.
-    """
-    update_operation(operation_id, status=OperationStatus.RUNNING)
+    """Run scan in background thread with progress tracking and auto-hash."""
+    update_operation(
+        operation_id,
+        status=OperationStatus.RUNNING,
+        started_at=datetime.now(),
+    )
 
     try:
+        # Phase 1: Quick pre-count for accurate progress bar
+        total_estimate = count_files(mount_path)
+        update_operation(operation_id, files_total=total_estimate)
+
+        # Phase 2: Actual scan with progress + cancellation
         conn = get_connection()
         try:
-            result = scanner_scan_drive(drive_id, mount_path, conn)
+            def on_progress(_dir: str, stats: dict | None) -> None:
+                if stats:
+                    update_progress(operation_id, stats["total"], total_estimate)
+
+            result = scanner_scan_drive(
+                drive_id,
+                mount_path,
+                conn,
+                progress_callback=on_progress,
+                cancel_check=lambda: is_cancelled(operation_id),
+                total_estimate=total_estimate,
+            )
+
+            if result.cancelled:
+                update_operation(
+                    operation_id,
+                    status=OperationStatus.CANCELLED,
+                    result={
+                        "new_files": result.new_files,
+                        "modified_files": result.modified_files,
+                        "unchanged_files": result.unchanged_files,
+                        "errors": result.errors,
+                        "total_scanned": result.total_scanned,
+                    },
+                    completed_at=datetime.now(),
+                )
+                return
 
             # Update last_scan timestamp
             conn.execute(
@@ -268,18 +492,32 @@ def _run_scan(operation_id: str, drive_id: int, mount_path: str) -> None:
             )
             conn.commit()
 
-            update_operation(
-                operation_id,
-                status=OperationStatus.COMPLETED,
-                result={
-                    "new_files": result.new_files,
-                    "modified_files": result.modified_files,
-                    "unchanged_files": result.unchanged_files,
-                    "errors": result.errors,
-                    "total_scanned": result.total_scanned,
-                },
-                completed_at=datetime.now(),
-            )
+            scan_result = {
+                "new_files": result.new_files,
+                "modified_files": result.modified_files,
+                "unchanged_files": result.unchanged_files,
+                "removed_files": result.removed_files,
+                "errors": result.errors,
+                "total_scanned": result.total_scanned,
+            }
+
+            # Phase 3: Auto-hash unhashed files
+            unhashed = conn.execute(
+                "SELECT COUNT(*) FROM files WHERE drive_id = ? AND partial_hash IS NULL",
+                (drive_id,),
+            ).fetchone()[0]
+
+            if unhashed > 0 and not is_cancelled(operation_id):
+                _run_auto_hash(operation_id, drive_id, mount_path, conn, scan_result)
+            else:
+                update_operation(
+                    operation_id,
+                    status=OperationStatus.COMPLETED,
+                    progress_percent=100.0,
+                    eta_seconds=0,
+                    result=scan_result,
+                    completed_at=datetime.now(),
+                )
         finally:
             conn.close()
     except Exception as e:
@@ -287,6 +525,79 @@ def _run_scan(operation_id: str, drive_id: int, mount_path: str) -> None:
             operation_id,
             status=OperationStatus.FAILED,
             error=str(e),
+            completed_at=datetime.now(),
+        )
+
+
+def _run_auto_hash(
+    operation_id: str,
+    drive_id: int,
+    mount_path: str,
+    conn: sqlite3.Connection,
+    scan_result: dict,
+) -> None:
+    """Auto-hash unhashed files after scan completes. Reuses the same operation ID."""
+    mount_path_obj = Path(mount_path)
+
+    files = conn.execute(
+        "SELECT id, path, size_bytes FROM files WHERE drive_id = ? AND partial_hash IS NULL",
+        (drive_id,),
+    ).fetchall()
+
+    total = len(files)
+    hashed = 0
+    errors = 0
+
+    # Reset progress for hash phase and update type so frontend knows
+    update_operation(
+        operation_id,
+        type="hash",
+        progress_percent=0.0,
+        files_processed=0,
+        files_total=total,
+        started_at=datetime.now(),
+    )
+
+    for i, file_row in enumerate(files):
+        if is_cancelled(operation_id):
+            scan_result["hash_cancelled"] = True
+            break
+
+        full_path = mount_path_obj / file_row["path"]
+        partial_hash = compute_partial_hash(full_path, file_row["size_bytes"])
+
+        if partial_hash:
+            conn.execute(
+                "UPDATE files SET partial_hash = ? WHERE id = ?",
+                (partial_hash, file_row["id"]),
+            )
+            hashed += 1
+        else:
+            errors += 1
+
+        if (i + 1) % 10 == 0 or i == total - 1:
+            update_progress(operation_id, i + 1, total)
+
+    conn.commit()
+
+    scan_result["hashed"] = hashed
+    scan_result["hash_errors"] = errors
+    scan_result["hash_total"] = total
+
+    if is_cancelled(operation_id):
+        update_operation(
+            operation_id,
+            status=OperationStatus.CANCELLED,
+            result=scan_result,
+            completed_at=datetime.now(),
+        )
+    else:
+        update_operation(
+            operation_id,
+            status=OperationStatus.COMPLETED,
+            progress_percent=100.0,
+            eta_seconds=0,
+            result=scan_result,
             completed_at=datetime.now(),
         )
 
@@ -326,23 +637,149 @@ async def trigger_scan(name: str, background_tasks: BackgroundTasks) -> dict:
         conn.close()
 
 
-def _run_hash(operation_id: str, drive_id: int, mount_path: str, force: bool) -> None:
-    """Run hashing in background thread.
+def _run_smart_scan(operation_id: str, drive_id: int, mount_path: str) -> None:
+    """Run smart (incremental) scan in background with progress tracking and auto-hash."""
+    update_operation(
+        operation_id,
+        status=OperationStatus.RUNNING,
+        started_at=datetime.now(),
+    )
 
-    Args:
-        operation_id: ID of the operation to track progress.
-        drive_id: Database ID of the drive.
-        mount_path: Path to the mounted drive.
-        force: If True, re-hash files that already have hashes.
+    try:
+        conn = get_connection()
+        try:
+            def on_progress(_dir: str, stats: dict | None) -> None:
+                if stats:
+                    update_progress(operation_id, stats["total"], stats.get("total_estimate", 0))
+
+            result = scanner_smart_scan(
+                drive_id,
+                mount_path,
+                conn,
+                progress_callback=on_progress,
+                cancel_check=lambda: is_cancelled(operation_id),
+            )
+
+            if result.cancelled:
+                update_operation(
+                    operation_id,
+                    status=OperationStatus.CANCELLED,
+                    result={
+                        "new_files": result.new_files,
+                        "modified_files": result.modified_files,
+                        "unchanged_files": result.unchanged_files,
+                        "removed_files": result.removed_files,
+                        "errors": result.errors,
+                        "dirs_scanned": result.dirs_scanned,
+                        "dirs_skipped": result.dirs_skipped,
+                    },
+                    completed_at=datetime.now(),
+                )
+                return
+
+            # Update last_scan timestamp
+            conn.execute(
+                "UPDATE drives SET last_scan = datetime('now') WHERE id = ?",
+                (drive_id,),
+            )
+            conn.commit()
+
+            scan_result = {
+                "new_files": result.new_files,
+                "modified_files": result.modified_files,
+                "unchanged_files": result.unchanged_files,
+                "removed_files": result.removed_files,
+                "errors": result.errors,
+                "dirs_scanned": result.dirs_scanned,
+                "dirs_skipped": result.dirs_skipped,
+                "total_scanned": result.total_scanned,
+            }
+
+            # Auto-hash any new/modified unhashed files
+            unhashed = conn.execute(
+                "SELECT COUNT(*) FROM files WHERE drive_id = ? AND partial_hash IS NULL",
+                (drive_id,),
+            ).fetchone()[0]
+
+            if unhashed > 0 and not is_cancelled(operation_id):
+                _run_auto_hash(operation_id, drive_id, mount_path, conn, scan_result)
+            else:
+                update_operation(
+                    operation_id,
+                    status=OperationStatus.COMPLETED,
+                    progress_percent=100.0,
+                    eta_seconds=0,
+                    result=scan_result,
+                    completed_at=datetime.now(),
+                )
+        finally:
+            conn.close()
+    except Exception as e:
+        update_operation(
+            operation_id,
+            status=OperationStatus.FAILED,
+            error=str(e),
+            completed_at=datetime.now(),
+        )
+
+
+@router.post("/{name}/auto-scan")
+async def auto_scan_drive(name: str, background_tasks: BackgroundTasks) -> dict:
+    """Smart incremental scan — only processes directories that changed.
+
+    Uses folder_stats (populated during full scans) to detect which
+    directories have been modified. Unchanged directories are skipped
+    entirely (no per-file stat calls), making this dramatically faster
+    on large drives.
+
+    If no folder_stats exist yet (first scan), falls back to a full scan.
+
+    Returns:
+        operation_id: The ID of the started operation.
+        status: "started"
     """
-    update_operation(operation_id, status=OperationStatus.RUNNING, progress_percent=0.0)
+    conn = get_connection()
+    try:
+        drive = conn.execute(
+            "SELECT id, name, mount_path FROM drives WHERE name = ?", (name,)
+        ).fetchone()
+
+        if not drive:
+            raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
+
+        mount_path = drive["mount_path"]
+        if not mount_path or not Path(mount_path).exists():
+            raise HTTPException(
+                status_code=400, detail=f"Drive '{name}' is not currently mounted"
+            )
+
+        # Use smart scan — it handles the full-scan fallback internally
+        op = create_operation("smart-scan", name)
+        background_tasks.add_task(_run_smart_scan, op.id, drive["id"], mount_path)
+
+        return {
+            "operation_id": op.id,
+            "status": "started",
+            "poll_url": f"/operations/{op.id}",
+        }
+    finally:
+        conn.close()
+
+
+def _run_hash(operation_id: str, drive_id: int, mount_path: str, force: bool) -> None:
+    """Run hashing in background thread with progress + cancellation."""
+    update_operation(
+        operation_id,
+        status=OperationStatus.RUNNING,
+        progress_percent=0.0,
+        started_at=datetime.now(),
+    )
 
     try:
         conn = get_connection()
         mount_path_obj = Path(mount_path)
 
         try:
-            # Query files needing hashing
             if force:
                 files = conn.execute(
                     "SELECT id, path, size_bytes FROM files WHERE drive_id = ?",
@@ -359,7 +796,19 @@ def _run_hash(operation_id: str, drive_id: int, mount_path: str, force: bool) ->
             hashed = 0
             errors = 0
 
+            update_operation(operation_id, files_total=total)
+
             for i, file_row in enumerate(files):
+                if is_cancelled(operation_id):
+                    conn.commit()
+                    update_operation(
+                        operation_id,
+                        status=OperationStatus.CANCELLED,
+                        result={"hashed": hashed, "errors": errors, "total": total},
+                        completed_at=datetime.now(),
+                    )
+                    return
+
                 full_path = mount_path_obj / file_row["path"]
                 partial_hash = compute_partial_hash(full_path, file_row["size_bytes"])
 
@@ -372,10 +821,8 @@ def _run_hash(operation_id: str, drive_id: int, mount_path: str, force: bool) ->
                 else:
                     errors += 1
 
-                # Update progress every 10 files or at end
                 if (i + 1) % 10 == 0 or i == total - 1:
-                    progress = ((i + 1) / total) * 100 if total > 0 else 100
-                    update_operation(operation_id, progress_percent=progress)
+                    update_progress(operation_id, i + 1, total)
 
             conn.commit()
 
@@ -383,6 +830,7 @@ def _run_hash(operation_id: str, drive_id: int, mount_path: str, force: bool) ->
                 operation_id,
                 status=OperationStatus.COMPLETED,
                 progress_percent=100.0,
+                eta_seconds=0,
                 result={"hashed": hashed, "errors": errors, "total": total},
                 completed_at=datetime.now(),
             )
@@ -720,6 +1168,120 @@ async def trigger_verify(
         # Create operation and start background task
         op = create_operation("verify", name)
         background_tasks.add_task(_run_verify, op.id, drive["id"], mount_path, force)
+
+        return {
+            "operation_id": op.id,
+            "status": "started",
+            "poll_url": f"/operations/{op.id}",
+        }
+    finally:
+        conn.close()
+
+
+def _run_verify_integrity(
+    operation_id: str, drive_id: int, mount_path: str, sample_percent: int
+) -> None:
+    """Run full integrity verification in background thread."""
+    update_operation(
+        operation_id,
+        status=OperationStatus.RUNNING,
+        progress_percent=0.0,
+        started_at=datetime.now(),
+    )
+
+    try:
+        conn = get_connection()
+        try:
+            # Track phases for progress: scan=15%, hash=60%, duplicates=25%
+            phase_weights = {"scan": 0.15, "hash": 0.60, "duplicates": 0.25}
+            phase_offsets = {"scan": 0.0, "hash": 0.15, "duplicates": 0.75}
+
+            def on_progress(phase: str, current: int, total: int) -> None:
+                if total > 0:
+                    phase_pct = (current / total) * phase_weights.get(phase, 0.33)
+                    overall = (phase_offsets.get(phase, 0) + phase_pct) * 100
+                    update_operation(
+                        operation_id,
+                        progress_percent=min(overall, 99.9),
+                        files_processed=current,
+                        files_total=total,
+                    )
+
+            result = verify_drive(
+                drive_id=drive_id,
+                mount_path=mount_path,
+                conn=conn,
+                progress_callback=on_progress,
+                cancel_check=lambda: is_cancelled(operation_id),
+                hash_sample_percent=sample_percent,
+            )
+
+            if result.cancelled:
+                update_operation(
+                    operation_id,
+                    status=OperationStatus.CANCELLED,
+                    result=result.to_dict(),
+                    completed_at=datetime.now(),
+                )
+            else:
+                update_operation(
+                    operation_id,
+                    status=OperationStatus.COMPLETED,
+                    progress_percent=100.0,
+                    eta_seconds=0,
+                    result=result.to_dict(),
+                    completed_at=datetime.now(),
+                )
+        finally:
+            conn.close()
+    except Exception as e:
+        update_operation(
+            operation_id,
+            status=OperationStatus.FAILED,
+            error=str(e),
+            completed_at=datetime.now(),
+        )
+
+
+@router.post("/{name}/verify-integrity")
+async def trigger_verify_integrity(
+    name: str,
+    background_tasks: BackgroundTasks,
+    sample: int = Query(
+        100,
+        ge=1,
+        le=100,
+        description="Percentage of hashed files to re-verify (1-100)",
+    ),
+) -> dict:
+    """Run deterministic integrity verification of scan data.
+
+    Three checks:
+    1. Scan integrity: filesystem vs DB (missing, stale, size mismatches)
+    2. Hash integrity: re-compute hashes and compare (sample or full)
+    3. Duplicate integrity: verify duplicate clusters are genuine
+
+    Returns immediately with an operation_id to poll for results.
+    """
+    conn = get_connection()
+    try:
+        drive = conn.execute(
+            "SELECT id, name, mount_path FROM drives WHERE name = ?", (name,)
+        ).fetchone()
+
+        if not drive:
+            raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
+
+        mount_path = drive["mount_path"]
+        if not mount_path or not Path(mount_path).exists():
+            raise HTTPException(
+                status_code=400, detail=f"Drive '{name}' is not currently mounted"
+            )
+
+        op = create_operation("verify-integrity", name)
+        background_tasks.add_task(
+            _run_verify_integrity, op.id, drive["id"], mount_path, sample
+        )
 
         return {
             "operation_id": op.id,

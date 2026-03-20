@@ -128,6 +128,7 @@ class DirectoryEntry(BaseModel):
     path: str
     file_count: int
     total_bytes: int
+    child_dir_count: int = 0
 
 
 class BrowseResponse(BaseModel):
@@ -177,7 +178,7 @@ async def browse_directory(
 
         # Separate into direct files and subdirectories
         direct_files = []
-        dir_stats: dict[str, dict] = {}  # dirname -> {count, bytes}
+        dir_stats: dict[str, dict] = {}  # dirname -> {count, bytes, subdirs}
 
         for row in rows:
             rel_path = row["path"]
@@ -188,9 +189,14 @@ async def browse_directory(
                 # This file is in a subdirectory
                 dir_name = remainder.split("/", 1)[0]
                 if dir_name not in dir_stats:
-                    dir_stats[dir_name] = {"count": 0, "bytes": 0}
+                    dir_stats[dir_name] = {"count": 0, "bytes": 0, "subdirs": set()}
                 dir_stats[dir_name]["count"] += 1
                 dir_stats[dir_name]["bytes"] += row["size_bytes"]
+                # Track immediate child directories within this directory
+                after_dir = remainder[len(dir_name) + 1:]
+                if "/" in after_dir:
+                    subdir_name = after_dir.split("/", 1)[0]
+                    dir_stats[dir_name]["subdirs"].add(subdir_name)
             else:
                 # Direct child file
                 direct_files.append(
@@ -214,6 +220,7 @@ async def browse_directory(
                 path=f"{prefix}{name}" if prefix else name,
                 file_count=stats["count"],
                 total_bytes=stats["bytes"],
+                child_dir_count=len(stats["subdirs"]),
             )
             for name, stats in dir_stats.items()
         ], key=lambda d: d.name.lower())
@@ -250,6 +257,126 @@ async def browse_directory(
             current_path=current_path,
             directories=directories,
             files=direct_files,
+        )
+    finally:
+        conn.close()
+
+
+class BackupDriveCoverage(BaseModel):
+    """Coverage stats for one backup drive."""
+
+    drive_name: str
+    file_count: int
+    percent_coverage: float
+
+
+class BackupStatusResponse(BaseModel):
+    """Response for folder backup status across drives."""
+
+    drive: str
+    path: str
+    total_files: int
+    hashed_files: int
+    backed_up_files: int
+    backup_drives: list[BackupDriveCoverage]
+
+
+@router.get("/browse/backup-status", response_model=BackupStatusResponse)
+async def browse_backup_status(
+    drive: str = Query(..., description="Source drive name"),
+    path: str = Query(..., description="Folder path relative to drive root"),
+) -> BackupStatusResponse:
+    """Return backup coverage for a folder across all other drives.
+
+    Matches files by partial_hash. Reports how many hashed files in the
+    folder also exist on each other drive and the percentage of coverage.
+    """
+    conn = get_connection()
+    try:
+        # Verify source drive exists
+        drive_row = conn.execute(
+            "SELECT id FROM drives WHERE name = ?", (drive,)
+        ).fetchone()
+        if not drive_row:
+            raise HTTPException(status_code=404, detail=f"Drive '{drive}' not found")
+
+        drive_id = drive_row["id"]
+
+        # Normalize path
+        current_path = path.strip("/")
+        prefix = f"{current_path}/" if current_path else ""
+
+        # Fetch all files recursively under this path on the source drive
+        rows = conn.execute(
+            """
+            SELECT partial_hash
+            FROM files
+            WHERE drive_id = ? AND path LIKE ?
+            """,
+            (drive_id, f"{prefix}%"),
+        ).fetchall()
+
+        total_files = len(rows)
+        hashes = [r["partial_hash"] for r in rows if r["partial_hash"] is not None]
+        hashed_files = len(hashes)
+
+        if not hashes:
+            return BackupStatusResponse(
+                drive=drive,
+                path=current_path,
+                total_files=total_files,
+                hashed_files=0,
+                backed_up_files=0,
+                backup_drives=[],
+            )
+
+        # For each hash, find which other drives have a matching file.
+        # Use a single query with GROUP BY drive to count per-drive matches.
+        # SQLite placeholders for IN clause.
+        placeholders = ",".join("?" * len(hashes))
+        coverage_rows = conn.execute(
+            f"""
+            SELECT d.name AS drive_name, COUNT(DISTINCT f.partial_hash) AS matched_hashes
+            FROM files f
+            JOIN drives d ON f.drive_id = d.id
+            WHERE f.drive_id != ?
+              AND f.partial_hash IS NOT NULL
+              AND f.partial_hash IN ({placeholders})
+            GROUP BY d.id
+            ORDER BY matched_hashes DESC
+            """,
+            [drive_id, *hashes],
+        ).fetchall()
+
+        # Count how many source hashes are backed up on at least one other drive
+        backed_up_hashes_row = conn.execute(
+            f"""
+            SELECT COUNT(DISTINCT f.partial_hash) AS backed_up
+            FROM files f
+            WHERE f.drive_id != ?
+              AND f.partial_hash IS NOT NULL
+              AND f.partial_hash IN ({placeholders})
+            """,
+            [drive_id, *hashes],
+        ).fetchone()
+        backed_up_files = backed_up_hashes_row["backed_up"] if backed_up_hashes_row else 0
+
+        backup_drives = [
+            BackupDriveCoverage(
+                drive_name=r["drive_name"],
+                file_count=r["matched_hashes"],
+                percent_coverage=round(r["matched_hashes"] / hashed_files * 100, 1),
+            )
+            for r in coverage_rows
+        ]
+
+        return BackupStatusResponse(
+            drive=drive,
+            path=current_path,
+            total_files=total_files,
+            hashed_files=hashed_files,
+            backed_up_files=backed_up_files,
+            backup_drives=backup_drives,
         )
     finally:
         conn.close()

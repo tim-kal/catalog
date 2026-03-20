@@ -1,21 +1,50 @@
 import SwiftUI
 
-/// Settings view showing API connection status, database stats, and app info.
+/// Settings view showing backend status, database stats, and app info.
 struct SettingsView: View {
+    @EnvironmentObject private var backend: BackendService
+
     @State private var healthStatus: HealthStatusResponse?
     @State private var isLoadingHealth = true
     @State private var healthError: String?
-    @State private var isConnected = false
 
     var body: some View {
         Form {
-            // API Connection
-            Section("API Connection") {
+            // Backend Status
+            Section("Backend") {
                 HStack {
                     Circle()
-                        .fill(isConnected ? .green : .red)
+                        .fill(backend.isRunning ? .green : .red)
                         .frame(width: 10, height: 10)
-                    Text(isConnected ? "Connected" : "Disconnected")
+                    Text(backend.isRunning ? "Running" : "Stopped")
+                    Spacer()
+                    if !backend.isRunning {
+                        Button("Start") {
+                            backend.start()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    } else {
+                        Button("Restart") {
+                            backend.stop()
+                            Task {
+                                try? await Task.sleep(for: .seconds(1))
+                                backend.start()
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+
+                if let error = backend.startupError {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
                 }
 
                 HStack {
@@ -49,25 +78,10 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-
-                if isLoadingHealth {
-                    HStack {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Checking connection...")
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    Button {
-                        Task { await loadHealth() }
-                    } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
-                    }
-                }
             }
 
             // Database Stats
-            if isConnected, let health = healthStatus {
+            if backend.isRunning, let health = healthStatus {
                 Section("Database Stats") {
                     HStack {
                         Text("Drives registered")
@@ -130,8 +144,10 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Settings")
-        .task {
-            await loadHealth()
+        .task(id: backend.isRunning) {
+            if backend.isRunning {
+                await loadHealth()
+            }
         }
     }
 
@@ -140,9 +156,7 @@ struct SettingsView: View {
         healthError = nil
         do {
             healthStatus = try await APIService.shared.fetchHealthStatus()
-            isConnected = true
         } catch {
-            isConnected = false
             healthError = error.localizedDescription
         }
         isLoadingHealth = false
@@ -151,4 +165,5 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView()
+        .environmentObject(BackendService.shared)
 }

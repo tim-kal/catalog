@@ -27,7 +27,7 @@ enum APIError: Error, LocalizedError {
 /// Thread-safe API service for communicating with the DriveCatalog FastAPI backend.
 actor APIService {
     /// Base URL for the API server.
-    static let baseURL = "http://localhost:8000"
+    static let baseURL = "http://localhost:8100"
 
     /// Shared instance for convenience.
     static let shared = APIService()
@@ -35,7 +35,9 @@ actor APIService {
     /// JSON decoder configured for the API response format.
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        // NOTE: Do NOT use .convertFromSnakeCase here — all models define
+        // explicit CodingKeys with snake_case raw values. Using both would
+        // double-convert keys and break decoding.
 
         // Custom date decoding to handle ISO8601 with optional fractional seconds
         decoder.dateDecodingStrategy = .custom { decoder in
@@ -56,6 +58,27 @@ actor APIService {
                 return date
             }
 
+            // Try bare datetime without timezone, stripping optional fractional seconds
+            // Python's datetime.now().isoformat() → "2026-01-24T09:38:05.123456"
+            let df = DateFormatter()
+            df.locale = Locale(identifier: "en_US_POSIX")
+            df.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+
+            // Strip fractional seconds (.123456) if present
+            let stripped = dateString.contains(".")
+                ? String(dateString.prefix(while: { $0 != "." }))
+                : dateString
+
+            if let date = df.date(from: stripped) {
+                return date
+            }
+
+            // Try space-separated datetime from SQLite (e.g. "2026-01-24 09:38:05")
+            df.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            if let date = df.date(from: stripped) {
+                return date
+            }
+
             throw DecodingError.dataCorruptedError(
                 in: container,
                 debugDescription: "Cannot decode date: \(dateString)"
@@ -68,7 +91,7 @@ actor APIService {
     /// JSON encoder configured for the API request format.
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
+        // CodingKeys handle snake_case mapping — no automatic conversion needed.
         return encoder
     }()
 
@@ -100,6 +123,51 @@ actor APIService {
         try await delete(url: url)
     }
 
+    /// Clear all scan data for a drive (files, hashes, metadata) while keeping the registration.
+    func clearScanData(driveName: String) async throws {
+        let url = try buildURL(path: "/drives/\(driveName)/clear-scan", queryItems: [
+            URLQueryItem(name: "confirm", value: "true")
+        ])
+        // Response contains mixed types (string + int), so use raw JSON
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            let message = parseErrorMessage(from: data) ?? "Unknown error"
+            throw APIError.httpError((response as? HTTPURLResponse)?.statusCode ?? 0, message)
+        }
+    }
+
+    /// Trigger deterministic integrity verification of scan, hash, and duplicate data.
+    func triggerVerifyIntegrity(driveName: String) async throws -> OperationStartResponse {
+        let url = try buildURL(path: "/drives/\(driveName)/verify-integrity")
+        return try await postEmpty(url: url)
+    }
+
+    /// Recognize a mounted volume by UUID, auto-updating registration if renamed.
+    /// Returns the recognized drive name, or nil if the volume isn't registered.
+    func recognizeDrive(mountPath: String) async throws -> String? {
+        let url = try buildURL(path: "/drives/recognize", queryItems: [
+            URLQueryItem(name: "mount_path", value: mountPath)
+        ])
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            return nil
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let status = json["status"] as? String,
+              status == "recognized",
+              let drive = json["drive"] as? [String: Any],
+              let name = drive["name"] as? String else {
+            return nil
+        }
+        return name
+    }
+
     /// Fetch detailed status for a drive.
     /// - Parameter name: Name of the drive.
     /// - Returns: Drive status including mount state and hash coverage.
@@ -118,6 +186,20 @@ actor APIService {
         return try await postEmpty(url: url)
     }
 
+    /// Trigger an auto-scan that only runs if filesystem differs from DB.
+    /// Returns raw JSON since response shape varies (started vs skipped).
+    func triggerAutoScan(driveName: String) async throws -> [String: Any] {
+        let url = try buildURL(path: "/drives/\(driveName)/auto-scan")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
     /// Trigger partial hash computation for files on the drive.
     /// - Parameters:
     ///   - driveName: Name of the drive to hash.
@@ -132,11 +214,37 @@ actor APIService {
         return try await postEmpty(url: url)
     }
 
+    /// Cancel a running operation.
+    func cancelOperation(id: String) async throws {
+        let url = try buildURL(path: "/operations/\(id)/cancel")
+        let _: [String: String] = try await postEmpty(url: url)
+    }
+
     /// Fetch the status of an async operation.
-    /// - Parameter id: The operation ID to check.
-    /// - Returns: Operation response with status and progress.
     func fetchOperation(id: String) async throws -> OperationResponse {
         let url = try buildURL(path: "/operations/\(id)")
+        return try await get(url: url)
+    }
+
+    /// Fetch the raw result dictionary from a completed operation.
+    func fetchOperationResult(id: String) async throws -> [String: Any] {
+        let url = try buildURL(path: "/operations/\(id)")
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw APIError.invalidResponse
+        }
+        return json["result"] as? [String: Any] ?? [:]
+    }
+
+    /// Fetch all recent operations. Used to check for active operations before quit.
+    func fetchOperations(limit: Int = 20) async throws -> OperationListResponse {
+        let url = try buildURL(path: "/operations", queryItems: [
+            URLQueryItem(name: "limit", value: String(limit))
+        ])
         return try await get(url: url)
     }
 
@@ -191,24 +299,77 @@ actor APIService {
         return try await get(url: url)
     }
 
-    // MARK: - Duplicate Endpoints
+    /// Get backup status for a folder — which other drives have copies of these files.
+    func fetchBackupStatus(drive: String, path: String) async throws -> BackupStatusResponse {
+        let url = try buildURL(path: "/files/browse/backup-status", queryItems: [
+            URLQueryItem(name: "drive", value: drive),
+            URLQueryItem(name: "path", value: path)
+        ])
+        return try await get(url: url)
+    }
 
-    /// Fetch duplicate clusters with stats.
-    func fetchDuplicates(limit: Int = 100, minSize: Int? = nil, sortBy: String = "reclaimable") async throws -> DuplicateListResponse {
+    /// Check which registered drives are currently mounted.
+    func fetchMountedDrives() async throws -> DriveListResponse {
+        let url = try buildURL(path: "/drives/mounted")
+        return try await get(url: url)
+    }
+
+    // MARK: - Backup / Protection Endpoints
+
+    /// Fetch file groups with protection classification and system stats.
+    func fetchProtectionData(
+        limit: Int = 100,
+        status: String? = nil,
+        drive: String? = nil,
+        sortBy: String = "reclaimable"
+    ) async throws -> ProtectionResponse {
         var queryItems = [
             URLQueryItem(name: "limit", value: String(limit)),
-            URLQueryItem(name: "sort_by", value: sortBy)
+            URLQueryItem(name: "sort_by", value: sortBy),
         ]
-        if let minSize { queryItems.append(URLQueryItem(name: "min_size", value: String(minSize))) }
+        if let status { queryItems.append(URLQueryItem(name: "status", value: status)) }
+        if let drive { queryItems.append(URLQueryItem(name: "drive", value: drive)) }
 
         let url = try buildURL(path: "/duplicates", queryItems: queryItems)
         return try await get(url: url)
     }
 
-    /// Fetch duplicate stats only.
-    func fetchDuplicateStats() async throws -> DuplicateStatsResponse {
+    /// Fetch system-wide protection stats only.
+    func fetchProtectionStats() async throws -> ProtectionStats {
         let url = try buildURL(path: "/duplicates/stats")
         return try await get(url: url)
+    }
+
+    /// Fetch protection stats for a specific drive.
+    func fetchDriveProtectionStats(driveName: String) async throws -> DriveProtectionStats {
+        let url = try buildURL(path: "/duplicates/drive/\(driveName)")
+        return try await get(url: url)
+    }
+
+    /// Fetch hierarchical protection tree: drives > directories.
+    func fetchProtectionTree(drive: String? = nil) async throws -> ProtectionTreeResponse {
+        var queryItems: [URLQueryItem]? = nil
+        if let drive {
+            queryItems = [URLQueryItem(name: "drive", value: drive)]
+        }
+        let url = try buildURL(path: "/duplicates/tree", queryItems: queryItems)
+        return try await get(url: url)
+    }
+
+    /// Fetch file groups within a specific directory on a drive.
+    func fetchDirectoryFiles(drive: String, path: String, limit: Int = 200) async throws -> [FileGroup] {
+        let url = try buildURL(path: "/duplicates/directory", queryItems: [
+            URLQueryItem(name: "drive", value: drive),
+            URLQueryItem(name: "path", value: path),
+            URLQueryItem(name: "limit", value: String(limit)),
+        ])
+        return try await get(url: url)
+    }
+
+    /// Verify files are true duplicates using deeper hash (first + middle + last chunks).
+    func verifyFiles(fileIds: [Int]) async throws -> VerificationResponse {
+        let url = try buildURL(path: "/duplicates/verify")
+        return try await post(url: url, body: VerificationRequest(fileIds: fileIds))
     }
 
     // MARK: - Search Endpoints
