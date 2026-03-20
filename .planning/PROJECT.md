@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A macOS-native CLI tool for cataloging external drives, detecting duplicate files using partial hashing, and performing verified media transfers. Designed for video professionals managing multiple backup drives with overlapping content who need visibility into what's stored where.
+A macOS-native app (CLI + SwiftUI) for cataloging external drives, detecting duplicate files using partial hashing, and performing verified media transfers. Designed for video professionals managing multiple backup drives with overlapping content who need visibility into what's stored where and the ability to consolidate drives.
 
 ## Core Value
 
@@ -23,16 +23,29 @@ Duplicate detection — knowing which files exist across multiple drives and ide
 - [x] Auto-scan on mount (configurable) — v1.0
 - [x] Media metadata extraction via ffprobe (duration, codec, resolution, framerate) — v1.0
 - [x] Container integrity verification via ffprobe — v1.0
+- [x] FastAPI server with Pydantic models, background operations, progress polling — v1.1
+- [x] SwiftUI macOS app with sidebar navigation, drive management, file browser — v1.1
+- [x] Finder-style column browser with backup coverage, hover popovers — v1.1
+- [x] Duplicate dashboard with reclaim analysis — v1.1
+- [x] Verified copy wizard with progress tracking — v1.1
+- [x] Incremental smart scan with folder_stats caching — v1.1
+- [x] Drive recognition via UUID, disk usage persistence — v1.1
+- [x] Integrity verification endpoint — v1.1
 
 ### Active
 
-(None currently — v1.0 shipped, gathering feedback)
+- [ ] Consolidation analysis: identify which drives can be freed by moving unique files elsewhere
+- [ ] Migration planner: generate optimal copy plans to consolidate drives
+- [ ] Verified migration executor: copy with hash verification, delete only after verified
+- [ ] Progress tracking for long-running migration operations
+- [ ] Migration wizard UI in SwiftUI
 
 ### Out of Scope
 
-- GUI (SwiftUI) — CLI-first approach, GUI is future phase after core is validated
 - Cross-platform support — macOS only, no Windows/Linux abstractions needed
 - Cloud sync — local drives only, no remote storage integration
+- Automated scheduling of migrations — user-initiated only for v2.0
+- Network drive support — local USB/Thunderbolt drives only
 
 ## Context
 
@@ -71,14 +84,28 @@ User context: Video professional with N external drives containing unknown/forgo
 | watchdog with FSEvents | Native macOS file system events, no polling overhead | ✓ Good — v1.0 |
 | Foreground daemon design | Let launchd manage lifecycle, simpler implementation | ✓ Good — v1.0 |
 | pyyaml over ruamel.yaml | Simpler, sufficient for config needs | ✓ Good — v1.0 |
+| FastAPI for Python API | Standard, async, Pydantic validation, background tasks | ✓ Good — v1.1 |
+| SwiftUI native for UI | macOS polish, user preference | ✓ Good — v1.1 |
+| Actor-based APIService | Thread-safe networking from concurrent SwiftUI views | ✓ Good — v1.1 |
+| used_bytes persistence | Store disk usage in DB so disconnected drives show storage info | ✓ Good — v1.1 |
+
+## Current Milestone: v2.0 Drive Consolidation Optimizer
+
+**Goal:** Analyze all drives to find which files can be moved to free entire drives, generate migration plans, execute with hash-verified transfers, and track progress through a SwiftUI migration wizard.
+
+**Target features:**
+- Consolidation analysis engine: cross-drive file distribution, identify freeable drives
+- Migration planner: optimal copy plans minimizing total bytes transferred
+- Verified migration executor: copy + hash verify + delete source
+- Progress tracking for potentially long operations
+- Migration wizard UI in SwiftUI
 
 ## Context
 
-Shipped v1.0 MVP with 2,359 LOC Python.
-Tech stack: Python 3.11+, Click, Rich, SQLite, xxhash, watchdog, pyyaml.
+Shipped v1.0 MVP (2,359 LOC Python) + v1.1 UI (7,800 lines added).
+Tech stack: Python 3.11+, FastAPI, Click, Rich, SQLite, xxhash, watchdog, pyyaml.
+Frontend: SwiftUI macOS 14.0+, Actor-based APIService.
 External dependencies: ffprobe (via brew install ffmpeg).
 
-CLI commands: `drives add`, `drives list`, `drives scan`, `drives hash`, `drives duplicates`, `drives search`, `drives copy`, `drives watch`, `drives media`, `drives verify`, `drives status`.
-
 ---
-*Last updated: 2026-01-24 after v1.0 milestone*
+*Last updated: 2026-03-21 after v2.0 milestone start*

@@ -23,6 +23,35 @@
 
 **Git range:** `feat(01-01)` → `feat(11-01)`
 
-**What's next:** TBD — initial MVP complete, gathering user feedback
+**What's next:** v1.1 UI milestone
+
+---
+
+## v1.1 UI (Shipped: 2026-03-21)
+
+**Delivered:** Native SwiftUI macOS desktop app backed by FastAPI server. Full drive management, Finder-style file browser, duplicate dashboard, search, verified copy wizard, and settings — all with real-time operation polling and background task support.
+
+**Phases completed:** 12-20 (18 plans total)
+
+**Key accomplishments:**
+- FastAPI server with Pydantic models, CORS, background operations with progress tracking
+- SwiftUI app with sidebar navigation, drive cards with storage bars, status indicators
+- Finder-style column browser with folder expansion, backup coverage display, hover popovers
+- Duplicate detection dashboard with reclaim analysis and cluster expansion
+- Search with glob patterns and filters across all drives
+- Verified copy wizard with progress polling
+- Settings with health check, database stats
+- Incremental smart scan with folder_stats caching
+- Drive recognition via UUID, disk usage persistence for disconnected drives
+- Integrity verification endpoint (scan + hash + duplicate checks)
+
+**Stats:**
+- 37 files, ~7,800 lines added
+- 9 phases, 18 plans
+- SwiftUI + FastAPI full-stack
+
+**Git range:** Phase 12 → `5aed64b`
+
+**What's next:** v2.0 Drive Consolidation Optimizer
 
 ---
