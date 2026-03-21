@@ -61,5 +61,53 @@ def init_db() -> None:
         if "used_bytes" not in cols:
             conn.execute("ALTER TABLE drives ADD COLUMN used_bytes INTEGER")
             conn.commit()
+
+        # Auto-migrate: add migration_plans and migration_files tables if missing
+        existing_tables = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        if "migration_plans" not in existing_tables:
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS migration_plans (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_drive_id INTEGER NOT NULL REFERENCES drives(id),
+                    source_drive_name TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'draft',
+                    total_files INTEGER NOT NULL DEFAULT 0,
+                    files_to_copy INTEGER NOT NULL DEFAULT 0,
+                    files_to_delete INTEGER NOT NULL DEFAULT 0,
+                    total_bytes_to_transfer INTEGER NOT NULL DEFAULT 0,
+                    files_completed INTEGER NOT NULL DEFAULT 0,
+                    bytes_transferred INTEGER NOT NULL DEFAULT 0,
+                    files_failed INTEGER NOT NULL DEFAULT 0,
+                    errors TEXT,
+                    operation_id TEXT,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    started_at TEXT,
+                    completed_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS migration_files (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    plan_id INTEGER NOT NULL REFERENCES migration_plans(id) ON DELETE CASCADE,
+                    source_file_id INTEGER NOT NULL REFERENCES files(id),
+                    source_path TEXT NOT NULL,
+                    source_size_bytes INTEGER NOT NULL,
+                    source_partial_hash TEXT,
+                    target_drive_id INTEGER REFERENCES drives(id),
+                    target_drive_name TEXT,
+                    target_path TEXT,
+                    action TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    error TEXT,
+                    started_at TEXT,
+                    completed_at TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_migration_files_plan_id ON migration_files(plan_id);
+                CREATE INDEX IF NOT EXISTS idx_migration_files_status ON migration_files(plan_id, status);
+            """)
+            conn.commit()
     finally:
         conn.close()

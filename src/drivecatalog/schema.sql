@@ -84,3 +84,44 @@ CREATE TABLE IF NOT EXISTS folder_stats (
 );
 
 CREATE INDEX IF NOT EXISTS idx_folder_stats_drive_id ON folder_stats(drive_id);
+
+-- Migration plans: track full migration lifecycle for consolidating a source drive.
+CREATE TABLE IF NOT EXISTS migration_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_drive_id INTEGER NOT NULL REFERENCES drives(id),
+    source_drive_name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft',  -- draft, validated, executing, completed, failed, cancelled
+    total_files INTEGER NOT NULL DEFAULT 0,
+    files_to_copy INTEGER NOT NULL DEFAULT 0,
+    files_to_delete INTEGER NOT NULL DEFAULT 0,  -- already backed up, just need source deleted
+    total_bytes_to_transfer INTEGER NOT NULL DEFAULT 0,
+    files_completed INTEGER NOT NULL DEFAULT 0,
+    bytes_transferred INTEGER NOT NULL DEFAULT 0,
+    files_failed INTEGER NOT NULL DEFAULT 0,
+    errors TEXT,  -- JSON array of error strings
+    operation_id TEXT,  -- links to in-memory operation tracker
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    started_at TEXT,
+    completed_at TEXT
+);
+
+-- Migration files: per-file entries within a migration plan.
+CREATE TABLE IF NOT EXISTS migration_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id INTEGER NOT NULL REFERENCES migration_plans(id) ON DELETE CASCADE,
+    source_file_id INTEGER NOT NULL REFERENCES files(id),
+    source_path TEXT NOT NULL,
+    source_size_bytes INTEGER NOT NULL,
+    source_partial_hash TEXT,
+    target_drive_id INTEGER REFERENCES drives(id),
+    target_drive_name TEXT,
+    target_path TEXT,
+    action TEXT NOT NULL,  -- 'copy_and_delete' or 'delete_only'
+    status TEXT NOT NULL DEFAULT 'pending',  -- pending, copying, verifying, verified, deleted, failed, skipped
+    error TEXT,
+    started_at TEXT,
+    completed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_migration_files_plan_id ON migration_files(plan_id);
+CREATE INDEX IF NOT EXISTS idx_migration_files_status ON migration_files(plan_id, status);
