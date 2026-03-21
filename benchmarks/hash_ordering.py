@@ -172,7 +172,7 @@ def drop_caches() -> bool:
                 capture_output=True,
             )
             return True
-        except (PermissionError, OSError, FileNotFoundError):
+        except (PermissionError, OSError, FileNotFoundError, subprocess.CalledProcessError):
             return False
     return False
 
