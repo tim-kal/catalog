@@ -147,3 +147,165 @@ def get_consolidation_candidates(conn: Connection) -> list[dict]:
         results.append(result)
 
     return results
+
+
+def get_consolidation_strategy(conn: Connection, source_drive_name: str) -> dict:
+    """Produce an optimal plan for moving a source drive's unique files to other drives.
+
+    Uses greedy largest-first bin packing: sort unique files by size descending,
+    assign each to the target drive with the most remaining free space.
+
+    Args:
+        conn: SQLite connection with Row factory.
+        source_drive_name: Name of the drive to consolidate away from.
+
+    Returns:
+        Dict with source_drive, assignments, unplaceable files, feasibility flag,
+        and target drive capacity impact.
+
+    Raises:
+        ValueError: If source_drive_name is not found in the database.
+    """
+    # 1. Look up the source drive
+    drive_row = conn.execute(
+        "SELECT id, name FROM drives WHERE name = ?", (source_drive_name,)
+    ).fetchone()
+    if not drive_row:
+        raise ValueError(f"Drive not found: {source_drive_name!r}")
+    source_drive_id = drive_row["id"]
+
+    # 2. Get all unique files on the source drive:
+    #    - partial_hash IS NULL (unhashed -- can't confirm duplicated)
+    #    - OR partial_hash has COUNT(DISTINCT drive_id) = 1 (only on this drive)
+    unique_files_query = """
+        WITH hash_drive_counts AS (
+            SELECT partial_hash, COUNT(DISTINCT drive_id) as drive_count
+            FROM files
+            WHERE partial_hash IS NOT NULL
+            GROUP BY partial_hash
+        )
+        SELECT f.path, f.size_bytes, f.partial_hash
+        FROM files f
+        LEFT JOIN hash_drive_counts hdc ON f.partial_hash = hdc.partial_hash
+        WHERE f.drive_id = ?
+          AND (f.partial_hash IS NULL OR hdc.drive_count = 1)
+        ORDER BY f.size_bytes DESC
+    """
+    unique_file_rows = conn.execute(unique_files_query, (source_drive_id,)).fetchall()
+
+    unique_files = [
+        {
+            "path": row["path"],
+            "size_bytes": row["size_bytes"],
+            "partial_hash": row["partial_hash"],
+        }
+        for row in unique_file_rows
+    ]
+
+    total_unique_files = len(unique_files)
+    total_unique_bytes = sum(f["size_bytes"] for f in unique_files)
+
+    # 3. Early exit: no unique files
+    if total_unique_files == 0:
+        return {
+            "source_drive": source_drive_name,
+            "total_unique_files": 0,
+            "total_unique_bytes": 0,
+            "total_bytes_to_transfer": 0,
+            "is_feasible": True,
+            "assignments": [],
+            "unplaceable": [],
+            "target_drives": [],
+        }
+
+    # 4. Get available target drives (other drives with known capacity and free space)
+    target_query = """
+        SELECT id, name, total_bytes, used_bytes,
+               (total_bytes - used_bytes) as free_bytes
+        FROM drives
+        WHERE id != ?
+          AND total_bytes IS NOT NULL
+          AND used_bytes IS NOT NULL
+          AND (total_bytes - used_bytes) > 0
+        ORDER BY (total_bytes - used_bytes) DESC
+    """
+    target_rows = conn.execute(target_query, (source_drive_id,)).fetchall()
+
+    # Track mutable remaining capacity per target
+    targets = [
+        {
+            "drive_name": row["name"],
+            "capacity_bytes": row["total_bytes"],
+            "free_before": row["free_bytes"],
+            "remaining": row["free_bytes"],
+        }
+        for row in target_rows
+    ]
+
+    # 5. No available targets: everything is unplaceable
+    if not targets:
+        return {
+            "source_drive": source_drive_name,
+            "total_unique_files": total_unique_files,
+            "total_unique_bytes": total_unique_bytes,
+            "total_bytes_to_transfer": 0,
+            "is_feasible": False,
+            "assignments": [],
+            "unplaceable": unique_files,
+            "target_drives": [],
+        }
+
+    # 6. Greedy bin-packing: largest files first, most-free-space target first
+    # Assignments keyed by target drive name
+    assignment_map: dict[str, list[dict]] = {t["drive_name"]: [] for t in targets}
+    unplaceable: list[dict] = []
+
+    for file in unique_files:
+        # Re-sort targets by remaining space (descending) before each assignment
+        targets.sort(key=lambda t: t["remaining"], reverse=True)
+
+        placed = False
+        for target in targets:
+            if target["remaining"] >= file["size_bytes"]:
+                assignment_map[target["drive_name"]].append(file)
+                target["remaining"] -= file["size_bytes"]
+                placed = True
+                break
+
+        if not placed:
+            unplaceable.append(file)
+
+    # 7. Build result
+    assignments = []
+    for target in targets:
+        files = assignment_map[target["drive_name"]]
+        if files:
+            assignments.append({
+                "target_drive": target["drive_name"],
+                "file_count": len(files),
+                "total_bytes": sum(f["size_bytes"] for f in files),
+                "files": files,
+            })
+
+    total_bytes_to_transfer = sum(a["total_bytes"] for a in assignments)
+
+    target_drives_info = [
+        {
+            "drive_name": t["drive_name"],
+            "capacity_bytes": t["capacity_bytes"],
+            "free_before": t["free_before"],
+            "free_after": t["remaining"],
+        }
+        for t in targets
+    ]
+
+    return {
+        "source_drive": source_drive_name,
+        "total_unique_files": total_unique_files,
+        "total_unique_bytes": total_unique_bytes,
+        "total_bytes_to_transfer": total_bytes_to_transfer,
+        "is_feasible": len(unplaceable) == 0,
+        "assignments": assignments,
+        "unplaceable": unplaceable,
+        "target_drives": target_drives_info,
+    }
