@@ -544,6 +544,9 @@ def _run_auto_hash(
         (drive_id,),
     ).fetchall()
 
+    # Sort by parent directory for disk locality (same as _run_hash)
+    files = sorted(files, key=lambda f: f["path"].rsplit("/", 1)[0] if "/" in f["path"] else "")
+
     total = len(files)
     hashed = 0
     errors = 0
