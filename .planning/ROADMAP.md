@@ -94,11 +94,11 @@ Plans:
   2. User can select a source drive and view a migration plan with target drive assignments and file breakdown before confirming
   3. User can step through the wizard flow (analyze, review plan, confirm, execute, done) with real-time progress showing file-level detail during execution
   4. User sees a completion summary with total space freed, files moved, and any errors encountered
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 23-01: TBD
-- [ ] 23-02: TBD
+- [ ] 23-01-PLAN.md — Swift models + APIService extensions for consolidation/migration endpoints
+- [ ] 23-02-PLAN.md — Migration wizard view with 5-step flow + DriveListView entry point
 
 ## Progress
 
@@ -106,4 +106,4 @@ Plans:
 |-----------|--------|-------|--------|-----------|
 | v1.0 MVP | 1-11 | 14/14 | Complete | 2026-01-24 |
 | v1.1 UI | 12-20 | 18/18 | Complete | 2026-03-21 |
-| v2.0 Consolidation | 21-23 | 5/TBD | In progress | - |
+| v2.0 Consolidation | 21-23 | 7/7 | In progress | - |
