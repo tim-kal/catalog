@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 Milestone: v2.0 Drive Consolidation Optimizer
 Phase: 21 of 23 (Consolidation Analysis Engine)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-03-21 — Roadmap created for v2.0 (3 phases, 25 requirements mapped)
+Plan: 01 of 02 complete
+Status: In progress
+Last activity: 2026-03-21 — Completed 21-01-PLAN.md (Consolidation Analysis Engine)
 
-Progress: [░░░░░░░░░░░░░░░░░░░░░░░░] 0%
+Progress: [████░░░░░░░░░░░░░░░░░░░░] 1/6 plans
 
 ## Completed Milestones
 
@@ -41,6 +41,9 @@ Full decision log in PROJECT.md Key Decisions table.
 - 3-phase structure: analysis engine, migration planner+executor, wizard UI
 - Phase 22 combines planner and executor (tightly coupled, can't test independently)
 - Partial hash (xxHash) for migration verification (consistent with existing dedup approach)
+- Greedy largest-first bin-packing for consolidation strategy (practical approximation for drive counts)
+- Unhashed files treated as unique conservatively in consolidation analysis
+- Drives with NULL capacity excluded as targets but allowed as source candidates
 
 ### Deferred Issues
 
@@ -53,5 +56,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Roadmap created for v2.0 milestone, ready to plan Phase 21
-Resume file: None
+Stopped at: Completed 21-01-PLAN.md, ready for 21-02-PLAN.md
+Resume file: .planning/phases/21-consolidation-analysis-engine/21-01-SUMMARY.md
