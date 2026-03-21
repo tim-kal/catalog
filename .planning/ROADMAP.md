@@ -8,7 +8,7 @@ Build a macOS CLI tool for cataloging external drives, detecting duplicates via 
 
 - [v1.0 MVP](milestones/v1.0-ROADMAP.md) (Phases 1-11) — SHIPPED 2026-01-24
 - **v1.1 UI** (Phases 12-20) — SHIPPED 2026-03-21
-- **v2.0 Drive Consolidation Optimizer** — Phases 21-23 (in progress)
+- **v2.0 Drive Consolidation Optimizer** — Phases 21-23 — SHIPPED 2026-03-21
 
 ## Completed Milestones
 
@@ -63,8 +63,8 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 **Plans:** 2 plans
 
 Plans:
-- [ ] 21-01-PLAN.md — Consolidation analysis module (pure Python engine with distribution, candidates, and strategy algorithms)
-- [ ] 21-02-PLAN.md — Consolidation analysis API (FastAPI routes, Pydantic models, router registration)
+- [x] 21-01-PLAN.md — Consolidation analysis module — completed 2026-03-21
+- [x] 21-02-PLAN.md — Consolidation analysis API — completed 2026-03-21
 
 ### Phase 22: Migration Planning & Execution
 
@@ -80,9 +80,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 22-01-PLAN.md — Migration database schema and planner module (tables + generate/validate/query functions)
-- [ ] 22-02-PLAN.md — Migration executor (background copy + hash verify + delete with cancellation and retry)
-- [ ] 22-03-PLAN.md — Migration API endpoints (6 FastAPI routes + Pydantic models + router registration)
+- [x] 22-01-PLAN.md — Migration schema + planner — completed 2026-03-21
+- [x] 22-02-PLAN.md — Migration executor — completed 2026-03-21
+- [x] 22-03-PLAN.md — Migration API endpoints — completed 2026-03-21
 
 ### Phase 23: Migration Wizard UI
 
@@ -97,8 +97,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 23-01-PLAN.md — Swift models + APIService extensions for consolidation/migration endpoints
-- [ ] 23-02-PLAN.md — Migration wizard view with 5-step flow + DriveListView entry point
+- [x] 23-01-PLAN.md — Swift models + APIService extensions — completed 2026-03-21
+- [x] 23-02-PLAN.md — Migration wizard view — completed 2026-03-21
 
 ## Progress
 
@@ -106,4 +106,4 @@ Plans:
 |-----------|--------|-------|--------|-----------|
 | v1.0 MVP | 1-11 | 14/14 | Complete | 2026-01-24 |
 | v1.1 UI | 12-20 | 18/18 | Complete | 2026-03-21 |
-| v2.0 Consolidation | 21-23 | 7/7 | In progress | - |
+| v2.0 Consolidation | 21-23 | 7/7 | Complete | 2026-03-21 |

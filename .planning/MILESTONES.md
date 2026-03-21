@@ -55,3 +55,28 @@
 **What's next:** v2.0 Drive Consolidation Optimizer
 
 ---
+
+## v2.0 Drive Consolidation Optimizer (Shipped: 2026-03-21)
+
+**Delivered:** Consolidation analysis engine, migration planner with verified execution, and SwiftUI migration wizard. Users can analyze drive collections, identify consolidation candidates, generate optimal migration plans, and execute hash-verified file transfers with per-file tracking.
+
+**Phases completed:** 21-23 (7 plans total)
+
+**Key accomplishments:**
+- Consolidation analysis: per-drive file distribution, candidate identification, greedy bin-packing strategy
+- Migration planner: persistent plan/file state in SQLite, copy vs delete-only classification
+- Migration executor: copy → hash verify → delete pipeline with per-file state, retry-once, safe cancellation
+- 6 migration API endpoints + 3 consolidation endpoints with background operation support
+- SwiftUI 5-step wizard: analyze → select drive → review plan → execute → completion summary
+- Real-time progress polling during execution with file-level detail
+
+**Stats:**
+- ~2,600 lines Python, ~1,100 lines Swift added
+- 3 phases, 7 plans
+- 25 requirements mapped and implemented
+
+**Git range:** `8ce5860` → `a251bbd`
+
+**What's next:** TBD
+
+---
