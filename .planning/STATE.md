@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 ## Current Position
 
 Milestone: v2.0 Drive Consolidation Optimizer
-Phase: 21 of 23 (Consolidation Analysis Engine) -- COMPLETE
-Plan: 02 of 02 complete
-Status: Phase complete, ready for Phase 22
-Last activity: 2026-03-21 — Completed 21-02-PLAN.md (Consolidation API Endpoints)
+Phase: 22 of 23 (Migration Planner & Executor)
+Plan: 01 of 03 complete
+Status: In progress
+Last activity: 2026-03-21 — Completed 22-01-PLAN.md (Migration Schema & Planner)
 
-Progress: [████████░░░░░░░░░░░░░░░░] 2/6 plans
+Progress: [██████████░░░░░░░░░░░░░░] 3/6 plans
 
 ## Completed Milestones
 
@@ -46,6 +46,8 @@ Full decision log in PROJECT.md Key Decisions table.
 - Drives with NULL capacity excluded as targets but allowed as source candidates
 - Explicit dict-to-model mapping in API route handlers (consistent with duplicates.py, safer for nested structures)
 - ValueError from engine mapped to HTTP 404 for unknown drive names
+- Unplaceable unique files tracked as copy_and_delete with NULL targets in migration plan
+- Plan validation is one-way (draft -> validated); re-validation requires new plan generation
 
 ### Deferred Issues
 
@@ -58,5 +60,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Completed Phase 21 (all plans), ready for Phase 22
-Resume file: .planning/phases/21-consolidation-analysis-engine/21-02-SUMMARY.md
+Stopped at: Completed 22-01 (Migration Schema & Planner), ready for 22-02
+Resume file: .planning/phases/22-migration-planning-execution/22-01-SUMMARY.md
