@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from drivecatalog.database import init_db
 
 from . import __version__
-from .routes import copy, drives, duplicates, files, operations, search, status
+from .routes import consolidation, copy, drives, duplicates, files, operations, search, status
 
 
 @asynccontextmanager
@@ -47,6 +47,7 @@ app.include_router(duplicates.router)
 app.include_router(search.router)
 app.include_router(operations.router)
 app.include_router(copy.router)
+app.include_router(consolidation.router)
 
 
 @app.get("/health")
