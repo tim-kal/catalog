@@ -272,11 +272,16 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
             )
 
         # --- Apply DDL ---
-        # Special handling for ALTER TABLE ADD COLUMN — skip if column exists
+        # Special handling for ALTER TABLE ADD COLUMN — skip if column exists.
+        # Strip SQL comment lines before detection (comments break startswith).
         sql = m.sql.strip()
-        if sql.upper().startswith("ALTER TABLE") and "ADD COLUMN" in sql.upper():
-            # Parse table and column name from "ALTER TABLE x ADD COLUMN y ..."
-            parts = sql.split()
+        sql_no_comments = "\n".join(
+            line for line in sql.splitlines()
+            if not line.strip().startswith("--")
+        ).strip()
+
+        if sql_no_comments.upper().startswith("ALTER TABLE") and "ADD COLUMN" in sql_no_comments.upper():
+            parts = sql_no_comments.split()
             table_name = parts[2]
             col_idx = next(
                 i for i, p in enumerate(parts) if p.upper() == "COLUMN"

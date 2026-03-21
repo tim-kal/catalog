@@ -66,6 +66,32 @@ final class BackendService: ObservableObject {
         guard process == nil else { return }
         startupError = nil
 
+        // Check if a server is already running on the port (e.g. from a previous app session)
+        Task {
+            if await checkExistingServer() {
+                logger.info("API server already running on port — reusing")
+                isRunning = true
+                return
+            }
+            launchServer()
+        }
+    }
+
+    /// Check if a server is already healthy on the expected port.
+    private func checkExistingServer() async -> Bool {
+        let url = URL(string: "\(APIService.baseURL)/health")!
+        do {
+            let (_, response) = try await URLSession.shared.data(from: url)
+            if let http = response as? HTTPURLResponse, http.statusCode == 200 {
+                return true
+            }
+        } catch {
+            // No server running
+        }
+        return false
+    }
+
+    private func launchServer() {
         guard let uv = uvPath else {
             startupError = "Cannot find uv. Install it: curl -LsSf https://astral.sh/uv/install.sh | sh"
             logger.error("uv binary not found")
@@ -88,7 +114,11 @@ final class BackendService: ObservableObject {
 
         proc.terminationHandler = { [weak self] proc in
             Task { @MainActor in
-                self?.isRunning = false
+                // Only clear isRunning if we set it from this process (not from an external server)
+                if self?.process === proc {
+                    self?.isRunning = false
+                    self?.process = nil
+                }
                 if proc.terminationStatus != 0 && proc.terminationStatus != 15 {
                     self?.logger.warning("API server exited with code \(proc.terminationStatus)")
                 }
