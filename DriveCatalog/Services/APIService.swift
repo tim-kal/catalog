@@ -412,6 +412,93 @@ actor APIService {
         return try await get(url: url)
     }
 
+    // MARK: - Consolidation Endpoints
+
+    /// Fetch per-drive file distribution with unique/duplicated breakdown.
+    /// - Returns: Distribution data for all drives.
+    func fetchDistribution() async throws -> DriveDistributionResponse {
+        let url = try buildURL(path: "/consolidation/distribution")
+        return try await get(url: url)
+    }
+
+    /// Fetch drives eligible for consolidation.
+    /// - Returns: Candidates with target drive information.
+    func fetchConsolidationCandidates() async throws -> ConsolidationCandidatesResponse {
+        let url = try buildURL(path: "/consolidation/candidates")
+        return try await get(url: url)
+    }
+
+    /// Compute optimal consolidation strategy for a source drive.
+    /// - Parameter drive: Name of the source drive to consolidate.
+    /// - Returns: Strategy with file assignments and feasibility.
+    func fetchConsolidationStrategy(drive: String) async throws -> ConsolidationStrategyResponse {
+        let url = try buildURL(path: "/consolidation/strategy", queryItems: [
+            URLQueryItem(name: "drive", value: drive)
+        ])
+        return try await get(url: url)
+    }
+
+    // MARK: - Migration Endpoints
+
+    /// Generate a migration plan for a source drive.
+    /// - Parameter sourceDrive: Name of the drive to migrate off.
+    /// - Returns: Summary of the generated plan.
+    func generateMigrationPlan(sourceDrive: String) async throws -> MigrationPlanSummary {
+        let url = try buildURL(path: "/migrations/generate")
+        let request = GeneratePlanRequest(sourceDrive: sourceDrive)
+        return try await post(url: url, body: request)
+    }
+
+    /// Fetch full details of a migration plan.
+    /// - Parameter planId: ID of the migration plan.
+    /// - Returns: Full plan details including per-status file counts.
+    func fetchMigrationPlan(planId: Int) async throws -> MigrationPlanResponse {
+        let url = try buildURL(path: "/migrations/\(planId)")
+        return try await get(url: url)
+    }
+
+    /// Validate a migration plan by checking free space on target drives.
+    /// - Parameter planId: ID of the migration plan to validate.
+    /// - Returns: Validation result with per-target space info.
+    func validateMigrationPlan(planId: Int) async throws -> ValidatePlanResponse {
+        let url = try buildURL(path: "/migrations/\(planId)/validate")
+        return try await postEmpty(url: url)
+    }
+
+    /// Start execution of a validated migration plan.
+    /// - Parameter planId: ID of the migration plan to execute.
+    /// - Returns: Execution response with operation ID for polling.
+    func executeMigrationPlan(planId: Int) async throws -> ExecuteResponse {
+        let url = try buildURL(path: "/migrations/\(planId)/execute")
+        return try await postEmpty(url: url)
+    }
+
+    /// Fetch paginated list of files in a migration plan.
+    /// - Parameters:
+    ///   - planId: ID of the migration plan.
+    ///   - status: Optional filter by file status.
+    ///   - limit: Maximum files to return (default 100).
+    ///   - offset: Number of files to skip (default 0).
+    /// - Returns: Paginated file list.
+    func fetchMigrationFiles(planId: Int, status: String? = nil, limit: Int = 100, offset: Int = 0) async throws -> MigrationFilesResponse {
+        var queryItems = [
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "offset", value: String(offset))
+        ]
+        if let status {
+            queryItems.append(URLQueryItem(name: "status", value: status))
+        }
+        let url = try buildURL(path: "/migrations/\(planId)/files", queryItems: queryItems)
+        return try await get(url: url)
+    }
+
+    /// Cancel a running migration.
+    /// - Parameter planId: ID of the migration plan to cancel.
+    func cancelMigration(planId: Int) async throws {
+        let url = try buildURL(path: "/migrations/\(planId)")
+        try await delete(url: url)
+    }
+
     // MARK: - Private Helpers
 
     /// Build a URL with the given path and optional query items.
