@@ -1,24 +1,36 @@
-"""Migration planner for DriveCatalog.
+"""Migration planner and executor for DriveCatalog.
 
-Generates, validates, and queries migration plans that assign every file on a
-source drive to either a copy_and_delete action (unique files that need to be
-moved to a target drive) or a delete_only action (duplicated files that already
-exist on other drives).
+Generates, validates, queries, and executes migration plans that assign every
+file on a source drive to either a copy_and_delete action (unique files that
+need to be moved to a target drive) or a delete_only action (duplicated files
+that already exist on other drives).
 
-Four core functions:
+Five core functions:
 
 - generate_migration_plan: create a plan from consolidation strategy
 - validate_plan: check free space on all target drives
 - get_plan_details: full plan metadata with per-status file counts
 - get_plan_files: paginated file list with optional status filtering
+- execute_migration_plan: run a validated plan (copy, verify, delete per file)
 """
 
 from __future__ import annotations
 
 import json
+import shutil
+from datetime import datetime
+from pathlib import Path
 from sqlite3 import Connection
 
+from drivecatalog.api.operations import (
+    OperationStatus,
+    is_cancelled,
+    update_operation,
+    update_progress,
+)
 from drivecatalog.consolidation import get_consolidation_strategy
+from drivecatalog.database import get_connection
+from drivecatalog.hasher import compute_partial_hash
 
 
 def generate_migration_plan(conn: Connection, source_drive_name: str) -> dict:
@@ -413,3 +425,376 @@ def get_plan_files(
         "files": files,
         "total": total,
     }
+
+
+def execute_migration_plan(plan_id: int, operation_id: str) -> dict:
+    """Execute a validated migration plan as a background-compatible operation.
+
+    Processes each file in the plan: copy to target, verify hash, delete source.
+    Supports cancellation via the in-memory operation tracker, retries failed
+    copies once, and persists all progress to SQLite after each file.
+
+    Designed to run synchronously in a background thread (same pattern as
+    _run_hash and _run_scan in drives.py). Opens its own database connection.
+
+    Args:
+        plan_id: ID of the migration plan to execute (must have status='validated').
+        operation_id: ID linking to the in-memory operation tracker for
+            progress updates and cancellation checks.
+
+    Returns:
+        Summary dict with plan_id, status, files_moved, bytes_transferred,
+        files_failed, and errors list.
+
+    Raises:
+        ValueError: If plan not found or status is not 'validated'.
+    """
+    conn = get_connection()
+    try:
+        return _execute_migration(conn, plan_id, operation_id)
+    except Exception as e:
+        # Unexpected error: mark plan failed and update operation
+        try:
+            conn.execute(
+                """UPDATE migration_plans
+                   SET status = 'failed', errors = ?, completed_at = datetime('now')
+                   WHERE id = ?""",
+                (json.dumps([str(e)]), plan_id),
+            )
+            conn.commit()
+        except Exception:
+            pass  # Best effort DB update
+        update_operation(
+            operation_id,
+            status=OperationStatus.FAILED,
+            error=str(e),
+            completed_at=datetime.now(),
+        )
+        raise
+    finally:
+        conn.close()
+
+
+def _execute_migration(conn: Connection, plan_id: int, operation_id: str) -> dict:
+    """Internal migration executor. Separated for clean error handling.
+
+    Args:
+        conn: Fresh SQLite connection (owned by caller).
+        plan_id: ID of the migration plan.
+        operation_id: In-memory operation tracker ID.
+
+    Returns:
+        Summary dict.
+    """
+    # 1. Load and validate plan
+    plan_row = conn.execute(
+        "SELECT * FROM migration_plans WHERE id = ?", (plan_id,)
+    ).fetchone()
+    if not plan_row:
+        raise ValueError(f"Migration plan not found: {plan_id}")
+    if plan_row["status"] != "validated":
+        raise ValueError(
+            f"Plan {plan_id} has status '{plan_row['status']}', must be 'validated' to execute"
+        )
+
+    # Mark plan as executing
+    conn.execute(
+        """UPDATE migration_plans
+           SET status = 'executing', started_at = datetime('now'), operation_id = ?
+           WHERE id = ?""",
+        (operation_id, plan_id),
+    )
+    conn.commit()
+    update_operation(
+        operation_id, status=OperationStatus.RUNNING, started_at=datetime.now()
+    )
+
+    # 2. Load source and target drive mount paths
+    source_drive_row = conn.execute(
+        "SELECT mount_path FROM drives WHERE id = ?",
+        (plan_row["source_drive_id"],),
+    ).fetchone()
+    if not source_drive_row or not source_drive_row["mount_path"]:
+        raise ValueError("Source drive is not mounted (mount_path is NULL)")
+    source_mount = Path(source_drive_row["mount_path"])
+    if not source_mount.exists():
+        raise ValueError(f"Source drive mount path does not exist: {source_mount}")
+
+    # Build target drive mount path lookup
+    target_drive_rows = conn.execute(
+        """SELECT DISTINCT target_drive_id FROM migration_files
+           WHERE plan_id = ? AND target_drive_id IS NOT NULL""",
+        (plan_id,),
+    ).fetchall()
+
+    target_mounts: dict[int, Path] = {}
+    for row in target_drive_rows:
+        drive_row = conn.execute(
+            "SELECT mount_path FROM drives WHERE id = ?",
+            (row["target_drive_id"],),
+        ).fetchone()
+        if not drive_row or not drive_row["mount_path"]:
+            raise ValueError(
+                f"Target drive {row['target_drive_id']} is not mounted (mount_path is NULL)"
+            )
+        mount = Path(drive_row["mount_path"])
+        if not mount.exists():
+            raise ValueError(
+                f"Target drive mount path does not exist: {mount}"
+            )
+        target_mounts[row["target_drive_id"]] = mount
+
+    # 3. Load all pending files
+    pending_files = conn.execute(
+        "SELECT * FROM migration_files WHERE plan_id = ? AND status = 'pending' ORDER BY id",
+        (plan_id,),
+    ).fetchall()
+    total_files = len(pending_files)
+
+    # 4. Process files in a loop
+    files_completed = 0
+    bytes_transferred = 0
+    errors: list[str] = []
+
+    for file_row in pending_files:
+        # 4a. Check cancellation
+        if is_cancelled(operation_id):
+            conn.execute(
+                """UPDATE migration_plans
+                   SET status = 'cancelled', completed_at = datetime('now')
+                   WHERE id = ?""",
+                (plan_id,),
+            )
+            conn.commit()
+            update_operation(
+                operation_id,
+                status=OperationStatus.CANCELLED,
+                completed_at=datetime.now(),
+            )
+            return {
+                "plan_id": plan_id,
+                "status": "cancelled",
+                "files_moved": files_completed,
+                "bytes_transferred": bytes_transferred,
+                "files_failed": len(errors),
+                "errors": errors,
+            }
+
+        source_full_path = source_mount / file_row["source_path"]
+
+        if file_row["action"] == "delete_only":
+            # 4b. Delete-only: file is duplicated elsewhere, just delete source
+            conn.execute(
+                "UPDATE migration_files SET status = 'verified' WHERE id = ?",
+                (file_row["id"],),
+            )
+            conn.commit()
+            try:
+                source_full_path.unlink()
+                conn.execute(
+                    """UPDATE migration_files
+                       SET status = 'deleted', completed_at = datetime('now')
+                       WHERE id = ?""",
+                    (file_row["id"],),
+                )
+                conn.commit()
+            except OSError as e:
+                conn.execute(
+                    "UPDATE migration_files SET status = 'failed', error = ? WHERE id = ?",
+                    (str(e), file_row["id"]),
+                )
+                conn.commit()
+                errors.append(f"{file_row['source_path']}: {e}")
+            files_completed += 1
+
+        elif file_row["action"] == "copy_and_delete":
+            # 4c. Copy and delete: copy to target, verify hash, delete source
+            target_drive_id = file_row["target_drive_id"]
+            if target_drive_id is None or target_drive_id not in target_mounts:
+                # Unplaceable file -- no target assigned
+                conn.execute(
+                    "UPDATE migration_files SET status = 'failed', error = ? WHERE id = ?",
+                    ("No target drive assigned", file_row["id"]),
+                )
+                conn.commit()
+                errors.append(f"{file_row['source_path']}: no target drive assigned")
+                files_completed += 1
+                _update_plan_progress(
+                    conn, plan_id, operation_id, files_completed, total_files,
+                    bytes_transferred, errors,
+                )
+                continue
+
+            target_mount = target_mounts[target_drive_id]
+            target_full_path = target_mount / file_row["target_path"]
+
+            # Mark as copying
+            conn.execute(
+                """UPDATE migration_files
+                   SET status = 'copying', started_at = datetime('now')
+                   WHERE id = ?""",
+                (file_row["id"],),
+            )
+            conn.commit()
+
+            # Copy with retry (max 2 attempts)
+            copy_succeeded = False
+            last_error: Exception | None = None
+
+            for attempt in range(2):
+                try:
+                    target_full_path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(str(source_full_path), str(target_full_path))
+                    copy_succeeded = True
+                    break
+                except OSError as e:
+                    last_error = e
+                    if attempt == 0:
+                        continue  # Retry once
+
+            if copy_succeeded:
+                # Verify hash
+                conn.execute(
+                    "UPDATE migration_files SET status = 'verifying' WHERE id = ?",
+                    (file_row["id"],),
+                )
+                conn.commit()
+
+                dest_hash = compute_partial_hash(
+                    target_full_path, file_row["source_size_bytes"]
+                )
+                source_hash = file_row["source_partial_hash"]
+
+                # If source has no stored hash, compute it fresh
+                if source_hash is None:
+                    source_hash = compute_partial_hash(
+                        source_full_path, file_row["source_size_bytes"]
+                    )
+
+                if dest_hash is not None and source_hash is not None and dest_hash == source_hash:
+                    # Hash match: mark verified, delete source
+                    conn.execute(
+                        "UPDATE migration_files SET status = 'verified' WHERE id = ?",
+                        (file_row["id"],),
+                    )
+                    conn.commit()
+
+                    try:
+                        source_full_path.unlink()
+                        conn.execute(
+                            """UPDATE migration_files
+                               SET status = 'deleted', completed_at = datetime('now')
+                               WHERE id = ?""",
+                            (file_row["id"],),
+                        )
+                        conn.commit()
+                        bytes_transferred += file_row["source_size_bytes"]
+                    except OSError as e:
+                        # Source delete failed after verified copy -- mark failed
+                        conn.execute(
+                            "UPDATE migration_files SET status = 'failed', error = ? WHERE id = ?",
+                            (f"Source delete failed: {e}", file_row["id"]),
+                        )
+                        conn.commit()
+                        errors.append(f"{file_row['source_path']}: source delete failed: {e}")
+                else:
+                    # Hash mismatch: remove bad copy, mark failed
+                    target_full_path.unlink(missing_ok=True)
+                    conn.execute(
+                        "UPDATE migration_files SET status = 'failed', error = ? WHERE id = ?",
+                        ("Hash mismatch after copy", file_row["id"]),
+                    )
+                    conn.commit()
+                    errors.append(f"{file_row['source_path']}: hash mismatch")
+            else:
+                # Copy failed after retries
+                error_msg = str(last_error) if last_error else "Unknown copy error"
+                conn.execute(
+                    "UPDATE migration_files SET status = 'failed', error = ? WHERE id = ?",
+                    (error_msg, file_row["id"]),
+                )
+                conn.commit()
+                errors.append(f"{file_row['source_path']}: {error_msg}")
+
+            files_completed += 1
+
+        # 4d. Update progress after every file
+        _update_plan_progress(
+            conn, plan_id, operation_id, files_completed, total_files,
+            bytes_transferred, errors,
+        )
+
+    # 5. Finalize
+    status_counts = conn.execute(
+        "SELECT status, COUNT(*) as cnt FROM migration_files WHERE plan_id = ? GROUP BY status",
+        (plan_id,),
+    ).fetchall()
+
+    # Determine final status: 'completed' if no pending/copying/verifying remain
+    active_statuses = {"pending", "copying", "verifying"}
+    has_active = any(row["status"] in active_statuses for row in status_counts)
+    final_status = "executing" if has_active else "completed"
+
+    failed_count = sum(
+        row["cnt"] for row in status_counts if row["status"] == "failed"
+    )
+
+    summary = {
+        "plan_id": plan_id,
+        "status": final_status,
+        "files_moved": files_completed,
+        "bytes_transferred": bytes_transferred,
+        "files_failed": failed_count,
+        "errors": errors,
+    }
+
+    conn.execute(
+        """UPDATE migration_plans
+           SET status = ?, completed_at = datetime('now'), errors = ?,
+               files_completed = ?, bytes_transferred = ?, files_failed = ?
+           WHERE id = ?""",
+        (
+            final_status,
+            json.dumps(errors),
+            files_completed,
+            bytes_transferred,
+            failed_count,
+            plan_id,
+        ),
+    )
+    conn.commit()
+
+    update_operation(
+        operation_id,
+        status=OperationStatus.COMPLETED,
+        progress_percent=100.0,
+        completed_at=datetime.now(),
+        result=summary,
+    )
+
+    return summary
+
+
+def _update_plan_progress(
+    conn: Connection,
+    plan_id: int,
+    operation_id: str,
+    files_completed: int,
+    total_files: int,
+    bytes_transferred: int,
+    errors: list[str],
+) -> None:
+    """Update progress in both SQLite and the in-memory operation tracker."""
+    failed_count = conn.execute(
+        "SELECT COUNT(*) as cnt FROM migration_files WHERE plan_id = ? AND status = 'failed'",
+        (plan_id,),
+    ).fetchone()["cnt"]
+
+    conn.execute(
+        """UPDATE migration_plans
+           SET files_completed = ?, bytes_transferred = ?, files_failed = ?
+           WHERE id = ?""",
+        (files_completed, bytes_transferred, failed_count, plan_id),
+    )
+    conn.commit()
+    update_progress(operation_id, files_completed, total_files)
