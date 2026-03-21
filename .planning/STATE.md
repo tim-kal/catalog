@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 Milestone: v2.0 Drive Consolidation Optimizer
 Phase: 23 of 23 (Migration Wizard UI)
-Plan: 01 of 02 complete
-Status: In progress
-Last activity: 2026-03-21 — Completed 23-01-PLAN.md (Swift Models & API Methods)
+Plan: 02 of 02 complete (awaiting human verification checkpoint)
+Status: Checkpoint - awaiting human verification of wizard UI
+Last activity: 2026-03-21 — Completed 23-02-PLAN.md tasks 1-2 (Wizard UI + toolbar entry point)
 
-Progress: [█████████████████████░░░] 6/7 plans
+Progress: [████████████████████████] 7/7 plans (pending verification)
 
 ## Completed Milestones
 
@@ -56,6 +56,8 @@ Full decision log in PROJECT.md Key Decisions table.
 - Background execution closes conn before starting task; _run_migration opens its own via execute_migration_plan
 - String (not Date) for Swift MigrationPlanResponse date fields (avoids decoder issues with Python datetime strings)
 - FileStatusCount.bytes as Int64 for consistency with all byte-count fields
+- Async Task.sleep polling (2s) for wizard migration progress (matches codebase pollOperation pattern)
+- WizardStep enum as single state driver for wizard flow (avoids multiple boolean flags)
 
 ### Deferred Issues
 
@@ -68,5 +70,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Phase 23 plan 01 complete (Swift models + API methods), ready for plan 02 (Wizard UI views)
-Resume file: .planning/phases/23-migration-wizard-ui/23-01-SUMMARY.md
+Stopped at: Phase 23 plan 02 tasks 1-2 complete, checkpoint:human-verify pending (Task 3)
+Resume file: .planning/phases/23-migration-wizard-ui/23-02-SUMMARY.md
