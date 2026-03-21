@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-03-21)
 
 **Core value:** Duplicate detection — knowing which files exist across multiple drives and identifying safe deletion candidates.
-**Current focus:** v2.0 Drive Consolidation Optimizer — Phase 22 complete, ready for Phase 23
+**Current focus:** v2.0 Drive Consolidation Optimizer — Phase 23 in progress (Wizard UI)
 
 ## Current Position
 
 Milestone: v2.0 Drive Consolidation Optimizer
-Phase: 22 of 23 (Migration Planner & Executor) -- COMPLETE
-Plan: 03 of 03 complete
-Status: Phase complete
-Last activity: 2026-03-21 — Completed 22-03-PLAN.md (Migration API Endpoints)
+Phase: 23 of 23 (Migration Wizard UI)
+Plan: 01 of 02 complete
+Status: In progress
+Last activity: 2026-03-21 — Completed 23-01-PLAN.md (Swift Models & API Methods)
 
-Progress: [████████████████████░░░░] 5/6 plans
+Progress: [█████████████████████░░░] 6/7 plans
 
 ## Completed Milestones
 
@@ -54,6 +54,8 @@ Full decision log in PROJECT.md Key Decisions table.
 - No empty ExecutePlanRequest model; plan_id from URL path parameter directly
 - ValueError mapped to 404 (not found) or 400 (wrong status) based on error message content
 - Background execution closes conn before starting task; _run_migration opens its own via execute_migration_plan
+- String (not Date) for Swift MigrationPlanResponse date fields (avoids decoder issues with Python datetime strings)
+- FileStatusCount.bytes as Int64 for consistency with all byte-count fields
 
 ### Deferred Issues
 
@@ -66,5 +68,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Phase 22 complete (all 3 plans), ready for Phase 23 (Wizard UI)
-Resume file: .planning/phases/22-migration-planning-execution/22-03-SUMMARY.md
+Stopped at: Phase 23 plan 01 complete (Swift models + API methods), ready for plan 02 (Wizard UI views)
+Resume file: .planning/phases/23-migration-wizard-ui/23-01-SUMMARY.md
