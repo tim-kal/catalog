@@ -77,12 +77,12 @@ Plans:
   3. User can execute a migration as a background operation where each copied file is hash-verified before the source is deleted, with per-file status tracking (pending/copying/verifying/verified/deleted/failed)
   4. User can cancel a running migration safely (copied files kept, remaining untouched), and failed copies are retried once then skipped with error logged
   5. User can poll progress (files completed, bytes transferred, ETA), migration state persists across API restarts, and completed migrations produce a summary with files moved, space freed, and errors
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 22-01: TBD
-- [ ] 22-02: TBD
-- [ ] 22-03: TBD
+- [ ] 22-01-PLAN.md — Migration database schema and planner module (tables + generate/validate/query functions)
+- [ ] 22-02-PLAN.md — Migration executor (background copy + hash verify + delete with cancellation and retry)
+- [ ] 22-03-PLAN.md — Migration API endpoints (6 FastAPI routes + Pydantic models + router registration)
 
 ### Phase 23: Migration Wizard UI
 
@@ -106,4 +106,4 @@ Plans:
 |-----------|--------|-------|--------|-----------|
 | v1.0 MVP | 1-11 | 14/14 | Complete | 2026-01-24 |
 | v1.1 UI | 12-20 | 18/18 | Complete | 2026-03-21 |
-| v2.0 Consolidation | 21-23 | 2/TBD | In progress | - |
+| v2.0 Consolidation | 21-23 | 5/TBD | In progress | - |
