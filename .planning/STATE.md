@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-03-21)
 
 **Core value:** Duplicate detection — knowing which files exist across multiple drives and identifying safe deletion candidates.
-**Current focus:** v2.0 Drive Consolidation Optimizer — Phase 22 (Migration Planner & Executor)
+**Current focus:** v2.0 Drive Consolidation Optimizer — Phase 22 complete, ready for Phase 23
 
 ## Current Position
 
 Milestone: v2.0 Drive Consolidation Optimizer
-Phase: 22 of 23 (Migration Planner & Executor)
-Plan: 02 of 03 complete
-Status: In progress
-Last activity: 2026-03-21 — Completed 22-02-PLAN.md (Migration Executor)
+Phase: 22 of 23 (Migration Planner & Executor) -- COMPLETE
+Plan: 03 of 03 complete
+Status: Phase complete
+Last activity: 2026-03-21 — Completed 22-03-PLAN.md (Migration API Endpoints)
 
-Progress: [████████████████░░░░░░░░] 4/6 plans
+Progress: [████████████████████░░░░] 5/6 plans
 
 ## Completed Milestones
 
@@ -51,6 +51,9 @@ Full decision log in PROJECT.md Key Decisions table.
 - execute_migration_plan uses own get_connection() (background thread pattern, matches _run_hash)
 - shutil.copy2 for migration copies (preserves metadata, simpler than streaming)
 - Per-file conn.commit() for crash recovery (WAL handles performance)
+- No empty ExecutePlanRequest model; plan_id from URL path parameter directly
+- ValueError mapped to 404 (not found) or 400 (wrong status) based on error message content
+- Background execution closes conn before starting task; _run_migration opens its own via execute_migration_plan
 
 ### Deferred Issues
 
@@ -63,5 +66,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Completed 22-02 (Migration Executor), ready for 22-03
-Resume file: .planning/phases/22-migration-planning-execution/22-02-SUMMARY.md
+Stopped at: Phase 22 complete (all 3 plans), ready for Phase 23 (Wizard UI)
+Resume file: .planning/phases/22-migration-planning-execution/22-03-SUMMARY.md
