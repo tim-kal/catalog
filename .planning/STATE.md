@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 Milestone: v2.0 Drive Consolidation Optimizer
 Phase: 22 of 23 (Migration Planner & Executor)
-Plan: 01 of 03 complete
+Plan: 02 of 03 complete
 Status: In progress
-Last activity: 2026-03-21 — Completed 22-01-PLAN.md (Migration Schema & Planner)
+Last activity: 2026-03-21 — Completed 22-02-PLAN.md (Migration Executor)
 
-Progress: [██████████░░░░░░░░░░░░░░] 3/6 plans
+Progress: [████████████████░░░░░░░░] 4/6 plans
 
 ## Completed Milestones
 
@@ -48,6 +48,9 @@ Full decision log in PROJECT.md Key Decisions table.
 - ValueError from engine mapped to HTTP 404 for unknown drive names
 - Unplaceable unique files tracked as copy_and_delete with NULL targets in migration plan
 - Plan validation is one-way (draft -> validated); re-validation requires new plan generation
+- execute_migration_plan uses own get_connection() (background thread pattern, matches _run_hash)
+- shutil.copy2 for migration copies (preserves metadata, simpler than streaming)
+- Per-file conn.commit() for crash recovery (WAL handles performance)
 
 ### Deferred Issues
 
@@ -60,5 +63,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Completed 22-01 (Migration Schema & Planner), ready for 22-02
-Resume file: .planning/phases/22-migration-planning-execution/22-01-SUMMARY.md
+Stopped at: Completed 22-02 (Migration Executor), ready for 22-03
+Resume file: .planning/phases/22-migration-planning-execution/22-02-SUMMARY.md
