@@ -936,6 +936,7 @@ struct DriveListView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showAddSheet = false
+    @State private var showConsolidationWizard = false
     @State private var driveToDelete: DriveResponse?
     @State private var showDeleteConfirmation = false
     @State private var expandedDriveId: Int?
@@ -1012,6 +1013,14 @@ struct DriveListView: View {
         .toolbar {
             ToolbarItem {
                 Button {
+                    showConsolidationWizard = true
+                } label: {
+                    Image(systemName: "arrow.triangle.merge")
+                }
+                .help("Consolidate Drives")
+            }
+            ToolbarItem {
+                Button {
                     showAddSheet = true
                 } label: {
                     Image(systemName: "plus")
@@ -1050,6 +1059,9 @@ struct DriveListView: View {
         }
         .sheet(isPresented: $showAddSheet) {
             AddDriveSheet(onAdded: loadDrives)
+        }
+        .sheet(isPresented: $showConsolidationWizard) {
+            ConsolidationWizardView()
         }
         .alert("Delete Drive", isPresented: $showDeleteConfirmation, presenting: driveToDelete) { drive in
             Button("Cancel", role: .cancel) {
