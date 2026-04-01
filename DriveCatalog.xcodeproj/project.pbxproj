@@ -48,6 +48,9 @@
 		DD08A1B2C3D4E5F6A7B8C9D0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CC08A1B2C3D4E5F6A7B8C9D0 /* Assets.xcassets */; };
 		AA10A3B4C5D6E7F8A9B0C1D2 /* LicenseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC10A3B4C5D6E7F8A9B0C1D2 /* LicenseManager.swift */; };
 		AA09A2B3C4D5E6F7A8B9C0D1 /* UpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC09A2B3C4D5E6F7A8B9C0D1 /* UpdateService.swift */; };
+		EE11A1B2C3D4E5F6A7B8C9D1 /* BetaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD11A1B2C3D4E5F6A7B8C9D1 /* BetaService.swift */; };
+		EE22A2B3C4D5E6F7A8B9C0D2 /* BetaRegistrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD22A2B3C4D5E6F7A8B9C0D2 /* BetaRegistrationView.swift */; };
+		EE33A3B4C5D6E7F8A9B0C1D3 /* BugReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD33A3B4C5D6E7F8A9B0C1D3 /* BugReportView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -94,6 +97,9 @@
 		BB08B8C9DAEBF12345678902 /* AllDrivesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllDrivesView.swift; sourceTree = "<group>"; };
 		CC10A3B4C5D6E7F8A9B0C1D2 /* LicenseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseManager.swift; sourceTree = "<group>"; };
 		CC09A2B3C4D5E6F7A8B9C0D1 /* UpdateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateService.swift; sourceTree = "<group>"; };
+		DD11A1B2C3D4E5F6A7B8C9D1 /* BetaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetaService.swift; sourceTree = "<group>"; };
+		DD22A2B3C4D5E6F7A8B9C0D2 /* BetaRegistrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetaRegistrationView.swift; sourceTree = "<group>"; };
+		DD33A3B4C5D6E7F8A9B0C1D3 /* BugReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugReportView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -146,6 +152,7 @@
 				166288762D5E2F39B2996279 /* APIService.swift */,
 				FEB9FA39235B908432E86E33 /* AppDelegate.swift */,
 				98E01EF2230C98C056CF68BE /* BackendService.swift */,
+				DD11A1B2C3D4E5F6A7B8C9D1 /* BetaService.swift */,
 				CC10A3B4C5D6E7F8A9B0C1D2 /* LicenseManager.swift */,
 				CC09A2B3C4D5E6F7A8B9C0D1 /* UpdateService.swift */,
 				BB03B3C4D5E6F78901234567 /* ViewCache.swift */,
@@ -192,7 +199,9 @@
 				BB05B5C6D7E8F90123456789 /* ActionDrillDownView.swift */,
 				BB06B6C7D8E9FA1234567890 /* ActionQueueView.swift */,
 				BB08B8C9DAEBF12345678902 /* AllDrivesView.swift */,
+				DD22A2B3C4D5E6F7A8B9C0D2 /* BetaRegistrationView.swift */,
 				3A992EDEB4EBB4554F6F9A84 /* BrowserView.swift */,
+				DD33A3B4C5D6E7F8A9B0C1D3 /* BugReportView.swift */,
 				BB07B7C8D9EAF01234567891 /* ConsolidatePageView.swift */,
 				5D6E4682185AD37F3F46A1C7 /* ConsolidationWizardView.swift */,
 				2018F3E2F8DCA71372D42638 /* DrivesView.swift */,
@@ -325,8 +334,11 @@
 				BD995CCFF98EB91211004674 /* AddDriveSheet.swift in Sources */,
 				5305BE891FFAA7787554C74C /* AppDelegate.swift in Sources */,
 				4C94804D2E8632E69A130ED2 /* BackendService.swift in Sources */,
+				EE22A2B3C4D5E6F7A8B9C0D2 /* BetaRegistrationView.swift in Sources */,
+				EE11A1B2C3D4E5F6A7B8C9D1 /* BetaService.swift in Sources */,
 				E28330CADB85656F60519D4D /* Browse.swift in Sources */,
 				3C6EEC5AD0E385960CCE94A3 /* BrowserView.swift in Sources */,
+				EE33A3B4C5D6E7F8A9B0C1D3 /* BugReportView.swift in Sources */,
 				AA07B7C8D9EAF01234567891 /* ConsolidatePageView.swift in Sources */,
 				448ACA44F5BC7850AD6CA874 /* Consolidation.swift in Sources */,
 				D743301F70D3024C8901354A /* ConsolidationWizardView.swift in Sources */,

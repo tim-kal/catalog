@@ -8,6 +8,7 @@ struct SettingsView: View {
 
     @AppStorage("showConsolidatePage") private var showConsolidatePage = false
     @State private var licenseKeyInput = ""
+    @State private var showBugReport = false
     @State private var healthStatus: HealthStatusResponse?
     @State private var isLoadingHealth = true
     @State private var healthError: String?
@@ -227,9 +228,21 @@ struct SettingsView: View {
                         .font(.caption)
                 }
             }
+
+            // Bug Report
+            Section("Feedback") {
+                Button {
+                    showBugReport = true
+                } label: {
+                    Label("Report a Bug", systemImage: "ladybug")
+                }
+            }
         }
         .formStyle(.grouped)
         .navigationTitle("Settings")
+        .sheet(isPresented: $showBugReport) {
+            BugReportView()
+        }
         .task(id: backend.isRunning) {
             if backend.isRunning {
                 await loadHealth()

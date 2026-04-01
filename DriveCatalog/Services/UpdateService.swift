@@ -8,7 +8,7 @@ final class UpdateService: ObservableObject {
     static let shared = UpdateService()
 
     /// URL to the update manifest JSON. Change this to your actual repo.
-    static let manifestURL = "https://raw.githubusercontent.com/tim-kal/DriveCatalog/main/updates/latest.json"
+    static let manifestURL = "https://raw.githubusercontent.com/tim-kal/catalog/main/updates/latest.json"
 
     @Published var updateAvailable = false
     @Published var latestVersion: String?
