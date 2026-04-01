@@ -46,6 +46,8 @@
 		AA07B7C8D9EAF01234567891 /* ConsolidatePageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB07B7C8D9EAF01234567891 /* ConsolidatePageView.swift */; };
 		AA08B8C9DAEBF12345678902 /* AllDrivesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB08B8C9DAEBF12345678902 /* AllDrivesView.swift */; };
 		DD08A1B2C3D4E5F6A7B8C9D0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CC08A1B2C3D4E5F6A7B8C9D0 /* Assets.xcassets */; };
+		AA10A3B4C5D6E7F8A9B0C1D2 /* LicenseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC10A3B4C5D6E7F8A9B0C1D2 /* LicenseManager.swift */; };
+		AA09A2B3C4D5E6F7A8B9C0D1 /* UpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC09A2B3C4D5E6F7A8B9C0D1 /* UpdateService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -90,6 +92,8 @@
 		BB06B6C7D8E9FA1234567890 /* ActionQueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionQueueView.swift; sourceTree = "<group>"; };
 		BB07B7C8D9EAF01234567891 /* ConsolidatePageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsolidatePageView.swift; sourceTree = "<group>"; };
 		BB08B8C9DAEBF12345678902 /* AllDrivesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllDrivesView.swift; sourceTree = "<group>"; };
+		CC10A3B4C5D6E7F8A9B0C1D2 /* LicenseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseManager.swift; sourceTree = "<group>"; };
+		CC09A2B3C4D5E6F7A8B9C0D1 /* UpdateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -142,6 +146,8 @@
 				166288762D5E2F39B2996279 /* APIService.swift */,
 				FEB9FA39235B908432E86E33 /* AppDelegate.swift */,
 				98E01EF2230C98C056CF68BE /* BackendService.swift */,
+				CC10A3B4C5D6E7F8A9B0C1D2 /* LicenseManager.swift */,
+				CC09A2B3C4D5E6F7A8B9C0D1 /* UpdateService.swift */,
 				BB03B3C4D5E6F78901234567 /* ViewCache.swift */,
 			);
 			path = Services;
@@ -349,6 +355,8 @@
 				265C093EBD3E94A9029B2C89 /* SettingsView.swift in Sources */,
 				21E64683D802B4F29680ADC8 /* Sidebar.swift in Sources */,
 				0FE4A32D979AE2E6CC846AF5 /* Status.swift in Sources */,
+				AA10A3B4C5D6E7F8A9B0C1D2 /* LicenseManager.swift in Sources */,
+				AA09A2B3C4D5E6F7A8B9C0D1 /* UpdateService.swift in Sources */,
 				AA03B3C4D5E6F78901234567 /* ViewCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

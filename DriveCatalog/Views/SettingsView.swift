@@ -3,8 +3,11 @@ import SwiftUI
 /// Settings view showing backend status, database stats, and app info.
 struct SettingsView: View {
     @EnvironmentObject private var backend: BackendService
+    @ObservedObject private var updater = UpdateService.shared
+    @ObservedObject private var license = LicenseManager.shared
 
     @AppStorage("showConsolidatePage") private var showConsolidatePage = false
+    @State private var licenseKeyInput = ""
     @State private var healthStatus: HealthStatusResponse?
     @State private var isLoadingHealth = true
     @State private var healthError: String?
@@ -118,6 +121,83 @@ struct SettingsView: View {
                 }
             }
 
+            // Updates
+            Section("Updates") {
+                if updater.updateAvailable, let version = updater.latestVersion {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Version \(version) available")
+                                .fontWeight(.medium)
+                            if let notes = updater.releaseNotes {
+                                Text(notes)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        if updater.isDownloading {
+                            ProgressView(value: updater.downloadProgress)
+                                .frame(width: 100)
+                        } else {
+                            Button("Install Update") {
+                                Task { await updater.downloadAndInstall() }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                        }
+                    }
+                    if let error = updater.updateError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                } else {
+                    HStack {
+                        Text("App is up to date")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Check Now") {
+                            Task { await updater.checkForUpdates() }
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            }
+
+            // License
+            Section("License") {
+                HStack {
+                    Text("Status")
+                    Spacer()
+                    Text(license.tier.rawValue.capitalized)
+                        .fontWeight(.medium)
+                        .foregroundStyle(license.tier == .pro ? .green : .blue)
+                }
+
+                if license.tier != .pro {
+                    HStack {
+                        TextField("License Key", text: $licenseKeyInput)
+                            .textFieldStyle(.roundedBorder)
+                        Button("Activate") {
+                            license.activate(key: licenseKeyInput)
+                        }
+                        .disabled(licenseKeyInput.isEmpty)
+                        .controlSize(.small)
+                    }
+                } else {
+                    HStack {
+                        Text(license.licenseKey ?? "")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Deactivate") {
+                            license.deactivate()
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            }
+
             // Features
             Section("Features") {
                 Toggle("Show Consolidate page", isOn: $showConsolidatePage)
@@ -135,7 +215,7 @@ struct SettingsView: View {
                 HStack {
                     Text("Version")
                     Spacer()
-                    Text("1.1")
+                    Text("\(updater.currentVersion) (build \(updater.currentBuild))")
                         .foregroundStyle(.secondary)
                 }
 
