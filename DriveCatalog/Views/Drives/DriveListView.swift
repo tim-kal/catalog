@@ -1201,12 +1201,15 @@ struct DriveCard: View {
                     activeOperation = nil
                     activeOperationType = nil
                     currentOperationId = nil
+                    // Clear stale change detection — DB is now up to date
+                    changeReport = nil
+                    diffConfirmedNoChanges = true
                     let message = operation.isUpToDate
                         ? "Drive is up to date — no changes detected"
                         : "Scan & hash completed"
                     operationResult = .success(message)
                     clearResultAfterDelay()
-                    await loadStatus()
+                    await loadStatus(force: true)
                     break
                 } else if operation.status == "failed" {
                     activeOperation = nil
