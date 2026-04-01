@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var backend: BackendService
 
+    @AppStorage("showConsolidatePage") private var showConsolidatePage = false
     @State private var healthStatus: HealthStatusResponse?
     @State private var isLoadingHealth = true
     @State private var healthError: String?
@@ -115,6 +116,11 @@ struct SettingsView: View {
                             .tint(.purple)
                     }
                 }
+            }
+
+            // Features
+            Section("Features") {
+                Toggle("Show Consolidate page", isOn: $showConsolidatePage)
             }
 
             // About

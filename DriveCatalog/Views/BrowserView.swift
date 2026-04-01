@@ -36,6 +36,7 @@ struct BrowserView: View {
     @State private var selectedDrive: DriveResponse?
     @State private var columns: [ColumnData] = []
     @State private var isLoading = false
+    @State private var showAllDrives = false
     @State private var errorMessage: String?
     @State private var selectedFile: FileResponse?
     @State private var fileToCopy: FileResponse?
@@ -65,16 +66,20 @@ struct BrowserView: View {
                     .frame(minWidth: 120, idealWidth: 140, maxWidth: 180)
 
                 VStack(spacing: 0) {
-                    toolBar
-                    Divider()
-                    if hasSearched {
-                        searchContent
+                    if showAllDrives {
+                        SearchView()
                     } else {
-                        columnContent
+                        toolBar
+                        Divider()
+                        if hasSearched {
+                            searchContent
+                        } else {
+                            columnContent
+                        }
                     }
                 }
             }
-            .navigationTitle("Browser")
+            .navigationTitle("Browse")
             .sheet(item: $selectedFile) { file in
                 FileDetailSheet(file: file)
             }
@@ -99,16 +104,31 @@ struct BrowserView: View {
 
     private var driveList: some View {
         List(selection: Binding(
-            get: { selectedDrive?.name },
+            get: { showAllDrives ? "__all__" : selectedDrive?.name },
             set: { name in
-                selectedDrive = drives.first { $0.name == name }
-                backupCache = [:]
-                kbColumn = 0
-                kbRow = -1
-                clearSearch()
-                Task { await loadColumn(path: "", depth: 0) }
+                if name == "__all__" {
+                    showAllDrives = true
+                    selectedDrive = nil
+                } else {
+                    showAllDrives = false
+                    selectedDrive = drives.first { $0.name == name }
+                    backupCache = [:]
+                    kbColumn = 0
+                    kbRow = -1
+                    clearSearch()
+                    Task { await loadColumn(path: "", depth: 0) }
+                }
             }
         )) {
+            Label {
+                Text("All Drives")
+                    .fontWeight(.medium)
+            } icon: {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+            }
+            .tag("__all__")
+
             Section("Drives") {
                 ForEach(drives) { drive in
                     Label {
