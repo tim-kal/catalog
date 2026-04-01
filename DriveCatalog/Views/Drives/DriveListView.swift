@@ -1417,7 +1417,9 @@ struct DriveListView: View {
             switch type {
             case .connected: return "cable.connector"
             case .disconnected: return "eject"
-            case .quickCheck: return passed == true ? "checkmark.shield.fill" : "exclamationmark.shield.fill"
+            case .quickCheck:
+                if passed == nil { return "hourglass" }
+                return passed == true ? "checkmark.shield.fill" : "exclamationmark.shield.fill"
             }
         }
 
@@ -1425,7 +1427,9 @@ struct DriveListView: View {
             switch type {
             case .connected: return .green
             case .disconnected: return .secondary
-            case .quickCheck: return passed == true ? .green : .orange
+            case .quickCheck:
+                if passed == nil { return .secondary }
+                return passed == true ? .green : .orange
             }
         }
 
@@ -1433,7 +1437,9 @@ struct DriveListView: View {
             switch type {
             case .connected: return "\(driveName) connected"
             case .disconnected: return "\(driveName) disconnected"
-            case .quickCheck: return "\(driveName): \(passed == true ? "Unchanged" : "Quick-check: possible changes")"
+            case .quickCheck:
+                if passed == nil { return "\(driveName): Checking..." }
+                return "\(driveName): \(passed == true ? "Unchanged" : "Quick-check: possible changes")"
             }
         }
     }
@@ -1539,15 +1545,28 @@ struct DriveListView: View {
                         // Not fully catalogued → full smart-scan
                         if let drive = drives.first(where: { $0.name == driveName }),
                            drive.lastScan != nil && !false {
+                            // Show "checking..." immediately
+                            let checkingEntry = ActivityLogEntry(date: Date(), driveName: driveName, type: .quickCheck, passed: nil)
+                            activityLog.insert(checkingEntry, at: 0)
+
                             let result = try? await APIService.shared.quickCheck(driveName: driveName)
                             let status = result?["status"] as? String ?? "error"
                             let passed = status == "verified"
-                            quickCheckMessages.append(
-                                QuickCheckMessage(driveName: driveName, passed: passed)
-                            )
-                            driveQuickChecks[driveName] = DriveCheckInfo(date: Date(), passed: passed)
-                            activityLog.insert(ActivityLogEntry(date: Date(), driveName: driveName, type: .quickCheck, passed: passed), at: 0)
-                            clearQuickCheckAfterDelay()
+
+                            // Replace "checking..." with actual result
+                            if let idx = activityLog.firstIndex(where: { $0.id == checkingEntry.id }) {
+                                activityLog[idx] = ActivityLogEntry(date: Date(), driveName: driveName, type: .quickCheck, passed: passed)
+                            }
+                            if passed {
+                                // No need for transient banner if unchanged
+                                driveQuickChecks[driveName] = DriveCheckInfo(date: Date(), passed: true)
+                            } else {
+                                quickCheckMessages.append(
+                                    QuickCheckMessage(driveName: driveName, passed: false)
+                                )
+                                driveQuickChecks[driveName] = DriveCheckInfo(date: Date(), passed: false)
+                                clearQuickCheckAfterDelay()
+                            }
                         } else {
                             _ = try? await APIService.shared.triggerAutoScan(driveName: driveName)
                         }
@@ -2239,17 +2258,34 @@ struct DriveListView: View {
         }
         guard !candidates.isEmpty else { return }
 
+        // Insert "Checking..." entries for all candidates
+        var checkingEntries: [String: ActivityLogEntry] = [:]
+        for drive in candidates {
+            let entry = ActivityLogEntry(date: Date(), driveName: drive.name, type: .quickCheck, passed: nil)
+            checkingEntries[drive.name] = entry
+            activityLog.insert(entry, at: 0)
+        }
+
+        // Run checks and update entries with results
+        var hasChanges = false
         for drive in candidates {
             let result = try? await APIService.shared.quickCheck(driveName: drive.name)
             let status = result?["status"] as? String ?? "error"
             let passed = status == "verified"
-            quickCheckMessages.append(
-                QuickCheckMessage(driveName: drive.name, passed: passed)
-            )
+
+            // Replace "Checking..." with result
+            if let entry = checkingEntries[drive.name],
+               let idx = activityLog.firstIndex(where: { $0.id == entry.id }) {
+                activityLog[idx] = ActivityLogEntry(date: Date(), driveName: drive.name, type: .quickCheck, passed: passed)
+            }
+
             driveQuickChecks[drive.name] = DriveCheckInfo(date: Date(), passed: passed)
-            activityLog.insert(ActivityLogEntry(date: Date(), driveName: drive.name, type: .quickCheck, passed: passed), at: 0)
+            if !passed {
+                quickCheckMessages.append(QuickCheckMessage(driveName: drive.name, passed: false))
+                hasChanges = true
+            }
         }
-        if !quickCheckMessages.isEmpty {
+        if hasChanges {
             clearQuickCheckAfterDelay()
         }
     }
