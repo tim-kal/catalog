@@ -4,6 +4,7 @@ import SwiftUI
 enum SidebarItem: String, CaseIterable, Identifiable {
     case drives
     case browser
+    case search
     case backups
     case insights
     case queue
@@ -16,6 +17,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .drives: return "Drives"
         case .browser: return "Browser"
+        case .search: return "Search"
         case .backups: return "Backups"
         case .insights: return "Insights"
         case .queue: return "Action Queue"
@@ -28,6 +30,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .drives: return "externaldrive"
         case .browser: return "folder"
+        case .search: return "magnifyingglass"
         case .backups: return "shield.lefthalf.filled"
         case .insights: return "lightbulb"
         case .queue: return "list.bullet.clipboard"

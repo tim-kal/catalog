@@ -17,6 +17,10 @@ struct ContentView: View {
                     .opacity(selection == .browser ? 1 : 0)
                     .allowsHitTesting(selection == .browser)
 
+                SearchView()
+                    .opacity(selection == .search ? 1 : 0)
+                    .allowsHitTesting(selection == .search)
+
                 BackupsView()
                     .opacity(selection == .backups ? 1 : 0)
                     .allowsHitTesting(selection == .backups)
