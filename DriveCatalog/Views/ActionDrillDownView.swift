@@ -12,9 +12,20 @@ struct ActionDrillDownView: View {
     @State private var errorMessage: String?
     @State private var totalReclaimable: Int64 = 0
     @State private var showByFolder = true
-    @State private var sortMode: SortMode = .reclaimable
+    @State private var sortMode: SortMode = .size
     @State private var queuedPaths: Set<String> = []
     @State private var queueMessage: String?
+
+    private var drillDownTitle: String {
+        switch action.actionType {
+        case "backup": return "Data at Risk"
+        case "cleanup" where action.id.contains("same_drive"): return "Same-Drive Copies"
+        case "cleanup": return "Redundant Copies"
+        default: return action.title
+        }
+    }
+
+    private var isBackupAction: Bool { action.actionType == "backup" }
 
     enum SortMode: String, CaseIterable {
         case reclaimable = "Reclaimable"
@@ -110,7 +121,7 @@ struct ActionDrillDownView: View {
 
             Spacer()
 
-            Text(action.title)
+            Text(drillDownTitle)
                 .font(.headline)
 
             Spacer()
@@ -274,7 +285,11 @@ struct ActionDrillDownView: View {
                 Text(formattedSize(folder.totalBytes))
                     .font(.callout)
                     .fontWeight(.semibold)
-                if folder.reclaimableBytes > 0 {
+                if isBackupAction {
+                    Text("\(formattedSize(folder.totalBytes)) at risk")
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                } else if folder.reclaimableBytes > 0 {
                     Text("\(formattedSize(folder.reclaimableBytes)) reclaimable")
                         .font(.caption2)
                         .foregroundStyle(.orange)
@@ -325,7 +340,12 @@ struct ActionDrillDownView: View {
             HStack(spacing: 10) {
                 Label("\(group.totalCopies) copies", systemImage: "doc.on.doc")
                 Label("\(group.driveCount) drives", systemImage: "externaldrive")
-                if group.reclaimableBytes > 0 {
+                if isBackupAction {
+                    if group.driveCount == 1 {
+                        Text("no backup")
+                            .foregroundStyle(.red)
+                    }
+                } else if group.reclaimableBytes > 0 {
                     Text("\(formattedSize(group.reclaimableBytes)) reclaimable")
                         .foregroundStyle(.orange)
                 }
