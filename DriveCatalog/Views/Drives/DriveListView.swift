@@ -52,6 +52,7 @@ struct DriveCard: View {
     @State private var changeReport: ChangeReport?
     @State private var isDiffing = false
     @State private var showChangeDetails = false
+    @State private var diffConfirmedNoChanges = false
 
     /// Parsed change report from the diff endpoint.
     struct ChangeReport {
@@ -379,17 +380,11 @@ struct DriveCard: View {
                         }
                     }
                     if let checkDate = lastQuickCheckDate {
+                        let effectivelyPassed = lastQuickCheckPassed == true || diffConfirmedNoChanges
                         HStack(spacing: 4) {
-                            Image(systemName: lastQuickCheckPassed == true ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
-                                .foregroundStyle(lastQuickCheckPassed == true ? .green : .orange)
-                            Text("Checked \(ageString(checkDate))")
-                        }
-                    }
-                    if let report = changeReport, !report.hasChanges {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                            Text("No changes")
+                            Image(systemName: effectivelyPassed ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
+                                .foregroundStyle(effectivelyPassed ? .green : .orange)
+                            Text(diffConfirmedNoChanges ? "No changes" : "Checked \(ageString(checkDate))")
                         }
                     }
                 }
@@ -408,8 +403,8 @@ struct DriveCard: View {
                 }
             } else if let report = changeReport, report.hasChanges {
                 changeReportView(report)
-            } else if lastQuickCheckPassed == false && isMounted {
-                // Quick-check failed but no diff yet — offer to analyze
+            } else if lastQuickCheckPassed == false && !diffConfirmedNoChanges && isMounted {
+                // Quick-check failed and diff hasn't confirmed no changes — offer to analyze
                 Button {
                     Task { await runDiff() }
                 } label: {
@@ -944,9 +939,13 @@ struct DriveCard: View {
         isDiffing = true
         changeReport = nil
         do {
-            // Diff endpoint is synchronous — returns result directly
             let result = try await APIService.shared.triggerDiff(driveName: drive.name)
-            changeReport = ChangeReport.from(dict: result)
+            let report = ChangeReport.from(dict: result)
+            changeReport = report
+            // If diff found no changes, correct the quick-check status
+            if report?.hasChanges == false {
+                diffConfirmedNoChanges = true
+            }
         } catch {
             // Silently fail — diff is optional
         }
