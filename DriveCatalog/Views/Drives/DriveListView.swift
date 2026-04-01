@@ -1758,17 +1758,32 @@ struct DriveListView: View {
             }
 
             if let error = backend.startupError {
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     Text(error)
-                        .font(.caption)
+                        .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                    Button("Retry") {
-                        backend.stop()
-                        backend.start()
+                        .multilineTextAlignment(.leading)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: 500)
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.red.opacity(0.05)))
+
+                    HStack(spacing: 12) {
+                        Button("Retry") {
+                            backend.stop()
+                            backend.start()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+
+                        Button("Show Log File") {
+                            let logURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+                                .appendingPathComponent("DriveCatalog/backend.log")
+                            NSWorkspace.shared.open(logURL)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                 }
             }
         }

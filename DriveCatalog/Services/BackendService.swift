@@ -106,11 +106,18 @@ final class BackendService: ObservableObject {
         return false
     }
 
+    /// Log file for backend output — helps diagnose startup failures.
+    private var backendLogURL: URL {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = support.appendingPathComponent("DriveCatalog")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("backend.log")
+    }
+
     private func launchServer() {
         let proc = Process()
 
         if let pythonBin = embeddedPythonPath, let pythonHome = embeddedPythonHome {
-            // Production: use embedded Python from app bundle
             logger.info("Using embedded Python: \(pythonBin)")
             proc.executableURL = URL(fileURLWithPath: pythonBin)
             proc.arguments = ["-m", "drivecatalog.api"]
@@ -121,7 +128,6 @@ final class BackendService: ObservableObject {
             env.removeValue(forKey: "VIRTUAL_ENV")
             proc.environment = env
         } else if let uv = uvPath {
-            // Development: use uv from the project directory
             logger.info("Using uv (development mode): \(uv)")
             proc.executableURL = URL(fileURLWithPath: uv)
             proc.arguments = ["run", "python", "-m", "drivecatalog.api"]
@@ -136,9 +142,12 @@ final class BackendService: ObservableObject {
             return
         }
 
-        // Pipe stdout/stderr to /dev/null (or a log file if debugging)
-        proc.standardOutput = FileHandle.nullDevice
-        proc.standardError = FileHandle.nullDevice
+        // Log backend output to file for diagnostics
+        let logFile = backendLogURL
+        FileManager.default.createFile(atPath: logFile.path, contents: nil)
+        let logHandle = FileHandle(forWritingAtPath: logFile.path)
+        proc.standardOutput = logHandle ?? FileHandle.nullDevice
+        proc.standardError = logHandle ?? FileHandle.nullDevice
 
         proc.terminationHandler = { [weak self] proc in
             Task { @MainActor in
@@ -215,7 +224,31 @@ final class BackendService: ObservableObject {
             }
             try? await Task.sleep(for: .milliseconds(attempt < 3 ? 100 : 300))
         }
-        startupError = "API server started but failed health check after 15 seconds"
-        logger.error("API server failed health check")
+        // Check if process is still alive — maybe it just needs more time
+        if let proc = process, proc.isRunning {
+            logger.warning("Health check failed but process still running — retrying...")
+            // One more round of checks with longer intervals
+            for _ in 1...10 {
+                try? await Task.sleep(for: .seconds(1))
+                do {
+                    let (_, response) = try await session.data(from: url)
+                    if let http = response as? HTTPURLResponse, http.statusCode == 200 {
+                        isRunning = true
+                        logger.info("API server healthy on extended retry")
+                        return
+                    }
+                } catch { }
+            }
+        }
+
+        // Read last lines from log for diagnostics
+        let logPath = backendLogURL
+        let logTail = (try? String(contentsOf: logPath, encoding: .utf8))
+            .flatMap { log in
+                let lines = log.components(separatedBy: .newlines).suffix(5)
+                return lines.isEmpty ? nil : lines.joined(separator: "\n")
+            } ?? "No log output"
+        startupError = "Backend failed to start.\n\nLog: \(logPath.path)\n\n\(logTail)"
+        logger.error("API server failed health check. Log: \(logPath.path)")
     }
 }
