@@ -67,11 +67,12 @@ struct BrowserView: View {
                     .frame(minWidth: 120, idealWidth: 140, maxWidth: 180)
 
                 VStack(spacing: 0) {
-                    if showAllDrives {
+                    if showAllDrives && !hasSearched {
+                        searchBar
+                        Divider()
                         AllDrivesView()
                     } else {
                         toolBar
-                        Divider()
                         if hasSearched {
                             searchContent
                         } else {
@@ -169,36 +170,38 @@ struct BrowserView: View {
 
     // MARK: - Toolbar (search + sort + breadcrumb)
 
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField(
+                showAllDrives ? "Search all drives..." : (selectedDrive.map { "Search \($0.name)..." } ?? "Search..."),
+                text: $searchQuery
+            )
+            .textFieldStyle(.plain)
+            .onSubmit { Task { await performSearch() } }
+
+            if !searchQuery.isEmpty {
+                Button {
+                    clearSearch()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if isSearching {
+                ProgressView().controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
     private var toolBar: some View {
         VStack(spacing: 0) {
-            // Search bar
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField(
-                    selectedDrive.map { "Search \($0.name)..." } ?? "Search all drives...",
-                    text: $searchQuery
-                )
-                .textFieldStyle(.plain)
-                .onSubmit { Task { await performSearch() } }
-
-                if !searchQuery.isEmpty {
-                    Button {
-                        clearSearch()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                if isSearching {
-                    ProgressView().controlSize(.small)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-
+            searchBar
             Divider()
 
             // Breadcrumb + sort
@@ -811,9 +814,11 @@ struct BrowserView: View {
         guard !trimmed.isEmpty else { return }
         isSearching = true
         hasSearched = true
+        // Auto-wrap with wildcards if user didn't include glob characters
+        let pattern = trimmed.contains("*") || trimmed.contains("?") ? trimmed : "*\(trimmed)*"
         do {
             let response = try await APIService.shared.searchFiles(
-                query: trimmed, drive: selectedDrive?.name
+                query: pattern, drive: showAllDrives ? nil : selectedDrive?.name
             )
             searchResults = response.files
             searchTotal = response.total
