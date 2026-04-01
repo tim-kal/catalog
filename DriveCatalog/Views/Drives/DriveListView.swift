@@ -1201,9 +1201,10 @@ struct DriveCard: View {
                     activeOperation = nil
                     activeOperationType = nil
                     currentOperationId = nil
-                    // Clear stale change detection — DB is now up to date
+                    // Clear stale state — DB is now up to date
                     changeReport = nil
                     diffConfirmedNoChanges = true
+                    verificationReport = nil
                     let message = operation.isUpToDate
                         ? "Drive is up to date — no changes detected"
                         : "Scan & hash completed"
@@ -1499,10 +1500,10 @@ struct DriveListView: View {
         .task(id: backend.isRunning) {
             if backend.isRunning {
                 await loadDrives()
-                // Bump trigger so all cards re-fetch status now that backend is ready
                 volumeRefreshTrigger += 1
                 startOperationPolling()
-                await quickCheckMountedDrives()
+                // Quick-check in parallel — don't block UI
+                Task { await quickCheckMountedDrives() }
             } else {
                 operationPollTask?.cancel()
             }

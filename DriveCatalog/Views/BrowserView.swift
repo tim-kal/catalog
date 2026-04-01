@@ -143,8 +143,15 @@ struct BrowserView: View {
                 ForEach(drives) { drive in
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(drive.name)
-                                .fontWeight(.medium)
+                            HStack(spacing: 4) {
+                                Text(drive.name)
+                                    .fontWeight(.medium)
+                                if FileManager.default.fileExists(atPath: drive.mountPath) {
+                                    Circle()
+                                        .fill(.green)
+                                        .frame(width: 6, height: 6)
+                                }
+                            }
                             Text("\(drive.fileCount) files")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
