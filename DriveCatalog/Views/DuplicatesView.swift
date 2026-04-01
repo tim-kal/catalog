@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Backups page showing hierarchical protection status: drives > directories > files.
 struct BackupsView: View {
+    @Environment(\.activeTab) private var activeTab
     @State private var treeData: ProtectionTreeResponse?
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -84,13 +85,15 @@ struct BackupsView: View {
             }
             .navigationTitle("Backups")
             .toolbar {
-                ToolbarItem {
-                    Button {
-                        Task { await loadData() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
+                if activeTab == .backups {
+                    ToolbarItem {
+                        Button {
+                            Task { await loadData() }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .help("Refresh")
                     }
-                    .help("Refresh")
                 }
             }
             .task {
