@@ -12,11 +12,26 @@ struct Sidebar: View {
     }
 
     var body: some View {
-        List(visibleItems, selection: $selection) { item in
-            Label(item.title, systemImage: item.systemImage)
-                .tag(item)
+        VStack(spacing: 0) {
+            List(visibleItems, selection: $selection) { item in
+                Label(item.title, systemImage: item.systemImage)
+                    .tag(item)
+            }
+            .listStyle(.sidebar)
+
+            // Version info
+            Divider()
+            HStack {
+                Text("DriveCatalog v1.2")
+                    .font(.caption2)
+                Spacer()
+                Text("Apr 2026")
+                    .font(.caption2)
+            }
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         }
-        .listStyle(.sidebar)
     }
 }
 

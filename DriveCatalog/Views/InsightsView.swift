@@ -175,81 +175,83 @@ struct InsightsView: View {
 
     private func actionsSection(_ actions: [RecommendedAction]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Recommended Actions")
-                .font(.title3)
-                .fontWeight(.semibold)
+            // Three fixed categories
+            let dataAtRisk = actions.filter { $0.actionType == "backup" }
+            let redundant = actions.first { $0.id == "trim_redundant" }
+            let sameDrive = actions.first { $0.id == "clean_same_drive_dupes" }
 
-            if actions.isEmpty {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                    Text("No urgent actions needed")
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 8)
-            } else {
-                ForEach(actions) { action in
-                    Button {
-                        selectedAction = action
-                    } label: {
-                        actionCard(action)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
+            // 1. Data at Risk
+            categoryCard(
+                title: "Data at Risk",
+                subtitle: dataAtRisk.isEmpty ? "All files are backed up" : "\(dataAtRisk.count) drives with unprotected files",
+                icon: "exclamationmark.shield.fill",
+                color: .red,
+                bytes: dataAtRisk.reduce(Int64(0)) { $0 + $1.impactBytes },
+                action: dataAtRisk.first
+            )
+
+            // 2. Redundant Copies
+            categoryCard(
+                title: "Redundant Copies",
+                subtitle: redundant?.description ?? "No files on 3+ drives",
+                icon: "shield.fill",
+                color: .blue,
+                bytes: redundant?.impactBytes ?? 0,
+                action: redundant
+            )
+
+            // 3. Same-Drive Copies
+            categoryCard(
+                title: "Same-Drive Copies",
+                subtitle: sameDrive?.description ?? "No same-drive duplicates found",
+                icon: "doc.on.doc.fill",
+                color: .orange,
+                bytes: sameDrive?.impactBytes ?? 0,
+                action: sameDrive
+            )
         }
     }
 
-    private func actionCard(_ action: RecommendedAction) -> some View {
-        HStack(spacing: 12) {
-            // Priority number
-            ZStack {
-                Circle()
-                    .fill(action.swiftColor.opacity(0.15))
-                    .frame(width: 32, height: 32)
-                Text("\(action.priority)")
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundStyle(action.swiftColor)
+    private func categoryCard(title: String, subtitle: String, icon: String, color: Color, bytes: Int64, action: RecommendedAction?) -> some View {
+        Button {
+            if let action { selectedAction = action }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundStyle(color)
+                    .frame(width: 28)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                if bytes > 0 {
+                    Text(formattedSize(bytes))
+                        .font(.callout)
+                        .fontWeight(.bold)
+                        .foregroundStyle(color)
+                }
+
+                if action != nil {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
-
-            // Icon
-            Image(systemName: action.icon)
-                .font(.title3)
-                .foregroundStyle(action.swiftColor)
-                .frame(width: 24)
-
-            // Content
-            VStack(alignment: .leading, spacing: 3) {
-                Text(action.title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Text(action.description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-
-            Spacer()
-
-            // Impact
-            if action.impactBytes > 0 {
-                Text(formattedSize(action.impactBytes))
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundStyle(action.swiftColor)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(action.swiftColor.opacity(0.1))
-                    .clipShape(Capsule())
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color(.controlBackgroundColor)))
         }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color(.controlBackgroundColor)))
+        .buttonStyle(.plain)
+        .disabled(action == nil)
     }
 
     // MARK: - Drive Risk Section
