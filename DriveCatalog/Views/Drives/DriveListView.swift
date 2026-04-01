@@ -1562,6 +1562,14 @@ struct DriveListView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .refreshCurrentPage)) { _ in
+            if activeTab == .drives {
+                Task {
+                    volumeRefreshTrigger += 1
+                    await loadDrives()
+                }
+            }
+        }
         .sheet(isPresented: $showAddSheet) {
             AddDriveSheet {
                 await loadDrives()
@@ -1603,10 +1611,6 @@ struct DriveListView: View {
             ToolbarItem {
                 Button { showAddSheet = true } label: { Image(systemName: "plus") }
                     .help("Add Drive")
-            }
-            ToolbarItem {
-                Button { Task { await loadDrives() } } label: { Image(systemName: "arrow.clockwise") }
-                    .help("Refresh")
             }
         }
     }

@@ -1,5 +1,9 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let refreshCurrentPage = Notification.Name("refreshCurrentPage")
+}
+
 struct ContentView: View {
     @State private var selection: SidebarItem? = .drives
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
@@ -48,6 +52,17 @@ struct ContentView: View {
                     .allowsHitTesting(selection == .settings)
             }
             .environment(\.activeTab, selection)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        NotificationCenter.default.post(name: .refreshCurrentPage, object: nil)
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .help("Refresh current page")
+                    .keyboardShortcut("r", modifiers: .command)
+                }
+            }
         }
         .frame(minWidth: 800, minHeight: 500)
     }

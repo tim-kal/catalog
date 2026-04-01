@@ -74,17 +74,8 @@ struct InsightsView: View {
             }
         }
         .navigationTitle("Insights")
-        .toolbar {
-            if activeTab == .insights {
-                ToolbarItem {
-                    Button {
-                        Task { await loadData() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .help("Refresh")
-                }
-            }
+        .onReceive(NotificationCenter.default.publisher(for: .refreshCurrentPage)) { _ in
+            if activeTab == .insights { Task { await loadData() } }
         }
     }
 

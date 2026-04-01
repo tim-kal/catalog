@@ -32,6 +32,7 @@ private struct ColumnData: Identifiable {
 
 struct BrowserView: View {
     @ObservedObject private var backend = BackendService.shared
+    @Environment(\.activeTab) private var activeTab
     @State private var drives: [DriveResponse] = []
     @State private var selectedDrive: DriveResponse?
     @State private var columns: [ColumnData] = []
@@ -95,6 +96,15 @@ struct BrowserView: View {
             .task(id: backend.isRunning) {
                 if backend.isRunning {
                     await loadDrives()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .refreshCurrentPage)) { _ in
+                if activeTab == .browser {
+                    Task {
+                        if let sel = selectedDrive {
+                            await loadColumn(path: "", depth: 0)
+                        }
+                    }
                 }
             }
         }

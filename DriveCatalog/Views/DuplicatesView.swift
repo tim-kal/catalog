@@ -85,17 +85,8 @@ struct BackupsView: View {
                 }
             }
             .navigationTitle("Backups")
-            .toolbar {
-                if activeTab == .backups {
-                    ToolbarItem {
-                        Button {
-                            Task { await loadData() }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        .help("Refresh")
-                    }
-                }
+            .onReceive(NotificationCenter.default.publisher(for: .refreshCurrentPage)) { _ in
+                if activeTab == .backups { Task { await loadData() } }
             }
             .task(id: backend.isRunning) {
                 if backend.isRunning { await loadData() }

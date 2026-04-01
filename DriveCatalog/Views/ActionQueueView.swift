@@ -55,6 +55,9 @@ struct ActionQueueView: View {
                 Task { await refresh() }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .refreshCurrentPage)) { _ in
+            if activeTab == .queue { Task { await refresh() } }
+        }
         .overlay(alignment: .top) {
             if let banner = completionBanner {
                 HStack(spacing: 8) {
