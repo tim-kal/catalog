@@ -140,10 +140,11 @@ struct DriveCard: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(isExpanded ? Color.accentColor.opacity(0.5) : Color.secondary.opacity(0.15), lineWidth: 1)
         )
-        .task(id: refreshTrigger) {
+        .task {
             diskSpace = DiskSpace.read(path: drive.mountPath)
+        }
+        .task(id: refreshTrigger) {
             await loadStatus()
-            // Resume polling if there's a running operation on this drive
             if activeOperation == nil {
                 await resumeRunningOperation()
             }
@@ -1467,8 +1468,9 @@ struct DriveListView: View {
         .task(id: backend.isRunning) {
             if backend.isRunning {
                 await loadDrives()
+                // Bump trigger so all cards re-fetch status now that backend is ready
+                volumeRefreshTrigger += 1
                 startOperationPolling()
-                // Quick-check all fully-catalogued mounted drives on startup
                 await quickCheckMountedDrives()
             } else {
                 operationPollTask?.cancel()

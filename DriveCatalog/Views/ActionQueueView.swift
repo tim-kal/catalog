@@ -90,7 +90,7 @@ struct ActionQueueView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                 if !actions.isEmpty {
-                    Text("\(actions.count) planned · \(actionableActions.count) ready now")
+                    Text("\(filteredActions.count) shown · \(actions.count) total · \(actionableActions.count) ready now")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
