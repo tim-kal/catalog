@@ -939,24 +939,9 @@ struct DriveCard: View {
         isDiffing = true
         changeReport = nil
         do {
-            let response = try await APIService.shared.triggerDiff(driveName: drive.name)
-            guard let opId = response["operation_id"] as? String else {
-                isDiffing = false
-                return
-            }
-            // Poll until complete
-            while true {
-                let op = try await APIService.shared.fetchOperation(id: opId)
-                if op.status == "completed" {
-                    // Fetch the full result
-                    let result = try await APIService.shared.fetchOperationResult(id: opId)
-                    changeReport = ChangeReport.from(dict: result)
-                    break
-                } else if op.status == "failed" || op.status == "cancelled" {
-                    break
-                }
-                try await Task.sleep(for: .seconds(1))
-            }
+            // Diff endpoint is synchronous — returns result directly
+            let result = try await APIService.shared.triggerDiff(driveName: drive.name)
+            changeReport = ChangeReport.from(dict: result)
         } catch {
             // Silently fail — diff is optional
         }

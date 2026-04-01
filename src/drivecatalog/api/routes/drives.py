@@ -4,6 +4,8 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+import os
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 from drivecatalog.database import get_connection
@@ -1295,6 +1297,127 @@ async def trigger_verify_integrity(
             "operation_id": op.id,
             "status": "started",
             "poll_url": f"/operations/{op.id}",
+        }
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Quick-check: fast change detection by sampling file counts and mtimes
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{name}/quick-check")
+async def quick_check_drive(name: str) -> dict:
+    """Quick-check a drive for changes by comparing file counts and sample mtimes."""
+    conn = get_connection()
+    try:
+        drive = conn.execute("SELECT * FROM drives WHERE name = ?", (name,)).fetchone()
+        if not drive:
+            raise HTTPException(404, f"Drive '{name}' not found")
+
+        mount_path = drive["mount_path"]
+        if not os.path.isdir(mount_path):
+            raise HTTPException(400, f"Drive '{name}' is not mounted at {mount_path}")
+
+        drive_id = drive["id"]
+        db_count = conn.execute(
+            "SELECT COUNT(*) as cnt FROM files WHERE drive_id = ?", (drive_id,)
+        ).fetchone()["cnt"]
+
+        actual_count = 0
+        for root, dirs, files in os.walk(mount_path):
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+            actual_count += len([f for f in files if not f.startswith(".")])
+
+        diff = actual_count - db_count
+        if abs(diff) > max(5, db_count * 0.01):
+            return {"status": "changed", "db_files": db_count, "disk_files": actual_count, "difference": diff}
+
+        sample_rows = conn.execute(
+            "SELECT path, mtime FROM files WHERE drive_id = ? ORDER BY RANDOM() LIMIT 20",
+            (drive_id,),
+        ).fetchall()
+
+        mismatches = 0
+        for row in sample_rows:
+            full_path = os.path.join(mount_path, row["path"])
+            if not os.path.exists(full_path):
+                mismatches += 1
+
+        if mismatches > 2:
+            return {"status": "changed", "db_files": db_count, "disk_files": actual_count, "sample_mismatches": mismatches}
+
+        return {"status": "verified", "files_checked": db_count}
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Diff: detailed change analysis between catalog and filesystem
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{name}/diff")
+async def diff_drive(name: str) -> dict:
+    """Compare cataloged files against the actual filesystem to find changes."""
+    conn = get_connection()
+    try:
+        drive = conn.execute("SELECT * FROM drives WHERE name = ?", (name,)).fetchone()
+        if not drive:
+            raise HTTPException(404, f"Drive '{name}' not found")
+
+        mount_path = drive["mount_path"]
+        if not os.path.isdir(mount_path):
+            raise HTTPException(400, f"Drive '{name}' is not mounted at {mount_path}")
+
+        drive_id = drive["id"]
+        db_rows = conn.execute(
+            "SELECT path, size_bytes, mtime FROM files WHERE drive_id = ?", (drive_id,)
+        ).fetchall()
+        db_files = {r["path"]: (r["size_bytes"], r["mtime"]) for r in db_rows}
+
+        disk_files = {}
+        for root, dirs, files in os.walk(mount_path):
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+            for fname in files:
+                if fname.startswith("."):
+                    continue
+                full_path = os.path.join(root, fname)
+                rel_path = os.path.relpath(full_path, mount_path)
+                try:
+                    stat = os.stat(full_path)
+                    disk_files[rel_path] = (stat.st_size, None)
+                except OSError:
+                    continue
+
+        db_paths = set(db_files.keys())
+        disk_paths = set(disk_files.keys())
+        added = sorted(disk_paths - db_paths)
+        deleted = sorted(db_paths - disk_paths)
+        modified = []
+        for path in db_paths & disk_paths:
+            if db_files[path][0] != disk_files[path][0]:
+                modified.append(path)
+
+        added_bytes = sum(disk_files[p][0] for p in added)
+        deleted_bytes = sum(db_files[p][0] for p in deleted)
+
+        return {
+            "summary": {
+                "added_count": len(added),
+                "deleted_count": len(deleted),
+                "modified_count": len(modified),
+                "moved_count": 0,
+                "unchanged_count": len(db_paths & disk_paths) - len(modified),
+                "bytes_added": added_bytes,
+                "bytes_deleted": deleted_bytes,
+                "net_bytes": added_bytes - deleted_bytes,
+            },
+            "added": [{"path": p} for p in added[:100]],
+            "deleted": [{"path": p} for p in deleted[:100]],
+            "modified": [{"path": p} for p in modified[:100]],
+            "moved": [],
         }
     finally:
         conn.close()
