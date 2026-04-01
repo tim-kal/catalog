@@ -110,7 +110,7 @@ struct InsightsView: View {
 
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 5)
-                            .fill(Color.red.opacity(0.2))
+                            .fill(Color.secondary.opacity(0.15))
                             .frame(height: 12)
                         RoundedRectangle(cornerRadius: 5)
                             .fill(Color.green)
@@ -120,18 +120,12 @@ struct InsightsView: View {
                 .frame(height: 12)
             }
 
-            // Key numbers
+            // Key numbers — show bytes, not file counts
             HStack(spacing: 0) {
                 healthMetric(
-                    value: formatCount(health.backedUpHashes + health.redundantHashes),
+                    value: formattedSize(health.backedUpBytes + health.redundantBytes),
                     label: "backed up",
                     color: .green
-                )
-                Spacer()
-                healthMetric(
-                    value: formatCount(health.unprotectedHashes),
-                    label: "unprotected",
-                    color: .red
                 )
                 Spacer()
                 healthMetric(

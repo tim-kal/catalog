@@ -246,7 +246,7 @@ struct BackupsView: View {
                         .padding(.vertical, 8)
                     } else if let groups = directoryFiles[key] {
                         if groups.isEmpty {
-                            Text("No hashed files in this directory")
+                            Text("Files not yet hashed — hash this drive to see backup status")
                                 .font(.caption)
                                 .foregroundStyle(.tertiary)
                                 .padding(.vertical, 8)
