@@ -2,23 +2,42 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var selection: SidebarItem? = .drives
+    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             Sidebar(selection: $selection)
         } detail: {
-            switch selection {
-            case .drives:
+            ZStack {
                 DrivesView()
-            case .browser:
+                    .opacity(selection == .drives ? 1 : 0)
+                    .allowsHitTesting(selection == .drives)
+
                 BrowserView()
-            case .backups:
+                    .opacity(selection == .browser ? 1 : 0)
+                    .allowsHitTesting(selection == .browser)
+
                 BackupsView()
-            case .settings:
+                    .opacity(selection == .backups ? 1 : 0)
+                    .allowsHitTesting(selection == .backups)
+
+                InsightsView()
+                    .opacity(selection == .insights ? 1 : 0)
+                    .allowsHitTesting(selection == .insights)
+
+                ActionQueueView()
+                    .opacity(selection == .queue ? 1 : 0)
+                    .allowsHitTesting(selection == .queue)
+
+                ConsolidatePageView()
+                    .opacity(selection == .consolidate ? 1 : 0)
+                    .allowsHitTesting(selection == .consolidate)
+
                 SettingsView()
-            case nil:
-                DrivesView()
+                    .opacity(selection == .settings ? 1 : 0)
+                    .allowsHitTesting(selection == .settings)
             }
+            .environment(\.activeTab, selection)
         }
         .frame(minWidth: 800, minHeight: 500)
     }

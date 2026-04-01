@@ -38,6 +38,7 @@ struct BrowseResponse: Codable {
 struct BackupDriveInfo: Codable, Identifiable {
     let driveName: String
     let fileCount: Int
+    let totalBytes: Int64?
     let percentCoverage: Double
 
     var id: String { driveName }
@@ -45,6 +46,7 @@ struct BackupDriveInfo: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case driveName = "drive_name"
         case fileCount = "file_count"
+        case totalBytes = "total_bytes"
         case percentCoverage = "percent_coverage"
     }
 }

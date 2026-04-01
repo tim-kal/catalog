@@ -35,16 +35,27 @@ final class BackendService: ObservableObject {
         forceStop()
     }
 
+    /// Path to embedded Python inside the app bundle (Contents/Resources/python/bin/python3).
+    private var embeddedPythonPath: String? {
+        guard let resourceURL = Bundle.main.resourceURL else { return nil }
+        let path = resourceURL.appendingPathComponent("python/bin/python3").path
+        return FileManager.default.fileExists(atPath: path) ? path : nil
+    }
+
+    /// Root of the embedded Python installation (Contents/Resources/python).
+    private var embeddedPythonHome: String? {
+        guard let resourceURL = Bundle.main.resourceURL else { return nil }
+        let path = resourceURL.appendingPathComponent("python").path
+        return FileManager.default.isReadableFile(atPath: path) ? path : nil
+    }
+
     /// Path to the DriveSnapshots project root (where pyproject.toml lives).
+    /// Used only for development (uv-based launch).
     private var projectPath: String {
-        // The Xcode project is inside DriveSnapshots, so go up from the app bundle
-        // For development: use the known project path
-        // In production, this would be bundled differently
         let knownPath = "\(NSHomeDirectory())/code/DriveSnapshots"
         if FileManager.default.fileExists(atPath: "\(knownPath)/pyproject.toml") {
             return knownPath
         }
-        // Fallback: derive from the app bundle location
         if let bundlePath = Bundle.main.bundlePath.components(separatedBy: "/DriveCatalog.app").first,
            FileManager.default.fileExists(atPath: "\(bundlePath)/pyproject.toml") {
             return bundlePath
@@ -52,7 +63,7 @@ final class BackendService: ObservableObject {
         return knownPath
     }
 
-    /// Possible locations for the uv binary.
+    /// Possible locations for the uv binary (development fallback).
     private var uvPath: String? {
         let candidates = [
             "\(NSHomeDirectory())/.local/bin/uv",
@@ -77,11 +88,15 @@ final class BackendService: ObservableObject {
         }
     }
 
-    /// Check if a server is already healthy on the expected port.
+    /// Check if a server is already healthy on the expected port (with short timeout).
     private func checkExistingServer() async -> Bool {
         let url = URL(string: "\(APIService.baseURL)/health")!
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 1  // 1 second max — don't block startup
+        config.timeoutIntervalForResource = 1
+        let session = URLSession(configuration: config)
         do {
-            let (_, response) = try await URLSession.shared.data(from: url)
+            let (_, response) = try await session.data(from: url)
             if let http = response as? HTTPURLResponse, http.statusCode == 200 {
                 return true
             }
@@ -92,21 +107,34 @@ final class BackendService: ObservableObject {
     }
 
     private func launchServer() {
-        guard let uv = uvPath else {
-            startupError = "Cannot find uv. Install it: curl -LsSf https://astral.sh/uv/install.sh | sh"
-            logger.error("uv binary not found")
+        let proc = Process()
+
+        if let pythonBin = embeddedPythonPath, let pythonHome = embeddedPythonHome {
+            // Production: use embedded Python from app bundle
+            logger.info("Using embedded Python: \(pythonBin)")
+            proc.executableURL = URL(fileURLWithPath: pythonBin)
+            proc.arguments = ["-m", "drivecatalog.api"]
+
+            var env = ProcessInfo.processInfo.environment
+            env["PYTHONHOME"] = pythonHome
+            env["PYTHONDONTWRITEBYTECODE"] = "1"
+            env.removeValue(forKey: "VIRTUAL_ENV")
+            proc.environment = env
+        } else if let uv = uvPath {
+            // Development: use uv from the project directory
+            logger.info("Using uv (development mode): \(uv)")
+            proc.executableURL = URL(fileURLWithPath: uv)
+            proc.arguments = ["run", "python", "-m", "drivecatalog.api"]
+            proc.currentDirectoryURL = URL(fileURLWithPath: projectPath)
+
+            var env = ProcessInfo.processInfo.environment
+            env.removeValue(forKey: "VIRTUAL_ENV")
+            proc.environment = env
+        } else {
+            startupError = "No Python backend found. Embedded Python missing and uv not installed."
+            logger.error("No Python backend available")
             return
         }
-
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: uv)
-        proc.arguments = ["run", "python", "-m", "drivecatalog.api"]
-        proc.currentDirectoryURL = URL(fileURLWithPath: projectPath)
-
-        // Suppress Xcode VIRTUAL_ENV warning
-        var env = ProcessInfo.processInfo.environment
-        env.removeValue(forKey: "VIRTUAL_ENV")
-        proc.environment = env
 
         // Pipe stdout/stderr to /dev/null (or a log file if debugging)
         proc.standardOutput = FileHandle.nullDevice
@@ -169,10 +197,14 @@ final class BackendService: ObservableObject {
     /// Wait for the API to respond to /health, with retries.
     private func waitForHealthy() async {
         let url = URL(string: "\(APIService.baseURL)/health")!
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 1
+        config.timeoutIntervalForResource = 1
+        let session = URLSession(configuration: config)
         for attempt in 1...30 {
-            try? await Task.sleep(for: .milliseconds(attempt < 5 ? 200 : 500))
+            // Check first, then sleep — shaves off the initial delay
             do {
-                let (_, response) = try await URLSession.shared.data(from: url)
+                let (_, response) = try await session.data(from: url)
                 if let http = response as? HTTPURLResponse, http.statusCode == 200 {
                     isRunning = true
                     logger.info("API server healthy after \(attempt) attempts")
@@ -181,6 +213,7 @@ final class BackendService: ObservableObject {
             } catch {
                 // Not ready yet
             }
+            try? await Task.sleep(for: .milliseconds(attempt < 3 ? 100 : 300))
         }
         startupError = "API server started but failed health check after 15 seconds"
         logger.error("API server failed health check")

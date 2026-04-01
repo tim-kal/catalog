@@ -267,6 +267,7 @@ class BackupDriveCoverage(BaseModel):
 
     drive_name: str
     file_count: int
+    total_bytes: int
     percent_coverage: float
 
 
@@ -336,7 +337,9 @@ async def browse_backup_status(
         placeholders = ",".join("?" * len(hashes))
         coverage_rows = conn.execute(
             f"""
-            SELECT d.name AS drive_name, COUNT(DISTINCT f.partial_hash) AS matched_hashes
+            SELECT d.name AS drive_name,
+                   COUNT(DISTINCT f.partial_hash) AS matched_hashes,
+                   COALESCE(SUM(f.size_bytes), 0) AS total_bytes
             FROM files f
             JOIN drives d ON f.drive_id = d.id
             WHERE f.drive_id != ?
@@ -365,6 +368,7 @@ async def browse_backup_status(
             BackupDriveCoverage(
                 drive_name=r["drive_name"],
                 file_count=r["matched_hashes"],
+                total_bytes=r["total_bytes"],
                 percent_coverage=round(r["matched_hashes"] / hashed_files * 100, 1),
             )
             for r in coverage_rows

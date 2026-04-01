@@ -31,6 +31,7 @@ private struct ColumnData: Identifiable {
 // MARK: - Browser View
 
 struct BrowserView: View {
+    @ObservedObject private var backend = BackendService.shared
     @State private var drives: [DriveResponse] = []
     @State private var selectedDrive: DriveResponse?
     @State private var columns: [ColumnData] = []
@@ -86,8 +87,10 @@ struct BrowserView: View {
                     })
                 }
             }
-            .task {
-                await loadDrives()
+            .task(id: backend.isRunning) {
+                if backend.isRunning {
+                    await loadDrives()
+                }
             }
         }
     }
@@ -99,7 +102,7 @@ struct BrowserView: View {
             get: { selectedDrive?.name },
             set: { name in
                 selectedDrive = drives.first { $0.name == name }
-                columns = []
+                backupCache = [:]
                 kbColumn = 0
                 kbRow = -1
                 clearSearch()
@@ -408,12 +411,15 @@ struct BrowserView: View {
                                     .foregroundStyle(.orange)
                             }
                         } else {
+                            Text("Copies found:")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
                             ForEach(backup.backupDrives, id: \.driveName) { bd in
                                 HStack(spacing: 4) {
                                     Image(systemName: bd.percentCoverage >= 100
-                                          ? "checkmark.circle.fill" : "circle.lefthalf.filled")
+                                          ? "checkmark.circle.fill" : "externaldrive.fill")
                                         .foregroundStyle(bd.percentCoverage >= 100 ? .green : .orange)
-                                    Text("\(bd.driveName) — \(Int(bd.percentCoverage))%")
+                                    Text("\(bd.driveName) – \(bd.fileCount) of \(backup.totalFiles) files\(bd.totalBytes.map { " – \(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file))" } ?? "")")
                                 }
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -829,7 +835,7 @@ private struct BackupBadgeView: View {
                             Text(bd.driveName)
                                 .font(.callout)
                             Spacer()
-                            Text("\(bd.fileCount) files")
+                            Text("\(bd.fileCount) files\(bd.totalBytes.map { " – \(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file))" } ?? "")")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Text("\(Int(bd.percentCoverage))%")

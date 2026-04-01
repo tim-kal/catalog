@@ -499,6 +499,69 @@ actor APIService {
         try await delete(url: url)
     }
 
+    // MARK: - Drive Quick Check & Diff
+
+    func quickCheck(driveName: String) async throws -> [String: Any] {
+        let url = try buildURL(path: "/drives/\(driveName)/quick-check")
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw APIError.invalidResponse
+        }
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
+    func triggerDiff(driveName: String) async throws -> [String: Any] {
+        let url = try buildURL(path: "/drives/\(driveName)/diff")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw APIError.invalidResponse
+        }
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
+    // MARK: - Insights
+
+    func fetchInsights() async throws -> InsightsResponse {
+        let url = try buildURL(path: "/insights")
+        return try await get(url: url)
+    }
+
+    // MARK: - Actions Queue
+
+    func fetchActions(status: String? = nil) async throws -> ActionListResponse {
+        var queryItems: [URLQueryItem] = []
+        if let status { queryItems.append(URLQueryItem(name: "status", value: status)) }
+        let url = try buildURL(path: "/actions", queryItems: queryItems.isEmpty ? nil : queryItems)
+        return try await get(url: url)
+    }
+
+    func fetchActionableActions() async throws -> ActionableResponse {
+        let url = try buildURL(path: "/actions/actionable")
+        return try await get(url: url)
+    }
+
+    func createAction(_ request: CreateActionRequest) async throws -> PlannedAction {
+        let url = try buildURL(path: "/actions")
+        return try await post(url: url, body: request)
+    }
+
+    func updateAction(id: Int, request: UpdateActionRequest) async throws -> PlannedAction {
+        let url = try buildURL(path: "/actions/\(id)")
+        return try await patch(url: url, body: request)
+    }
+
+    func deleteAction(id: Int) async throws {
+        let url = try buildURL(path: "/actions/\(id)")
+        try await delete(url: url)
+    }
+
+    func verifyActions() async throws -> VerifyActionsResponse {
+        let url = try buildURL(path: "/actions/verify")
+        return try await postEmpty(url: url)
+    }
+
     // MARK: - Private Helpers
 
     /// Build a URL with the given path and optional query items.
@@ -524,6 +587,16 @@ actor APIService {
     private func post<T: Decodable, B: Encodable>(url: URL, body: B) async throws -> T {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try encoder.encode(body)
+
+        return try await perform(request: request)
+    }
+
+    /// Perform a PATCH request with a JSON body and decode the response.
+    private func patch<T: Decodable, B: Encodable>(url: URL, body: B) async throws -> T {
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try encoder.encode(body)
 
