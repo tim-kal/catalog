@@ -112,6 +112,7 @@ struct BrowserView: View {
                 } else {
                     showAllDrives = false
                     selectedDrive = drives.first { $0.name == name }
+                    UserDefaults.standard.set(name, forKey: "browserSelectedDrive")
                     backupCache = [:]
                     kbColumn = 0
                     kbRow = -1
@@ -678,15 +679,38 @@ struct BrowserView: View {
     // MARK: - Data Loading
 
     private func loadDrives() async {
+        // Show cached state immediately
+        if drives.isEmpty {
+            if let cached = ViewCache.load([DriveResponse].self, key: "browserDrives") {
+                drives = cached
+                let savedName = UserDefaults.standard.string(forKey: "browserSelectedDrive")
+                if let name = savedName, let drive = cached.first(where: { $0.name == name }) {
+                    selectedDrive = drive
+                } else if let first = cached.first {
+                    selectedDrive = first
+                }
+                // Load cached root column for selected drive
+                if let sel = selectedDrive,
+                   let cachedCol = ViewCache.load(BrowseResponse.self, key: "browserRoot_\(sel.name)") {
+                    columns = [ColumnData(depth: 0, path: "", response: cachedCol)]
+                }
+            }
+        }
+
+        // Refresh from API in background
         do {
             let response = try await APIService.shared.fetchDrives()
             drives = response.drives
-            if let first = drives.first {
+            ViewCache.save(response.drives, key: "browserDrives")
+            if selectedDrive == nil, let first = drives.first {
                 selectedDrive = first
+            }
+            // Refresh root column for selected drive
+            if let sel = selectedDrive, columns.isEmpty || columns.first?.response.drive != sel.name {
                 await loadColumn(path: "", depth: 0)
             }
         } catch {
-            // Non-critical
+            // Non-critical — cached data already shown
         }
     }
 
@@ -723,6 +747,8 @@ struct BrowserView: View {
 
             if depth == 0 {
                 columns = [newCol]
+                // Cache root column for instant load next time
+                ViewCache.save(response, key: "browserRoot_\(drive.name)")
             } else {
                 // Replace or append
                 if columns.count > depth {
