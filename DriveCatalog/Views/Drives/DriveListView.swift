@@ -1450,15 +1450,22 @@ struct DriveListView: View {
         }
         let result: [DriveResponse] = sortAscending ? sorted : Array(sorted.reversed())
 
-        // Float newly registered drive to top
-        guard let pinId = newlyRegisteredDriveId,
-              let idx = result.firstIndex(where: { $0.id == pinId }) else {
-            return result
+        // Float mounted drives to top, then newly registered
+        var mounted = result.filter { FileManager.default.fileExists(atPath: $0.mountPath) }
+        var unmounted = result.filter { !FileManager.default.fileExists(atPath: $0.mountPath) }
+
+        // Pin newly registered drive to very top
+        if let pinId = newlyRegisteredDriveId {
+            if let idx = mounted.firstIndex(where: { $0.id == pinId }) {
+                let pinned = mounted.remove(at: idx)
+                mounted.insert(pinned, at: 0)
+            } else if let idx = unmounted.firstIndex(where: { $0.id == pinId }) {
+                let pinned = unmounted.remove(at: idx)
+                mounted.insert(pinned, at: 0) // even unmounted new drive goes to top
+            }
         }
-        var reordered = result
-        let pinned = reordered.remove(at: idx)
-        reordered.insert(pinned, at: 0)
-        return reordered
+
+        return mounted + unmounted
     }
 
     var body: some View {
