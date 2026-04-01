@@ -693,6 +693,8 @@ struct BrowserView: View {
                 if let sel = selectedDrive,
                    let cachedCol = ViewCache.load(BrowseResponse.self, key: "browserRoot_\(sel.name)") {
                     columns = [ColumnData(depth: 0, path: "", response: cachedCol)]
+                    // Fetch backup statuses for cached directories
+                    Task { await loadBackupStatuses(drive: sel.name, directories: cachedCol.directories) }
                 }
             }
         }
@@ -705,8 +707,8 @@ struct BrowserView: View {
             if selectedDrive == nil, let first = drives.first {
                 selectedDrive = first
             }
-            // Refresh root column for selected drive
-            if let sel = selectedDrive, columns.isEmpty || columns.first?.response.drive != sel.name {
+            // Always refresh root column to get fresh data + backup statuses
+            if let sel = selectedDrive {
                 await loadColumn(path: "", depth: 0)
             }
         } catch {
@@ -730,6 +732,16 @@ struct BrowserView: View {
         kbColumn = index + 1
         kbRow = 0
         Task { await loadColumn(path: newPath, depth: index + 1) }
+    }
+
+    private func loadBackupStatuses(drive: String, directories: [DirectoryEntry]) async {
+        for dir in directories {
+            if let status = try? await APIService.shared.fetchBackupStatus(
+                drive: drive, path: dir.path
+            ) {
+                backupCache[dir.path] = status
+            }
+        }
     }
 
     private func loadColumn(path: String, depth: Int) async {
@@ -759,15 +771,7 @@ struct BrowserView: View {
             }
 
             // Load backup statuses for directories in background
-            Task {
-                for dir in response.directories {
-                    if let status = try? await APIService.shared.fetchBackupStatus(
-                        drive: drive.name, path: dir.path
-                    ) {
-                        backupCache[dir.path] = status
-                    }
-                }
-            }
+            Task { await loadBackupStatuses(drive: drive.name, directories: response.directories) }
         } catch {
             if depth == 0 {
                 errorMessage = error.localizedDescription
