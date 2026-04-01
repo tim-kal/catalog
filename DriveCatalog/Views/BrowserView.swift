@@ -484,10 +484,25 @@ struct BrowserView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            if file.partialHash != nil {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.green)
+            if let copies = file.copyCount, copies > 1 {
+                HStack(spacing: 2) {
+                    Image(systemName: "externaldrive.fill")
+                        .font(.caption2)
+                    Text("\(copies)")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                }
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(copies >= 3 ? Color.blue.opacity(0.15) : Color.green.opacity(0.15))
+                .foregroundStyle(copies >= 3 ? .blue : .green)
+                .clipShape(Capsule())
+                .help("Exists on \(copies) drives")
+            } else if file.copyCount == 1 {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .help("Only on this drive — no backup")
             }
         }
         .padding(.vertical, 2)

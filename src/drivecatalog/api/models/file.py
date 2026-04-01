@@ -19,6 +19,7 @@ class FileResponse(BaseModel):
     mtime: str | None
     partial_hash: str | None
     is_media: bool
+    copy_count: int | None = None  # total copies across all drives (if computed)
 
 
 class FileListResponse(BaseModel):

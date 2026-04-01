@@ -1727,7 +1727,10 @@ struct DriveListView: View {
     private var driveSummaryBar: some View {
         let totalStorage = drives.reduce(Int64(0)) { $0 + $1.totalBytes }
         let totalUsed = drives.reduce(Int64(0)) { total, drive in
-            total + (DiskSpace.read(path: drive.mountPath)?.usedBytes ?? 0)
+            // Live disk space if mounted, otherwise cached status from DB
+            let live = DiskSpace.read(path: drive.mountPath)?.usedBytes
+            let cached = ViewCache.load(DriveStatusResponse.self, key: "driveStatus_\(drive.name)")?.usedBytes
+            return total + (live ?? cached ?? 0)
         }
         let totalFree = totalStorage - totalUsed
         let usedPercent = totalStorage > 0 ? Double(totalUsed) / Double(totalStorage) * 100 : 0

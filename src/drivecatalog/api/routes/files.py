@@ -252,6 +252,25 @@ async def browse_directory(
                 for r in root_rows
             ]
 
+        # Compute copy_count for hashed files (how many drives have this file)
+        hashed_files = [f for f in direct_files if f.partial_hash]
+        if hashed_files:
+            hashes = list({f.partial_hash for f in hashed_files})
+            placeholders = ",".join("?" * len(hashes))
+            count_rows = conn.execute(
+                f"""
+                SELECT partial_hash, COUNT(DISTINCT drive_id) as drive_count
+                FROM files
+                WHERE partial_hash IN ({placeholders})
+                GROUP BY partial_hash
+                """,
+                hashes,
+            ).fetchall()
+            hash_counts = {r["partial_hash"]: r["drive_count"] for r in count_rows}
+            for f in direct_files:
+                if f.partial_hash:
+                    f.copy_count = hash_counts.get(f.partial_hash, 1)
+
         return BrowseResponse(
             drive=drive,
             current_path=current_path,
