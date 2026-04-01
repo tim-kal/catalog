@@ -140,10 +140,8 @@ struct DriveCard: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(isExpanded ? Color.accentColor.opacity(0.5) : Color.secondary.opacity(0.15), lineWidth: 1)
         )
-        .task {
-            diskSpace = DiskSpace.read(path: drive.mountPath)
-        }
         .task(id: refreshTrigger) {
+            diskSpace = DiskSpace.read(path: drive.mountPath)
             await loadStatus()
             if activeOperation == nil {
                 await resumeRunningOperation()
