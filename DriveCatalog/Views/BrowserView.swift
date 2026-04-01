@@ -67,7 +67,7 @@ struct BrowserView: View {
 
                 VStack(spacing: 0) {
                     if showAllDrives {
-                        SearchView()
+                        AllDrivesView()
                     } else {
                         toolBar
                         Divider()

@@ -44,6 +44,7 @@
 		AA05B5C6D7E8F90123456789 /* ActionDrillDownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB05B5C6D7E8F90123456789 /* ActionDrillDownView.swift */; };
 		AA06B6C7D8E9FA1234567890 /* ActionQueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB06B6C7D8E9FA1234567890 /* ActionQueueView.swift */; };
 		AA07B7C8D9EAF01234567891 /* ConsolidatePageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB07B7C8D9EAF01234567891 /* ConsolidatePageView.swift */; };
+		AA08B8C9DAEBF12345678902 /* AllDrivesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB08B8C9DAEBF12345678902 /* AllDrivesView.swift */; };
 		DD08A1B2C3D4E5F6A7B8C9D0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CC08A1B2C3D4E5F6A7B8C9D0 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -88,6 +89,7 @@
 		BB05B5C6D7E8F90123456789 /* ActionDrillDownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionDrillDownView.swift; sourceTree = "<group>"; };
 		BB06B6C7D8E9FA1234567890 /* ActionQueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionQueueView.swift; sourceTree = "<group>"; };
 		BB07B7C8D9EAF01234567891 /* ConsolidatePageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsolidatePageView.swift; sourceTree = "<group>"; };
+		BB08B8C9DAEBF12345678902 /* AllDrivesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllDrivesView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -183,6 +185,7 @@
 			children = (
 				BB05B5C6D7E8F90123456789 /* ActionDrillDownView.swift */,
 				BB06B6C7D8E9FA1234567890 /* ActionQueueView.swift */,
+				BB08B8C9DAEBF12345678902 /* AllDrivesView.swift */,
 				3A992EDEB4EBB4554F6F9A84 /* BrowserView.swift */,
 				BB07B7C8D9EAF01234567891 /* ConsolidatePageView.swift */,
 				5D6E4682185AD37F3F46A1C7 /* ConsolidationWizardView.swift */,
@@ -312,6 +315,7 @@
 				A16E6ECBAC4EE224A58D508E /* APIService.swift in Sources */,
 				AA05B5C6D7E8F90123456789 /* ActionDrillDownView.swift in Sources */,
 				AA06B6C7D8E9FA1234567890 /* ActionQueueView.swift in Sources */,
+				AA08B8C9DAEBF12345678902 /* AllDrivesView.swift in Sources */,
 				BD995CCFF98EB91211004674 /* AddDriveSheet.swift in Sources */,
 				5305BE891FFAA7787554C74C /* AppDelegate.swift in Sources */,
 				4C94804D2E8632E69A130ED2 /* BackendService.swift in Sources */,
