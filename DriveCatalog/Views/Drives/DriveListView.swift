@@ -369,7 +369,7 @@ struct DriveCard: View {
             }
 
             // Connection & check status (mounted drives only)
-            if isMounted, lastConnected != nil || lastQuickCheckDate != nil {
+            if isMounted, lastConnected != nil || lastQuickCheckDate != nil || changeReport != nil {
                 HStack(spacing: 12) {
                     if let connected = lastConnected {
                         HStack(spacing: 4) {
@@ -383,6 +383,13 @@ struct DriveCard: View {
                             Image(systemName: lastQuickCheckPassed == true ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
                                 .foregroundStyle(lastQuickCheckPassed == true ? .green : .orange)
                             Text("Checked \(ageString(checkDate))")
+                        }
+                    }
+                    if let report = changeReport, !report.hasChanges {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Text("No changes")
                         }
                     }
                 }
@@ -399,7 +406,7 @@ struct DriveCard: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-            } else if let report = changeReport {
+            } else if let report = changeReport, report.hasChanges {
                 changeReportView(report)
             } else if lastQuickCheckPassed == false && isMounted {
                 // Quick-check failed but no diff yet — offer to analyze
