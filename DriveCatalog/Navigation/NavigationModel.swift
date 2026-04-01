@@ -16,7 +16,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .drives: return "Drives"
         case .browser: return "Browse"
-        case .backups: return "Backups"
+        case .backups: return "Files"
         case .insights: return "Insights"
         case .queue: return "Action Queue"
         case .consolidate: return "Consolidate"
