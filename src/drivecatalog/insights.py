@@ -234,8 +234,8 @@ def _build_actions(
             "priority": priority,
             "title": f"Back up {dr['drive_name']}",
             "description": (
-                f"{_fmt_bytes(dr['unprotected_bytes'])} of irreplaceable content, "
-                f"{free_str}"
+                f"{_fmt_bytes(dr['unprotected_bytes'])} at risk — copy to another drive to protect. "
+                f"Drive is {free_str}."
             ),
             "impact_bytes": dr["unprotected_bytes"],
             "action_type": "backup",
@@ -272,8 +272,8 @@ def _build_actions(
             "priority": priority,
             "title": "Clean same-drive duplicates",
             "description": (
-                f"{dupes:,} identical files on the same drive waste "
-                f"{_fmt_bytes(reclaimable)}"
+                f"Free up {_fmt_bytes(reclaimable)} by removing {dupes:,} duplicate files "
+                f"that exist multiple times on the same drive."
             ),
             "impact_bytes": reclaimable,
             "action_type": "cleanup",
@@ -291,8 +291,8 @@ def _build_actions(
             "priority": priority,
             "title": "Trim redundant copies",
             "description": (
-                f"{redundant:,} files exist on 3+ drives — "
-                f"already safely backed up, extra copies can be removed to free space"
+                f"Free up {_fmt_bytes(protection['over_backed_up_bytes'])} — "
+                f"{redundant:,} files already exist on 3+ drives and can be safely removed from extras."
             ),
             "impact_bytes": protection["over_backed_up_bytes"],
             "action_type": "cleanup",

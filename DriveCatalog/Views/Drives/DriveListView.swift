@@ -1062,14 +1062,22 @@ struct DriveCard: View {
     // MARK: - Data Loading
 
     private func loadStatus() async {
+        // Show cached status immediately
+        if status == nil {
+            status = ViewCache.load(DriveStatusResponse.self, key: "driveStatus_\(drive.name)")
+        }
         isLoadingStatus = true
         statusError = nil
         do {
-            status = try await APIService.shared.fetchDriveStatus(name: drive.name)
-            // Refresh disk space too
+            let fresh = try await APIService.shared.fetchDriveStatus(name: drive.name)
+            status = fresh
+            ViewCache.save(fresh, key: "driveStatus_\(drive.name)")
             diskSpace = DiskSpace.read(path: drive.mountPath)
         } catch {
-            statusError = error.localizedDescription
+            // Keep cached status if available, only show error if no cached data
+            if status == nil {
+                statusError = error.localizedDescription
+            }
         }
         isLoadingStatus = false
     }
