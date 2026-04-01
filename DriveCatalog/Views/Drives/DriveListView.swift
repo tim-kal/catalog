@@ -143,7 +143,7 @@ struct DriveCard: View {
         )
         .task(id: refreshTrigger) {
             diskSpace = DiskSpace.read(path: drive.mountPath)
-            await loadStatus()
+            await loadStatus(force: refreshTrigger > 0)
             if activeOperation == nil {
                 await resumeRunningOperation()
             }
@@ -942,7 +942,6 @@ struct DriveCard: View {
             let result = try await APIService.shared.triggerDiff(driveName: drive.name)
             let report = ChangeReport.from(dict: result)
             changeReport = report
-            // If diff found no changes, correct the quick-check status
             if report?.hasChanges == false {
                 diffConfirmedNoChanges = true
             }
@@ -1050,20 +1049,26 @@ struct DriveCard: View {
 
     // MARK: - Data Loading
 
-    private func loadStatus() async {
+    @State private var lastStatusFetch: Date?
+
+    private func loadStatus(force: Bool = false) async {
         // Show cached status immediately
         if status == nil {
             status = ViewCache.load(DriveStatusResponse.self, key: "driveStatus_\(drive.name)")
         }
-        isLoadingStatus = true
+        // Skip API call if we have fresh data (< 60s old) and not forced
+        if !force, status != nil, let last = lastStatusFetch, Date().timeIntervalSince(last) < 60 {
+            return
+        }
+        isLoadingStatus = status == nil  // Only show spinner if no cached data
         statusError = nil
         do {
             let fresh = try await APIService.shared.fetchDriveStatus(name: drive.name)
             status = fresh
+            lastStatusFetch = Date()
             ViewCache.save(fresh, key: "driveStatus_\(drive.name)")
             diskSpace = DiskSpace.read(path: drive.mountPath)
         } catch {
-            // Keep cached status if available, only show error if no cached data
             if status == nil {
                 statusError = error.localizedDescription
             }
@@ -1419,7 +1424,7 @@ struct DriveListView: View {
             switch type {
             case .connected: return "\(driveName) connected"
             case .disconnected: return "\(driveName) disconnected"
-            case .quickCheck: return "\(driveName): \(passed == true ? "Unchanged" : "Changes detected")"
+            case .quickCheck: return "\(driveName): \(passed == true ? "Unchanged" : "Quick-check: possible changes")"
             }
         }
     }
@@ -1953,7 +1958,7 @@ struct DriveListView: View {
 
                         Text(msg.passed
                              ? "\(msg.driveName): Unchanged"
-                             : "\(msg.driveName): Changes detected")
+                             : "\(msg.driveName): Quick-check: possible changes")
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
