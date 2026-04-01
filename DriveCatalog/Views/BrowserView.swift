@@ -805,6 +805,7 @@ struct BrowserView: View {
 /// Backup badge with hover popover — needs its own View for @State.
 private struct BackupBadgeView: View {
     let backup: BackupStatusResponse
+    @Environment(\.activeTab) private var activeTab
     @State private var isHovered = false
 
     private var allFull: Bool {
@@ -825,7 +826,7 @@ private struct BackupBadgeView: View {
         .foregroundStyle(allFull ? .green : .orange)
         .clipShape(Capsule())
         .onHover { hovering in
-            isHovered = hovering
+            if activeTab == .browser { isHovered = hovering }
         }
         .popover(isPresented: $isHovered, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 8) {

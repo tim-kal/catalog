@@ -1363,6 +1363,7 @@ struct DriveListView: View {
     @State private var operationPollTask: Task<Void, Never>?
     /// Transient quick-check results shown in activity panel.
     @State private var quickCheckMessages: [QuickCheckMessage] = []
+    @State private var connectionBanner: String?
     /// Session activity log for the history panel.
     @State private var activityLog: [ActivityLogEntry] = []
     /// Per-drive: when last mounted (this session only).
@@ -1454,6 +1455,24 @@ struct DriveListView: View {
     var body: some View {
         mainContent
             .toolbar(content: driveToolbar)
+            .overlay(alignment: .top) {
+                if let banner = connectionBanner {
+                    HStack(spacing: 8) {
+                        Image(systemName: "cable.connector")
+                            .foregroundStyle(.green)
+                        Text(banner)
+                            .fontWeight(.medium)
+                    }
+                    .font(.callout)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .shadow(radius: 8)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
         .task {
             // Show cached drive list immediately while backend starts
             loadCachedDrives()
@@ -1484,6 +1503,11 @@ struct DriveListView: View {
                 Task {
                     if let driveName = try? await APIService.shared.recognizeDrive(mountPath: volumeURL.path) {
                         driveLastConnected[driveName] = Date()
+                        withAnimation(.easeInOut) { connectionBanner = "\(driveName) connected" }
+                        Task {
+                            try? await Task.sleep(for: .seconds(4))
+                            withAnimation(.easeOut) { connectionBanner = nil }
+                        }
                         activityLog.insert(ActivityLogEntry(date: Date(), driveName: driveName, type: .connected, passed: nil), at: 0)
                         await loadDrives()
                         // Fully catalogued → quick-check (~5 sec, non-blocking)
@@ -1510,6 +1534,11 @@ struct DriveListView: View {
             volumeRefreshTrigger += 1
             if let volumeURL = notification.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL {
                 if let drive = drives.first(where: { $0.mountPath == volumeURL.path }) {
+                    withAnimation(.easeInOut) { connectionBanner = "\(drive.name) disconnected" }
+                    Task {
+                        try? await Task.sleep(for: .seconds(4))
+                        withAnimation(.easeOut) { connectionBanner = nil }
+                    }
                     activityLog.insert(ActivityLogEntry(date: Date(), driveName: drive.name, type: .disconnected, passed: nil), at: 0)
                 }
             }
