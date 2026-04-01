@@ -113,7 +113,6 @@ struct BrowserView: View {
                     showAllDrives = false
                     selectedDrive = drives.first { $0.name == name }
                     UserDefaults.standard.set(name, forKey: "browserSelectedDrive")
-                    backupCache = [:]
                     kbColumn = 0
                     kbRow = -1
                     clearSearch()
@@ -679,6 +678,12 @@ struct BrowserView: View {
     // MARK: - Data Loading
 
     private func loadDrives() async {
+        // Load cached backup statuses
+        if backupCache.isEmpty,
+           let cached = ViewCache.load([String: BackupStatusResponse].self, key: "browserBackupCache") {
+            backupCache = cached
+        }
+
         // Show cached state immediately
         if drives.isEmpty {
             if let cached = ViewCache.load([DriveResponse].self, key: "browserDrives") {
@@ -742,6 +747,8 @@ struct BrowserView: View {
                 backupCache[dir.path] = status
             }
         }
+        // Persist to disk for instant display next time
+        ViewCache.save(backupCache, key: "browserBackupCache")
     }
 
     private func loadColumn(path: String, depth: Int) async {
