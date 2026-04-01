@@ -391,8 +391,18 @@ struct BrowserView: View {
                 Text(dir.name)
                     .lineLimit(1)
 
-                if let backup = backupCache[dir.path], !backup.backupDrives.isEmpty {
-                    backupBadge(backup)
+                if let backup = backupCache[dir.path] {
+                    if backup.backupDrives.isEmpty {
+                        if backup.hashedFiles > 0 {
+                            // Hashed but no copies on other drives
+                            Image(systemName: "exclamationmark.shield.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                                .help("No backups — only on this drive")
+                        }
+                    } else {
+                        backupBadge(backup)
+                    }
                 }
 
                 Spacer()
@@ -426,9 +436,9 @@ struct BrowserView: View {
                                     .font(.caption2)
                                     .foregroundStyle(.tertiary)
                             } else {
-                                Label("No backups found", systemImage: "exclamationmark.triangle")
+                                Label("No backups", systemImage: "exclamationmark.shield.fill")
                                     .font(.caption2)
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(.red)
                             }
                         } else {
                             Text("Copies found:")
