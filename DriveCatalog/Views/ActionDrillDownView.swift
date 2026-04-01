@@ -240,7 +240,7 @@ struct ActionDrillDownView: View {
     }
 
     private func folderRow(_ folder: FolderSummary) -> some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: "folder.fill")
                 .foregroundStyle(.blue)
                 .font(.subheadline)

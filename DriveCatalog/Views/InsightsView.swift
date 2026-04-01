@@ -3,6 +3,7 @@ import SwiftUI
 /// Unified insights page: backup health, risk assessment, and recommended actions.
 struct InsightsView: View {
     @Environment(\.activeTab) private var activeTab
+    @ObservedObject private var backend = BackendService.shared
     @State private var data: InsightsResponse?
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -19,7 +20,9 @@ struct InsightsView: View {
         }
         .task {
             if data == nil { data = ViewCache.load(InsightsResponse.self, key: "insights") }
-            await loadData()
+        }
+        .task(id: backend.isRunning) {
+            if backend.isRunning { await loadData() }
         }
         .onChange(of: activeTab) { _, newTab in
             if newTab == .insights && selectedAction == nil {

@@ -3,6 +3,7 @@ import SwiftUI
 /// Backups page showing hierarchical protection status: drives > directories > files.
 struct BackupsView: View {
     @Environment(\.activeTab) private var activeTab
+    @ObservedObject private var backend = BackendService.shared
     @State private var treeData: ProtectionTreeResponse?
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -96,8 +97,8 @@ struct BackupsView: View {
                     }
                 }
             }
-            .task {
-                await loadData()
+            .task(id: backend.isRunning) {
+                if backend.isRunning { await loadData() }
             }
             .onChange(of: selectedDrive) {
                 Task { await loadData() }
@@ -246,7 +247,7 @@ struct BackupsView: View {
                         .padding(.vertical, 8)
                     } else if let groups = directoryFiles[key] {
                         if groups.isEmpty {
-                            Text("Files not yet hashed — hash this drive to see backup status")
+                            Text("No file groups found for this directory")
                                 .font(.caption)
                                 .foregroundStyle(.tertiary)
                                 .padding(.vertical, 8)
@@ -341,7 +342,17 @@ struct BackupsView: View {
         let key = "\(drive):\(path)"
         loadingDirs.insert(key)
         do {
-            let groups = try await APIService.shared.fetchDirectoryFiles(drive: drive, path: path)
+            // Fetch files in this directory; if empty (all files in subdirs), fetch recursively
+            var groups = try await APIService.shared.fetchDirectoryFiles(drive: drive, path: path)
+            if groups.isEmpty {
+                // Fallback: get file groups filtered by this drive + path prefix from the main endpoint
+                let response = try await APIService.shared.fetchProtectionData(
+                    limit: 200, status: nil, drive: drive, sortBy: "size"
+                )
+                groups = response.groups.filter { group in
+                    group.locations.contains { $0.driveName == drive && $0.path.hasPrefix(path + "/") }
+                }
+            }
             directoryFiles[key] = groups
         } catch {
             directoryFiles[key] = []
