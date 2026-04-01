@@ -279,7 +279,7 @@ struct BackupsView: View {
             Image(systemName: icon)
                 .font(.caption2)
             Text(formatCount(count))
-                .font(.caption2)
+                .font(.system(.caption2, design: .monospaced))
         }
         .foregroundStyle(color)
         .padding(.horizontal, 6)

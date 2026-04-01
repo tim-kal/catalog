@@ -944,6 +944,11 @@ struct DriveCard: View {
             changeReport = report
             if report?.hasChanges == false {
                 diffConfirmedNoChanges = true
+                // Notify parent to correct the activity log
+                NotificationCenter.default.post(
+                    name: .init("driveVerifiedNoChanges"),
+                    object: drive.name
+                )
             }
         } catch {
             // Silently fail — diff is optional
@@ -1561,6 +1566,16 @@ struct DriveListView: View {
                     }
                     activityLog.insert(ActivityLogEntry(date: Date(), driveName: drive.name, type: .disconnected, passed: nil), at: 0)
                 }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .init("driveVerifiedNoChanges"))) { notification in
+            if let driveName = notification.object as? String {
+                // Correct the quick-check log entry
+                if let idx = activityLog.firstIndex(where: { $0.driveName == driveName && $0.type == .quickCheck && $0.passed == false }) {
+                    activityLog.remove(at: idx)
+                    activityLog.insert(ActivityLogEntry(date: Date(), driveName: driveName, type: .quickCheck, passed: true), at: 0)
+                }
+                driveQuickChecks[driveName] = DriveCheckInfo(date: Date(), passed: true)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .refreshCurrentPage)) { _ in

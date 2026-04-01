@@ -151,7 +151,11 @@ struct ActionDrillDownView: View {
                 HStack(spacing: 12) {
                     Label("\(groups.count) file groups", systemImage: "doc.on.doc")
                     Label("\(folderSummaries.count) folders", systemImage: "folder")
-                    if totalReclaimable > 0 {
+                    let totalSize = groups.reduce(Int64(0)) { $0 + $1.sizeBytes }
+                    if action.actionType == "backup" {
+                        Label("\(formattedSize(totalSize)) at risk", systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                    } else if totalReclaimable > 0 {
                         Label("\(formattedSize(totalReclaimable)) reclaimable", systemImage: "arrow.uturn.backward")
                             .foregroundStyle(.orange)
                     }
