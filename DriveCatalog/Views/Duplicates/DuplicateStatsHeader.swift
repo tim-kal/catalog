@@ -9,7 +9,7 @@ struct ProtectionDashboard: View {
             // Top row: system storage overview
             HStack(spacing: 12) {
                 statCard(
-                    title: "Total Storage",
+                    title: "Cataloged",
                     value: formattedSize(stats.totalStorageBytes),
                     icon: "internaldrive.fill",
                     color: .blue
@@ -21,16 +21,16 @@ struct ProtectionDashboard: View {
                     color: .secondary
                 )
                 statCard(
-                    title: "Files",
-                    value: formatCount(stats.totalFiles),
-                    icon: "doc.fill",
-                    color: .secondary
+                    title: "Protected",
+                    value: formattedSize(stats.backedUpBytes + stats.overBackedUpBytes),
+                    icon: "checkmark.shield.fill",
+                    color: .green
                 )
                 statCard(
-                    title: "Hashed",
-                    value: "\(stats.hashedFiles)/\(stats.totalFiles)",
-                    icon: "number",
-                    color: stats.unhashedFiles > 0 ? .orange : .green
+                    title: "At Risk",
+                    value: formattedSize(stats.unprotectedBytes),
+                    icon: "exclamationmark.shield.fill",
+                    color: .red
                 )
             }
 
@@ -67,11 +67,8 @@ struct ProtectionDashboard: View {
 
                 // Legend
                 HStack(spacing: 16) {
-                    legendItem(color: .green, label: "Backed up", count: stats.backedUpFiles + stats.overBackedUpFiles)
-                    legendItem(color: .red, label: "Unprotected", count: stats.unprotectedFiles)
-                    if stats.unhashedFiles > 0 {
-                        legendItem(color: .orange, label: "Not hashed", count: stats.unhashedFiles)
-                    }
+                    legendItem(color: .green, label: "Backed up", size: formattedSize(stats.backedUpBytes + stats.overBackedUpBytes))
+                    legendItem(color: .red, label: "Unprotected", size: formattedSize(stats.unprotectedBytes))
                 }
                 .font(.caption)
             }
@@ -79,39 +76,36 @@ struct ProtectionDashboard: View {
             .background(Color(.controlBackgroundColor).opacity(0.5))
             .cornerRadius(8)
 
-            // Protection breakdown cards
+            // Protection breakdown cards — bytes prominent, file count secondary
             HStack(spacing: 12) {
                 protectionCard(
-                    title: "Unprotected",
-                    count: stats.unprotectedFiles,
+                    title: "No Backup",
                     bytes: stats.unprotectedBytes,
+                    count: stats.unprotectedFiles,
                     icon: "exclamationmark.shield.fill",
-                    color: .red,
-                    subtitle: "No backup"
+                    color: .red
                 )
                 protectionCard(
-                    title: "Backed Up",
-                    count: stats.backedUpFiles,
+                    title: "On 2 Drives",
                     bytes: stats.backedUpBytes,
+                    count: stats.backedUpFiles,
                     icon: "checkmark.shield.fill",
-                    color: .green,
-                    subtitle: "On 2 drives"
+                    color: .green
                 )
                 protectionCard(
-                    title: "Redundant",
-                    count: stats.overBackedUpFiles,
+                    title: "3+ Drives",
                     bytes: stats.overBackedUpBytes,
+                    count: stats.overBackedUpFiles,
                     icon: "shield.fill",
-                    color: .blue,
-                    subtitle: "3+ drives"
+                    color: .blue
                 )
                 protectionCard(
-                    title: "Same-Drive Dupes",
-                    count: stats.sameDriveDuplicateCount,
+                    title: "Reclaimable",
                     bytes: stats.reclaimableBytes,
+                    count: stats.sameDriveDuplicateCount,
                     icon: "doc.on.doc.fill",
                     color: .orange,
-                    subtitle: "Reclaimable"
+                    subtitle: "Same-drive duplicates"
                 )
             }
         }
@@ -143,19 +137,19 @@ struct ProtectionDashboard: View {
         }
     }
 
-    private func protectionCard(title: String, count: Int, bytes: Int64, icon: String, color: Color, subtitle: String) -> some View {
+    private func protectionCard(title: String, bytes: Int64, count: Int, icon: String, color: Color, subtitle: String? = nil) -> some View {
         GroupBox {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.title3)
                     .foregroundStyle(color)
-                Text(formatCount(count))
+                Text(formattedSize(bytes))
                     .font(.callout)
                     .fontWeight(.bold)
-                Text(formattedSize(bytes))
+                Text("\(formatCount(count)) files")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(subtitle)
+                Text(subtitle ?? title)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
@@ -164,10 +158,10 @@ struct ProtectionDashboard: View {
         }
     }
 
-    private func legendItem(color: Color, label: String, count: Int) -> some View {
+    private func legendItem(color: Color, label: String, size: String) -> some View {
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 8, height: 8)
-            Text("\(label) (\(formatCount(count)))")
+            Text("\(label) (\(size))")
                 .foregroundStyle(.secondary)
         }
     }
