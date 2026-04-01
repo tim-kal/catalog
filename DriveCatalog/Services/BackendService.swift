@@ -125,6 +125,7 @@ final class BackendService: ObservableObject {
             var env = ProcessInfo.processInfo.environment
             env["PYTHONHOME"] = pythonHome
             env["PYTHONDONTWRITEBYTECODE"] = "1"
+            env["PYTHONNOUSERSITE"] = "1"
             env.removeValue(forKey: "VIRTUAL_ENV")
             proc.environment = env
         } else if let uv = uvPath {

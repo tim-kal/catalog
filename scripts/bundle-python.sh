@@ -37,7 +37,8 @@ echo "==> Installing pip..."
 "$PYTHON_DIR/bin/python3" -m ensurepip --upgrade 2>/dev/null || true
 
 echo "==> Installing project dependencies..."
-"$PYTHON_DIR/bin/python3" -m pip install --no-cache-dir --quiet \
+SITE_PACKAGES="$PYTHON_DIR/lib/python${PYTHON_VERSION}/site-packages"
+"$PYTHON_DIR/bin/python3" -m pip install --no-cache-dir --quiet --target="$SITE_PACKAGES" \
     'fastapi[standard]>=0.115.0' \
     'click>=8.1.0' \
     'rich>=13.0.0' \
@@ -48,7 +49,7 @@ echo "==> Installing project dependencies..."
 
 # Step 4: Install the project itself (so `python -m drivecatalog.api` works)
 echo "==> Installing drivecatalog package..."
-"$PYTHON_DIR/bin/python3" -m pip install --no-cache-dir --quiet "$PROJECT_DIR"
+"$PYTHON_DIR/bin/python3" -m pip install --no-cache-dir --quiet --target="$SITE_PACKAGES" "$PROJECT_DIR"
 
 # Step 5: Trim unnecessary files to reduce bundle size
 echo "==> Trimming unnecessary files..."
