@@ -1545,9 +1545,10 @@ struct DriveListView: View {
                         // Not fully catalogued → full smart-scan
                         if let drive = drives.first(where: { $0.name == driveName }),
                            drive.lastScan != nil && !false {
-                            // Show "checking..." immediately
+                            // Show "checking..." immediately, wait a moment for drive to fully mount
                             let checkingEntry = ActivityLogEntry(date: Date(), driveName: driveName, type: .quickCheck, passed: nil)
                             activityLog.insert(checkingEntry, at: 0)
+                            try? await Task.sleep(for: .seconds(3))
 
                             let result = try? await APIService.shared.quickCheck(driveName: driveName)
                             let status = result?["status"] as? String ?? "error"
@@ -2265,6 +2266,9 @@ struct DriveListView: View {
             checkingEntries[drive.name] = entry
             activityLog.insert(entry, at: 0)
         }
+
+        // Brief delay for drives to fully mount before checking
+        try? await Task.sleep(for: .seconds(2))
 
         // Run checks and update entries with results
         var hasChanges = false

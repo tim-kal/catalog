@@ -1345,7 +1345,7 @@ async def quick_check_drive(name: str) -> dict:
             if not os.path.exists(full_path):
                 mismatches += 1
 
-        if mismatches > 2:
+        if mismatches > 4:  # Tolerate a few mismatches (drive may still be mounting)
             return {"status": "changed", "db_files": db_count, "disk_files": actual_count, "sample_mismatches": mismatches}
 
         return {"status": "verified", "files_checked": db_count}
