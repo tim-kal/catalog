@@ -1335,7 +1335,7 @@ async def quick_check_drive(name: str) -> dict:
             return {"status": "changed", "db_files": db_count, "disk_files": actual_count, "difference": diff}
 
         sample_rows = conn.execute(
-            "SELECT path, mtime FROM files WHERE drive_id = ? ORDER BY RANDOM() LIMIT 20",
+            "SELECT path, mtime FROM files WHERE drive_id = ? ORDER BY RANDOM() LIMIT 50",
             (drive_id,),
         ).fetchall()
 
@@ -1345,7 +1345,7 @@ async def quick_check_drive(name: str) -> dict:
             if not os.path.exists(full_path):
                 mismatches += 1
 
-        if mismatches > 4:  # Tolerate a few mismatches (drive may still be mounting)
+        if mismatches > 5:  # >10% of sample = real changes
             return {"status": "changed", "db_files": db_count, "disk_files": actual_count, "sample_mismatches": mismatches}
 
         return {"status": "verified", "files_checked": db_count}
