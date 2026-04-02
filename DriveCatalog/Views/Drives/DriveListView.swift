@@ -1366,7 +1366,7 @@ struct DriveListView: View {
     @State private var errorMessage: String?
     @State private var showAddSheet = false
     @State private var driveToDelete: DriveResponse?
-    @State private var showDeleteConfirmation = false
+    // driveToDelete triggers delete confirmation sheet via .sheet(item:)
     @State private var expandedDriveIds: Set<Int> = []
     /// Tracks the most recently expanded drive for auto-scroll.
     @State private var lastExpandedId: Int?
@@ -1611,17 +1611,14 @@ struct DriveListView: View {
                 await loadDrives()
             }
         }
-        .sheet(isPresented: $showDeleteConfirmation) {
-            if let drive = driveToDelete {
-                DeleteDriveConfirmation(drive: drive) {
-                    Task {
-                        await deleteDrive(drive)
-                        showDeleteConfirmation = false
-                    }
-                } onCancel: {
+        .sheet(item: $driveToDelete) { drive in
+            DeleteDriveConfirmation(drive: drive) { keepData in
+                Task {
+                    await deleteDrive(drive, keepData: keepData)
                     driveToDelete = nil
-                    showDeleteConfirmation = false
                 }
+            } onCancel: {
+                driveToDelete = nil
             }
         }
     }
@@ -1706,7 +1703,7 @@ struct DriveListView: View {
             }
             Button(role: .destructive) {
                 driveToDelete = drive
-                showDeleteConfirmation = true
+                // driveToDelete triggers sheet automatically
             } label: {
                 Label("Delete", systemImage: "trash")
             }
@@ -2365,23 +2362,27 @@ struct DriveListView: View {
         }
     }
 
-    private func deleteDrive(_ drive: DriveResponse) async {
+    private func deleteDrive(_ drive: DriveResponse, keepData: Bool = false) async {
         do {
+            if keepData {
+                // Only remove the drive registration, keep file records for reference
+                try await APIService.shared.clearScanData(driveName: drive.name)
+            }
             try await APIService.shared.deleteDrive(name: drive.name)
+            expandedDriveIds.remove(drive.id)
             await loadDrives()
         } catch {
             errorMessage = error.localizedDescription
         }
-        driveToDelete = nil
     }
 }
 
 // MARK: - Delete Drive Confirmation
 
-/// Requires the user to type "DELETE" to confirm drive deletion.
+/// Dialog for removing a drive from the catalog.
 private struct DeleteDriveConfirmation: View {
     let drive: DriveResponse
-    let onConfirm: () -> Void
+    let onConfirm: (_ keepData: Bool) -> Void
     let onCancel: () -> Void
 
     @State private var confirmText = ""
@@ -2392,19 +2393,32 @@ private struct DeleteDriveConfirmation: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.largeTitle)
+        VStack(spacing: 20) {
+            // Header
+            Image(systemName: "externaldrive.badge.minus")
+                .font(.system(size: 36))
                 .foregroundStyle(.red)
 
-            Text("Delete \"\(drive.name)\"?")
+            Text("Remove \"\(drive.name)\"?")
                 .font(.headline)
 
-            Text("This will permanently remove the drive registration and all \(drive.fileCount.formatted()) catalogued file records and hashes. This cannot be undone.")
-                .font(.subheadline)
+            // Info
+            VStack(alignment: .leading, spacing: 8) {
+                InfoRow(label: "Files catalogued", value: "\(drive.fileCount.formatted())")
+                InfoRow(label: "Total size", value: ByteCountFormatter.string(fromByteCount: drive.totalBytes, countStyle: .file))
+                if let lastScan = drive.lastScan {
+                    InfoRow(label: "Last scanned", value: lastScan.formatted(date: .abbreviated, time: .omitted))
+                }
+            }
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color(.controlBackgroundColor)))
+
+            Text("This will remove the drive from your catalog. All file records and hashes for this drive will be permanently deleted.")
+                .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
+            // Confirmation
             VStack(alignment: .leading, spacing: 4) {
                 Text("Type DELETE to confirm:")
                     .font(.caption)
@@ -2413,24 +2427,39 @@ private struct DeleteDriveConfirmation: View {
                     .textFieldStyle(.roundedBorder)
                     .focused($isFocused)
                     .onSubmit {
-                        if isConfirmed { onConfirm() }
+                        if isConfirmed { onConfirm(false) }
                     }
             }
 
+            // Actions
             HStack(spacing: 12) {
                 Button("Cancel") { onCancel() }
                     .keyboardShortcut(.escape)
                     .buttonStyle(.bordered)
 
-                Button("Delete Drive") { onConfirm() }
+                Spacer()
+
+                Button("Remove Drive") { onConfirm(false) }
                     .buttonStyle(.borderedProminent)
                     .tint(.red)
                     .disabled(!isConfirmed)
             }
         }
         .padding(24)
-        .frame(width: 360)
+        .frame(width: 380)
         .onAppear { isFocused = true }
+    }
+
+    private struct InfoRow: View {
+        let label: String
+        let value: String
+        var body: some View {
+            HStack {
+                Text(label).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Text(value).font(.caption).fontWeight(.medium)
+            }
+        }
     }
 }
 
