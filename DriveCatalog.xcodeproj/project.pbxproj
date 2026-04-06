@@ -250,8 +250,10 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 2F181224FCF92501A4935BDB /* Build configuration list for PBXNativeTarget "DriveCatalog" */;
 			buildPhases = (
+				4C8D75ED9760DC2F30AB66CB /* Stamp Build Info */,
 				2B896EA8B7A69EEEE2AEFED5 /* Sources */,
 				50267CEF3575D0B25D39F725 /* Resources */,
+				3F8E31AB340E5AAE7B8FBD02 /* Embed Python Runtime */,
 			);
 			buildRules = (
 			);
@@ -307,6 +309,45 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		3F8E31AB340E5AAE7B8FBD02 /* Embed Python Runtime */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Python Runtime";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "bash \"${SRCROOT}/scripts/embed-python.sh\"\n";
+		};
+		4C8D75ED9760DC2F30AB66CB /* Stamp Build Info */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp Build Info";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "PLIST=\"${SRCROOT}/DriveCatalog/Info.plist\"\nGIT_HASH=$(cd \"${SRCROOT}\" && git rev-parse --short=7 HEAD 2>/dev/null || echo \"dev\")\nBUILD_DATE=$(date +\"%Y-%m-%d\")\n/usr/libexec/PlistBuddy -c \"Add :GitCommitHash string ${GIT_HASH}\" \"$PLIST\" 2>/dev/null \\\n    || /usr/libexec/PlistBuddy -c \"Set :GitCommitHash ${GIT_HASH}\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Add :BuildDate string ${BUILD_DATE}\" \"$PLIST\" 2>/dev/null \\\n    || /usr/libexec/PlistBuddy -c \"Set :BuildDate ${BUILD_DATE}\" \"$PLIST\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		2B896EA8B7A69EEEE2AEFED5 /* Sources */ = {
