@@ -1,6 +1,6 @@
 {
   "version": "1.3.0",
-  "build": 3,
+  "build": 4,
   "url": "https://github.com/tim-kal/catalog/releases/download/v1.3.0/DriveCatalog.zip",
   "notes": "Folder duplicates, catalog protection, manage page, robust drive recognition, parallel scanning, migration safety.",
   "min_os": "14.0"
