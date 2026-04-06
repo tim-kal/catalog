@@ -2582,6 +2582,8 @@ private struct AmbiguousMatchSheet: View {
     var onDismiss: () -> Void
 
     @State private var selectedCandidate: DriveResponse?
+    @State private var isResolving = false
+    @State private var resolveError: String?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -2602,12 +2604,28 @@ private struct AmbiguousMatchSheet: View {
                 Spacer()
 
                 Button("Confirm") {
-                    // TODO: POST resolve to backend when endpoint is added
-                    dismiss()
-                    onDismiss()
+                    guard let candidate = selectedCandidate else { return }
+                    isResolving = true
+                    Task {
+                        do {
+                            let url = URL(string: "\(APIService.baseURL)/drives/resolve-ambiguous?mount_path=\(info.mountPath.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&drive_id=\(candidate.id)")!
+                            var request = URLRequest(url: url)
+                            request.httpMethod = "POST"
+                            let (_, response) = try await URLSession.shared.data(for: request)
+                            if let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
+                                dismiss()
+                                onDismiss()
+                            } else {
+                                resolveError = "Server returned an error"
+                            }
+                        } catch {
+                            resolveError = error.localizedDescription
+                        }
+                        isResolving = false
+                    }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(selectedCandidate == nil)
+                .disabled(selectedCandidate == nil || isResolving)
             }
             .padding()
 
@@ -2677,8 +2695,18 @@ private struct AmbiguousMatchSheet: View {
                     .padding(.horizontal)
                 }
             }
-            .padding(.top, 12)
+            if let error = resolveError {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                .padding(.horizontal)
+            }
         }
+        .padding(.top, 12)
         .frame(minWidth: 400, minHeight: 280)
     }
 }

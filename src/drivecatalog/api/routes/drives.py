@@ -441,6 +441,12 @@ async def recognize_mounted_drive(
         if result.confidence == "weak":
             status = "weak_match"
 
+        # Update identifiers on certain/probable matches (not weak)
+        if result.confidence in ("certain", "probable"):
+            from drivecatalog.drives import _update_drive_identifiers, collect_drive_identifiers
+            ids = collect_drive_identifiers(path_obj)
+            _update_drive_identifiers(conn, drive["id"], path_obj, ids)
+
         return DriveRecognizeResponse(
             status=status,
             confidence=result.confidence,
@@ -458,6 +464,42 @@ async def recognize_mounted_drive(
             ),
             mount_path=mount_path,
         )
+    finally:
+        conn.close()
+
+
+@router.post("/resolve-ambiguous")
+async def resolve_ambiguous(
+    mount_path: str = Query(..., description="Mount path of the ambiguous volume"),
+    drive_id: int = Query(..., description="ID of the drive the user selected"),
+) -> dict:
+    """Resolve an ambiguous drive match — user confirmed which registered drive this is.
+
+    Updates the selected drive's identifiers and mount path to match the mounted volume.
+    """
+    path_obj = Path(mount_path)
+    if not path_obj.exists():
+        raise HTTPException(400, f"Path '{mount_path}' does not exist")
+
+    conn = get_connection()
+    try:
+        drive = conn.execute(
+            "SELECT id, name FROM drives WHERE id = ?", (drive_id,)
+        ).fetchone()
+        if not drive:
+            raise HTTPException(404, f"Drive with id {drive_id} not found")
+
+        from drivecatalog.drives import _update_drive_identifiers, collect_drive_identifiers
+
+        ids = collect_drive_identifiers(path_obj)
+        _update_drive_identifiers(conn, drive_id, path_obj, ids)
+
+        return {
+            "status": "resolved",
+            "drive_id": drive_id,
+            "drive_name": drive["name"],
+            "mount_path": mount_path,
+        }
     finally:
         conn.close()
 
