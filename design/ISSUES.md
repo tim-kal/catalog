@@ -32,3 +32,9 @@ Auto-captured system issues. Review periodically and close resolved items.
 **Impact:** Task needs rework
 **Details:** 3 missing bundle extensions, column type is INTEGER/boolean instead of TEXT with bundle root path per AC, API field is group-level instead of per-file
 
+## 2026-04-06 13:15 UTC — Executor failed: DC-002
+**Category:** operational
+**Task:** DC-002
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
