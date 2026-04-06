@@ -147,24 +147,16 @@ xcodebuild \
     archive \
     2>&1 | tail -20
 
-echo "==> Exporting archive..."
+EXPORT_DIR="$BUILD_DIR/export"
+mkdir -p "$EXPORT_DIR"
 
-# Create export options plist
-EXPORT_OPTIONS="$BUILD_DIR/ExportOptions.plist"
 if [ "$SKIP_SIGN" = true ]; then
-    cat > "$EXPORT_OPTIONS" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>method</key>
-    <string>developer-id</string>
-    <key>signingStyle</key>
-    <string>manual</string>
-</dict>
-</plist>
-PLIST
+    # For unsigned builds, copy .app directly from archive (exportArchive needs a team)
+    echo "==> Extracting app from archive (unsigned)..."
+    cp -R "$ARCHIVE_PATH/Products/Applications/$APP_NAME.app" "$EXPORT_DIR/"
 else
+    echo "==> Exporting archive (signed)..."
+    EXPORT_OPTIONS="$BUILD_DIR/ExportOptions.plist"
     cat > "$EXPORT_OPTIONS" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -179,16 +171,14 @@ else
 </dict>
 </plist>
 PLIST
+
+    xcodebuild \
+        -exportArchive \
+        -archivePath "$ARCHIVE_PATH" \
+        -exportOptionsPlist "$EXPORT_OPTIONS" \
+        -exportPath "$EXPORT_DIR" \
+        2>&1 | tail -10
 fi
-
-EXPORT_DIR="$BUILD_DIR/export"
-
-xcodebuild \
-    -exportArchive \
-    -archivePath "$ARCHIVE_PATH" \
-    -exportOptionsPlist "$EXPORT_OPTIONS" \
-    -exportPath "$EXPORT_DIR" \
-    2>&1 | tail -10
 
 APP_PATH="$EXPORT_DIR/$APP_NAME.app"
 
