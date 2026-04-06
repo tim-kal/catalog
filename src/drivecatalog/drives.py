@@ -444,13 +444,15 @@ def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionRe
                 drive=None, confidence="ambiguous", candidates=candidates
             )
 
-    # 6. mount_path fallback
+    # 6. mount_path fallback — DO NOT auto-update identifiers on weak match.
+    # This match is unreliable (two drives with the same Finder name share a mount_path).
+    # Return the candidate but let the frontend ask the user to confirm.
     row = conn.execute(
         f"SELECT {cols} FROM drives WHERE mount_path = ?", (str(mount_path),)
     ).fetchone()
     if row:
         drive = dict(row)
-        _update_drive_identifiers(conn, drive["id"], mount_path, ids)
+        # Don't call _update_drive_identifiers — this might be the wrong drive
         return RecognitionResult(drive=drive, confidence="weak")
 
     # 7. No match

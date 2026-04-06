@@ -276,6 +276,18 @@ ALTER TABLE drives ADD COLUMN fs_fingerprint TEXT;
         sql="SELECT 1;",  # DDL handled in data_migration
         data_migration=lambda conn: _migrate_unique_drive_names(conn),
     ),
+    # ------------------------------------------------------------------
+    # Version 8 — re-populate drive identifiers with real hardware serials
+    # v6 used IORegistryEntryName (product name) which is identical for
+    # drives of the same model. v8 re-runs with ioreg-based serial extraction.
+    # ------------------------------------------------------------------
+    Migration(
+        version=8,
+        description="Re-populate drive identifiers with real hardware serial numbers",
+        requires_rescan=False,
+        sql="SELECT 1;",
+        data_migration=lambda conn: _migrate_repopulate_drive_identifiers(conn),
+    ),
 ]
 
 # When adding a new migration, also update expectedSchemaVersion in
@@ -299,6 +311,39 @@ def _migrate_unique_drive_names(conn: sqlite3.Connection) -> None:
             conn.execute("UPDATE drives SET name = ? WHERE id = ?", (new_name, id_row[0]))
             logger.info("Renamed duplicate drive id=%d: '%s' -> '%s'", id_row[0], name, new_name)
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_drives_name_unique ON drives(name)")
+    conn.commit()
+
+
+def _migrate_repopulate_drive_identifiers(conn: sqlite3.Connection) -> None:
+    """Re-populate ALL identifier columns with the latest extraction code.
+
+    This fixes drives that got the product name (e.g. "SanDisk Extreme Pro Media")
+    instead of the real hardware serial number from ioreg.
+    Clears old device_serial first so stale product names don't persist.
+    """
+    from pathlib import Path
+
+    from drivecatalog.drives import collect_drive_identifiers
+
+    rows = conn.execute("SELECT id, mount_path FROM drives").fetchall()
+    for row in rows:
+        mount_path = row[1]
+        if not mount_path or not Path(mount_path).exists():
+            continue
+        # Clear old serial (might be product name, not real serial)
+        conn.execute("UPDATE drives SET device_serial = NULL WHERE id = ?", (row[0],))
+        ids = collect_drive_identifiers(Path(mount_path))
+        conn.execute(
+            """UPDATE drives SET
+                uuid = COALESCE(?, uuid),
+                disk_uuid = COALESCE(?, disk_uuid),
+                device_serial = ?,
+                partition_index = COALESCE(?, partition_index),
+                fs_fingerprint = COALESCE(?, fs_fingerprint)
+            WHERE id = ?""",
+            (ids.volume_uuid, ids.disk_uuid, ids.device_serial,
+             ids.partition_index, ids.fs_fingerprint, row[0]),
+        )
     conn.commit()
 
 
