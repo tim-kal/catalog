@@ -1,7 +1,7 @@
 {
-  "version": "1.3.2",
-  "build": 8,
-  "url": "https://github.com/tim-kal/catalog/releases/download/v1.3.2/DriveCatalog.zip",
-  "notes": "Schema integrity repair, Reset All Data button, error codes (DC-E001..DC-E010).",
+  "version": "1.3.3",
+  "build": 9,
+  "url": "https://github.com/tim-kal/catalog/releases/download/v1.3.3/DriveCatalog.zip",
+  "notes": "Fixed Reset All Data — no duplicate app instance, clears cached views.",
   "min_os": "14.0"
 }
