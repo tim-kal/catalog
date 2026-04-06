@@ -290,6 +290,8 @@ struct BrowserView: View {
                 } label: {
                     HStack(spacing: 3) {
                         Text(field.rawValue)
+                            .lineLimit(1)
+                            .fixedSize()
                         if sortField == field {
                             Image(systemName: sortDirection == .ascending
                                   ? "chevron.up" : "chevron.down")
@@ -297,7 +299,7 @@ struct BrowserView: View {
                         }
                     }
                     .font(.caption)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 6)
                     .padding(.vertical, 4)
                     .background(sortField == field
                                 ? Color.accentColor.opacity(0.15) : Color.clear)

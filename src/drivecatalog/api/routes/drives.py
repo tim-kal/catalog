@@ -128,6 +128,24 @@ async def create_drive(request: DriveCreateRequest) -> DriveResponse:
         conn.close()
 
 
+@router.patch("/{name}/rename")
+async def rename_drive(name: str, new_name: str = Query(..., description="New drive name")) -> dict:
+    """Rename a drive in the catalog."""
+    conn = get_connection()
+    try:
+        drive = conn.execute("SELECT id FROM drives WHERE name = ?", (name,)).fetchone()
+        if not drive:
+            raise HTTPException(404, f"Drive '{name}' not found")
+        existing = conn.execute("SELECT id FROM drives WHERE name = ?", (new_name,)).fetchone()
+        if existing:
+            raise HTTPException(409, f"A drive named '{new_name}' already exists")
+        conn.execute("UPDATE drives SET name = ? WHERE id = ?", (new_name, drive["id"]))
+        conn.commit()
+        return {"old_name": name, "new_name": new_name}
+    finally:
+        conn.close()
+
+
 @router.delete("/{name}")
 async def delete_drive(
     name: str,

@@ -608,13 +608,13 @@ struct DriveCard: View {
                     }
                 }
             }
-            .alert("Clear Scan Data", isPresented: $showClearConfirmation) {
+            .alert("Clear Scan Data for \"\(drive.name)\"?", isPresented: $showClearConfirmation) {
                 Button("Cancel", role: .cancel) {}
-                Button("Clear", role: .destructive) {
+                Button("Clear Data", role: .destructive) {
                     Task { await clearScanData() }
                 }
             } message: {
-                Text("This will delete all \(drive.fileCount.formatted()) catalogued files and hashes for \"\(drive.name)\". The drive registration will be kept so you can re-scan.")
+                Text("This removes all \(drive.fileCount.formatted()) file records and hashes from the catalog.\n\nThe drive stays registered — you can re-scan it anytime. No files on the actual drive are affected.")
             }
 
         }
@@ -1366,7 +1366,8 @@ struct DriveListView: View {
     @State private var errorMessage: String?
     @State private var showAddSheet = false
     @State private var driveToDelete: DriveResponse?
-    // driveToDelete triggers delete confirmation sheet via .sheet(item:)
+    @State private var driveToRename: DriveResponse?
+    @State private var renameText = ""
     @State private var expandedDriveIds: Set<Int> = []
     /// Tracks the most recently expanded drive for auto-scroll.
     @State private var lastExpandedId: Int?
@@ -1621,6 +1622,21 @@ struct DriveListView: View {
                 driveToDelete = nil
             }
         }
+        .alert("Rename Drive", isPresented: Binding(
+            get: { driveToRename != nil },
+            set: { if !$0 { driveToRename = nil } }
+        )) {
+            TextField("Drive name", text: $renameText)
+            Button("Cancel", role: .cancel) { driveToRename = nil }
+            Button("Rename") {
+                if let drive = driveToRename, !renameText.isEmpty {
+                    Task { await renameDrive(drive, to: renameText) }
+                }
+                driveToRename = nil
+            }
+        } message: {
+            Text("Enter a new name for \"\(driveToRename?.name ?? "")\"")
+        }
     }
 
     @ViewBuilder
@@ -1701,11 +1717,19 @@ struct DriveListView: View {
                     Label("Unmount", systemImage: "eject.fill")
                 }
             }
+            Button {
+                renameText = drive.name
+                driveToRename = drive
+            } label: {
+                Label("Rename", systemImage: "pencil")
+            }
+
+            Divider()
+
             Button(role: .destructive) {
                 driveToDelete = drive
-                // driveToDelete triggers sheet automatically
             } label: {
-                Label("Delete", systemImage: "trash")
+                Label("Remove from Catalog", systemImage: "trash")
             }
         }
     }
@@ -2359,6 +2383,15 @@ struct DriveListView: View {
             }
         } catch {
             // Unmount failed silently in context menu
+        }
+    }
+
+    private func renameDrive(_ drive: DriveResponse, to newName: String) async {
+        do {
+            try await APIService.shared.renameDrive(name: drive.name, newName: newName)
+            await loadDrives()
+        } catch {
+            errorMessage = "Rename failed: \(error.localizedDescription)"
         }
     }
 

@@ -499,6 +499,18 @@ actor APIService {
         try await delete(url: url)
     }
 
+    func renameDrive(name: String, newName: String) async throws {
+        let url = try buildURL(path: "/drives/\(name)/rename", queryItems: [
+            URLQueryItem(name: "new_name", value: newName)
+        ])
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw APIError.invalidResponse
+        }
+    }
+
     // MARK: - Drive Quick Check & Diff
 
     func quickCheck(driveName: String) async throws -> [String: Any] {

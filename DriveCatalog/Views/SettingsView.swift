@@ -229,6 +229,28 @@ struct SettingsView: View {
                 }
             }
 
+            // How it works
+            Section("How it Works") {
+                VStack(alignment: .leading, spacing: 8) {
+                    helpItem(icon: "1.circle.fill", color: .blue,
+                        title: "Connect & Scan",
+                        text: "Plug in an external drive. Catalog scans all files and computes hashes to identify duplicates.")
+                    helpItem(icon: "2.circle.fill", color: .green,
+                        title: "Browse & Search",
+                        text: "Use the Files page to browse any drive's contents and search across all drives at once.")
+                    helpItem(icon: "3.circle.fill", color: .orange,
+                        title: "Check Backups",
+                        text: "The Backups page shows which files are protected (on 2+ drives) and which are at risk (only on one drive).")
+                    helpItem(icon: "4.circle.fill", color: .purple,
+                        title: "Get Insights",
+                        text: "Insights shows what's at risk, what's redundant, and what you can clean up to free space.")
+                    helpItem(icon: "5.circle.fill", color: .red,
+                        title: "Take Action",
+                        text: "Queue copy or delete operations. Drives don't need to be connected — actions wait until the drive is plugged in.")
+                }
+                .padding(.vertical, 4)
+            }
+
             // Bug Report
             Section("Feedback") {
                 Button {
@@ -246,6 +268,18 @@ struct SettingsView: View {
         .task(id: backend.isRunning) {
             if backend.isRunning {
                 await loadHealth()
+            }
+        }
+    }
+
+    private func helpItem(icon: String, color: Color, title: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .foregroundStyle(color)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.subheadline).fontWeight(.medium)
+                Text(text).font(.caption).foregroundStyle(.secondary)
             }
         }
     }
