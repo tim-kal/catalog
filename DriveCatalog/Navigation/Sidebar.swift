@@ -92,6 +92,20 @@ struct Sidebar: View {
             // Version info
             Divider()
             VStack(alignment: .leading, spacing: 2) {
+                #if DEBUG
+                HStack(spacing: 4) {
+                    Text("DEBUG")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(.red.opacity(0.2))
+                        .foregroundStyle(.red)
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                    Text("v\(appVersion) · \(appBuild)")
+                        .font(.caption2)
+                    Spacer()
+                }
+                #else
                 HStack {
                     Text("DriveCatalog v\(appVersion)")
                         .font(.caption2)
@@ -99,6 +113,7 @@ struct Sidebar: View {
                     Text("Build \(appBuild)")
                         .font(.caption2)
                 }
+                #endif
                 Text(buildInfo)
                     .font(.system(size: 9, design: .monospaced))
             }

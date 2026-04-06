@@ -14,8 +14,10 @@ struct DriveCatalogApp: App {
                 .environmentObject(updater)
                 .onAppear {
                     backend.start()
+                    #if !DEBUG
                     Task { await updater.checkForUpdates() }
                     updater.startPeriodicChecks()
+                    #endif
                 }
         }
         .commands {
