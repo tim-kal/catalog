@@ -1,7 +1,7 @@
 {
-  "version": "1.3.5",
-  "build": 11,
-  "url": "https://github.com/tim-kal/catalog/releases/download/v1.3.5/DriveCatalog.zip",
-  "notes": "Fixed: update check was disabled in release builds due to DEBUG flag misconfiguration.",
+  "version": "1.3.6",
+  "build": 12,
+  "url": "https://github.com/tim-kal/catalog/releases/download/v1.3.6/DriveCatalog.zip",
+  "notes": "Unique drive names enforced, faster polling, error logging improvements, drive recognition fixes.",
   "min_os": "14.0"
 }
