@@ -1,4 +1,3 @@
-| 2026-04-06 12:56 UTC | DC-002 | review:changes_requested | DC-002 was never implemented — executor self-reported "blocked" and no code was produced. |
 | 2026-04-06 12:57 UTC | DC-003 | review:changes_requested | DC-003 was never implemented — executor self-reported "blocked" and no code was produced; zero acceptance criteria are met. |
 | 2026-04-06 12:58 UTC | DC-004 | review:changes_requested | DC-004 was never implemented — executor self-reported "blocked" and produced no code; zero of 7 acceptance criteria are met. |
 | 2026-04-06 13:01 UTC | DC-001 | verified | Implemented folder-level duplicate and subset detection with GET /folder-duplicates API endpoint |
@@ -8,3 +7,4 @@
 | 2026-04-06 13:15 UTC | DC-003 | verified | Implemented unified Manage page merging Insights + Backups into 3 sections: Backup Status, Duplikate & Platzgewinn, Empfohlene Aktionen. Sidebar updated: .insights/.backups removed, .manage added with rectangle.3.group icon. Folder-duplicate API integrated with graceful degradation. |
 | 2026-04-06 13:16 UTC | DC-004 | verified | verified |
 | 2026-04-06 13:16 UTC | DC-005 | verified | verified |
+| 2026-04-06 13:17 UTC | DC-006 | verified | verified |
