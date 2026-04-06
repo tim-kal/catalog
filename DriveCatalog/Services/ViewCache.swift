@@ -25,4 +25,13 @@ enum ViewCache {
         guard let data = try? Data(contentsOf: url(for: key)) else { return nil }
         return try? JSONDecoder().decode(type, from: data)
     }
+
+    /// Delete all cached view data.
+    static func clearAll() {
+        if let contents = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) {
+            for file in contents {
+                try? FileManager.default.removeItem(at: file)
+            }
+        }
+    }
 }

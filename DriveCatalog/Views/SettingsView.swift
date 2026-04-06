@@ -393,22 +393,21 @@ struct SettingsView: View {
             request.httpMethod = "POST"
             let (_, response) = try await URLSession.shared.data(for: request)
             if let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
+                // 1. Clear all cached view data
+                ViewCache.clearAll()
+
+                // 2. Stop the backend (old server has stale state)
+                backend.stop()
+
+                // 3. Brief pause for cleanup
+                try? await Task.sleep(for: .seconds(1))
+
+                // 4. Restart backend (init_db creates fresh DB)
+                backend.start()
+
+                // 5. Update UI
                 resetComplete = true
                 healthStatus = nil
-
-                // Restart the app after a short delay so the user sees the confirmation
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    // Relaunch: start a new instance, then terminate this one
-                    let appPath = Bundle.main.bundlePath
-                    let task = Process()
-                    task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-                    task.arguments = ["-n", appPath]
-                    try? task.run()
-
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        NSApplication.shared.terminate(nil)
-                    }
-                }
             }
         } catch {
             healthError = "Reset failed: \(error.localizedDescription)"
