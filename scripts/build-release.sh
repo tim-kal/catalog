@@ -83,6 +83,21 @@ if [ -n "$BUILD_NUMBER" ]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$PLIST"
 fi
 
+# ---------- Stamp build metadata (git commit + date) ----------
+
+GIT_HASH=$(cd "$PROJECT_DIR" && git rev-parse --short=7 HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE=$(date +"%Y-%m-%d")
+
+echo "==> Stamping build: $GIT_HASH · $BUILD_DATE"
+
+# Add or update GitCommitHash
+/usr/libexec/PlistBuddy -c "Add :GitCommitHash string $GIT_HASH" "$PLIST" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Set :GitCommitHash $GIT_HASH" "$PLIST"
+
+# Add or update BuildDate
+/usr/libexec/PlistBuddy -c "Add :BuildDate string $BUILD_DATE" "$PLIST" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Set :BuildDate $BUILD_DATE" "$PLIST"
+
 # ---------- Bundle Python runtime ----------
 
 echo "==> Bundling Python runtime..."

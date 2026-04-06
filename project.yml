@@ -22,3 +22,13 @@ targets:
       INFOPLIST_FILE: DriveCatalog/Info.plist
       PRODUCT_NAME: DriveCatalog
       GENERATE_INFOPLIST_FILE: false
+    preBuildScripts:
+      - script: |
+          PLIST="${SRCROOT}/DriveCatalog/Info.plist"
+          GIT_HASH=$(cd "${SRCROOT}" && git rev-parse --short=7 HEAD 2>/dev/null || echo "dev")
+          BUILD_DATE=$(date +"%Y-%m-%d")
+          /usr/libexec/PlistBuddy -c "Add :GitCommitHash string ${GIT_HASH}" "$PLIST" 2>/dev/null \
+              || /usr/libexec/PlistBuddy -c "Set :GitCommitHash ${GIT_HASH}" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :BuildDate string ${BUILD_DATE}" "$PLIST" 2>/dev/null \
+              || /usr/libexec/PlistBuddy -c "Set :BuildDate ${BUILD_DATE}" "$PLIST"
+        name: Stamp Build Info

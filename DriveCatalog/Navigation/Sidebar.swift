@@ -12,6 +12,20 @@ struct Sidebar: View {
         }
     }
 
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+    }
+
+    private var appBuild: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+    }
+
+    private var buildInfo: String {
+        let commit = Bundle.main.infoDictionary?["GitCommitHash"] as? String ?? "dev"
+        let date = Bundle.main.infoDictionary?["BuildDate"] as? String ?? "local"
+        return "\(commit) · \(date)"
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             List(visibleItems, selection: $selection) { item in
@@ -45,12 +59,16 @@ struct Sidebar: View {
 
             // Version info
             Divider()
-            HStack {
-                Text("DriveCatalog v1.2")
-                    .font(.caption2)
-                Spacer()
-                Text("Apr 2026")
-                    .font(.caption2)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text("DriveCatalog v\(appVersion)")
+                        .font(.caption2)
+                    Spacer()
+                    Text("Build \(appBuild)")
+                        .font(.caption2)
+                }
+                Text(buildInfo)
+                    .font(.system(size: 9, design: .monospaced))
             }
             .foregroundStyle(.tertiary)
             .padding(.horizontal, 16)
