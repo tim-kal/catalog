@@ -33,6 +33,8 @@ vendor/
 
 # Database
 *.db
+*.db-shm
+*.db-wal
 
 # Planning docs (internal)
 .planning/
