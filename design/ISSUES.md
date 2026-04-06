@@ -26,3 +26,9 @@ Auto-captured system issues. Review periodically and close resolved items.
 **Impact:** Task needs rework
 **Details:** DC-004 was never implemented — executor self-reported "blocked" and produced no code; zero of 7 acceptance criteria are met.
 
+## 2026-04-06 13:09 UTC — Reviewer changes_requested: DC-002
+**Category:** quality
+**Task:** DC-002
+**Impact:** Task needs rework
+**Details:** 3 missing bundle extensions, column type is INTEGER/boolean instead of TEXT with bundle root path per AC, API field is group-level instead of per-file
+

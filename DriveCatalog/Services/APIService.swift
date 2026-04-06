@@ -540,6 +540,14 @@ actor APIService {
         return try await get(url: url)
     }
 
+    // MARK: - Folder Duplicates
+
+    /// Fetches folder-level duplicate data. Returns nil if the endpoint is unavailable.
+    func fetchFolderDuplicates() async -> FolderDuplicateResponse? {
+        guard let url = try? buildURL(path: "/folder-duplicates") else { return nil }
+        return try? await get(url: url)
+    }
+
     // MARK: - Actions Queue
 
     func fetchActions(status: String? = nil) async throws -> ActionListResponse {

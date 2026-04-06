@@ -86,7 +86,7 @@ struct BackupsView: View {
             }
             .navigationTitle("Backups")
             .onReceive(NotificationCenter.default.publisher(for: .refreshCurrentPage)) { _ in
-                if activeTab == .backups { Task { await loadData() } }
+                if activeTab == .manage { Task { await loadData() } }
             }
             .task(id: backend.isRunning) {
                 if backend.isRunning { await loadData() }

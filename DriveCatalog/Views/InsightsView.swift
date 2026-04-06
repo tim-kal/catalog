@@ -25,7 +25,7 @@ struct InsightsView: View {
             if backend.isRunning { await loadData() }
         }
         .onChange(of: activeTab) { _, newTab in
-            if newTab == .insights && selectedAction == nil {
+            if newTab == .manage && selectedAction == nil {
                 Task { await loadData() }
             }
         }
@@ -75,7 +75,7 @@ struct InsightsView: View {
         }
         .navigationTitle("Insights")
         .onReceive(NotificationCenter.default.publisher(for: .refreshCurrentPage)) { _ in
-            if activeTab == .insights { Task { await loadData() } }
+            if activeTab == .manage { Task { await loadData() } }
         }
     }
 

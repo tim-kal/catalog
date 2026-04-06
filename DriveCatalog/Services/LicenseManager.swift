@@ -34,9 +34,9 @@ final class LicenseManager: ObservableObject {
         case .free:
             switch feature {
             case .unlimitedDrives: return false
-            case .insights: return false
+            case .manage: return false
             case .actionQueue: return false
-            case .browse, .backups, .settings: return true
+            case .browse, .settings: return true
             }
         }
     }
@@ -66,10 +66,9 @@ final class LicenseManager: ObservableObject {
 
     enum Feature {
         case unlimitedDrives
-        case insights
+        case manage
         case actionQueue
         case browse
-        case backups
         case settings
     }
 }

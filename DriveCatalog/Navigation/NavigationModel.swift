@@ -4,8 +4,7 @@ import SwiftUI
 enum SidebarItem: String, CaseIterable, Identifiable {
     case drives
     case browser
-    case backups
-    case insights
+    case manage
     case queue
     case consolidate
     case settings
@@ -16,8 +15,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .drives: return "Drives"
         case .browser: return "Files"
-        case .backups: return "Backups"
-        case .insights: return "Insights"
+        case .manage: return "Manage"
         case .queue: return "Action Queue"
         case .consolidate: return "Consolidate"
         case .settings: return "Settings"
@@ -28,8 +26,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .drives: return "externaldrive"
         case .browser: return "folder"
-        case .backups: return "shield.lefthalf.filled"
-        case .insights: return "lightbulb"
+        case .manage: return "rectangle.3.group"
         case .queue: return "list.bullet.clipboard"
         case .consolidate: return "arrow.triangle.merge"
         case .settings: return "gear"
