@@ -114,11 +114,11 @@ final class UpdateService: ObservableObject {
             try FileManager.default.moveItem(at: downloadedURL, to: zipPath)
             downloadProgress = 0.5
 
-            // 2. Unzip
+            // 2. Unzip using ditto (handles macOS ZIP format correctly)
             let unzipProc = Process()
             let unzipPipe = Pipe()
-            unzipProc.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-            unzipProc.arguments = ["-o", zipPath.path, "-d", tempDir.path]
+            unzipProc.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+            unzipProc.arguments = ["-x", "-k", zipPath.path, tempDir.path]
             unzipProc.standardError = unzipPipe
             try unzipProc.run()
             unzipProc.waitUntilExit()
