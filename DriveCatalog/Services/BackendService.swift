@@ -173,10 +173,13 @@ final class BackendService: ObservableObject {
     private func launchServer() {
         let proc = Process()
 
+        // Extract port from APIService.baseURL so debug/release use different ports
+        let serverPort = URLComponents(string: APIService.baseURL)?.port ?? 8100
+
         if let pythonBin = embeddedPythonPath, let pythonHome = embeddedPythonHome {
             logger.info("Using embedded Python: \(pythonBin)")
             proc.executableURL = URL(fileURLWithPath: pythonBin)
-            proc.arguments = ["-m", "drivecatalog.api"]
+            proc.arguments = ["-m", "drivecatalog.api", "--port", "\(serverPort)"]
 
             var env = ProcessInfo.processInfo.environment
             env["PYTHONHOME"] = pythonHome
@@ -187,7 +190,7 @@ final class BackendService: ObservableObject {
         } else if let uv = uvPath {
             logger.info("Using uv (development mode): \(uv)")
             proc.executableURL = URL(fileURLWithPath: uv)
-            proc.arguments = ["run", "python", "-m", "drivecatalog.api"]
+            proc.arguments = ["run", "python", "-m", "drivecatalog.api", "--port", "\(serverPort)"]
             proc.currentDirectoryURL = URL(fileURLWithPath: projectPath)
 
             var env = ProcessInfo.processInfo.environment

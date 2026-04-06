@@ -36,7 +36,12 @@ enum APIError: Error, LocalizedError {
 /// Thread-safe API service for communicating with the DriveCatalog FastAPI backend.
 actor APIService {
     /// Base URL for the API server.
+    /// Debug builds use port 8101 to avoid conflicts with a running release app.
+    #if DEBUG
+    static let baseURL = "http://localhost:8101"
+    #else
     static let baseURL = "http://localhost:8100"
+    #endif
 
     /// Shared instance for convenience.
     static let shared = APIService()
