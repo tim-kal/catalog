@@ -1,31 +1,31 @@
 # DriveSnapshots — State
 
 ## What It Is
-**DriveCatalog** — a macOS desktop app (SwiftUI frontend + Python/FastAPI backend) for cataloging external drives, detecting duplicates, browsing files, and managing consolidation/migration workflows. Currently at v1.2.
+**DriveCatalog** — macOS desktop app (SwiftUI + Python/FastAPI) for cataloging external drives, detecting duplicates, browsing files, managing consolidation/migration. v1.2.
 
 ## Architecture
-- **Frontend**: SwiftUI macOS app (14.0+, Swift 5.9). ~12k lines across 43 Swift files. Uses `NavigationSplitView` with sidebar tabs: Drives, Files, Backups, Insights, Action Queue, Consolidate (hidden by default), Settings.
-- **Backend**: Python FastAPI server (`src/drivecatalog/`). ~5.4k lines across 30+ modules. Started as an embedded subprocess by `BackendService.swift`. CORS wide open for local access.
-- **Database**: SQLite with WAL mode at `~/.drivecatalog/catalog.db`. Custom migration system in `migrations.py`.
-- **Build**: XcodeGen (`project.yml`). Embedded Python runtime in app bundle for release; `uv` fallback for dev.
-- **Communication**: Swift frontend calls Python backend via HTTP (localhost). `APIService.swift` is the HTTP client.
+- **Frontend**: SwiftUI macOS 14.0+, ~12k LOC, 43 Swift files. NavigationSplitView with sidebar.
+- **Backend**: Python FastAPI, ~5.4k LOC, 30+ modules. Embedded subprocess via BackendService.swift.
+- **Database**: SQLite WAL at `~/.drivecatalog/catalog.db`. Custom migrations.
+- **Build**: XcodeGen. Embedded Python for release, uv for dev.
+- **Comms**: HTTP localhost. APIService.swift ↔ FastAPI.
 
-## Key Subsystems
-| Area | Backend | Frontend |
-|------|---------|----------|
-| Drive management | `drives.py`, routes/drives | DrivesView, DriveDetailView, AddDriveSheet |
-| File scanning | `scanner.py`, `hasher.py` | (driven by backend, status shown in UI) |
-| Duplicate detection | `duplicates.py`, routes/duplicates | DuplicatesView, DuplicateClusterRow, ReclaimSheet |
-| File browsing | routes/files, `search.py` | BrowserView, FileRow, SearchView |
-| Insights | `insights.py`, routes/insights | InsightsView |
-| Consolidation | `consolidation.py`, routes/consolidation | ConsolidatePageView, ConsolidationWizardView |
-| Migration | `migration.py`, routes/migrations | (UI TBD) |
-| Actions/Ops | `audit.py`, routes/actions, operations | ActionQueueView, ActionDrillDownView |
-| Copy/Verify | `copier.py`, `verifier.py`, routes/copy | CopySheet |
-| Updates/Beta | (external) | UpdateService, BetaService, LicenseManager |
+## Open Design Threads (from last session)
 
-## Recent Activity (last ~10 commits)
-Active feature work: drive rename, sort headers, clear data dialog, how-it-works guide, quick-check reliability improvements, search improvements, beta access system, auto-updater, insights simplification. Project is in active development with frequent commits.
+### 1. Manage Page (merge Backup + Insights)
+Decision: merge into single "Manage" page with sections: Backup Status (per folder AND per drive), Duplikate & Platzgewinn, Empfohlene Aktionen. Replaces separate Insights + Backups sidebar items.
 
-## Migrate Orchestrator
-Project is configured with migrate orchestrator (`config.yaml`). Using Claude Opus 4.6. Design files exist but are fresh (first orient).
+### 2. Ordner-Duplikat-Erkennung
+Must be exact: full hash match on all files in both dirs = Ordner-Duplikat. Subset detection (A ⊂ B). No fuzzy thresholds — precision tool. Show on Manage page alongside file-level duplicates.
+
+### 3. Katalog-Dateien (.cocatalog, .photoslibrary, .RDC)
+Capture One + Photos.app bundles contain real originals (esp. tethered shooting). Scanner currently traverses into bundles and finds "duplicates". Need: detect known bundle extensions, mark files inside as "catalog-protected", warn before any delete action.
+
+### 4. Parallel Scanning
+Currently: one scan = one BackgroundTask thread. SQLite WAL should handle concurrent writes but never tested. No per-drive lock, no UI for parallel scan status. Feature to build.
+
+### 5. Feedback/Ticket Pipeline
+BugReportView exists, sends to `catalog-beta.vercel.app/api/bug-report`. Backend status unknown — may not exist yet. Goal: bug → GitHub Issue → notification to operator. Ambitious pipeline (auto-analyze, test, release) deferred.
+
+### 6. Konsolidierungs-Reihenfolge
+User wants: "where to move data, in what order, to maximize freed space". Needs Manage page + Ordner-Duplikat logic first.
