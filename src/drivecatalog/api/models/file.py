@@ -40,6 +40,7 @@ class FileLocation(BaseModel):
     drive_name: str
     path: str
     file_id: int
+    catalog_bundle: str | None = None
 
 
 class FileGroup(BaseModel):
@@ -53,7 +54,6 @@ class FileGroup(BaseModel):
     status: str  # unprotected, same_drive_duplicate, backed_up, over_backed_up
     same_drive_extras: int
     reclaimable_bytes: int
-    catalog_bundle_warning: bool = False
     locations: list[FileLocation]
 
 

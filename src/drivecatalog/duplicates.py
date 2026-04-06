@@ -328,8 +328,6 @@ def get_directory_file_groups(
         drive_count = len({r["drive_name"] for r in loc_rows})
         total_copies = len(loc_rows)
         same_drive_extras = total_copies - drive_count
-        has_bundle = any(r["catalog_bundle"] for r in loc_rows)
-
         if drive_count == 1:
             status = "same_drive_duplicate" if same_drive_extras > 0 else "unprotected"
         elif drive_count == 2:
@@ -357,9 +355,13 @@ def get_directory_file_groups(
             "status": status,
             "same_drive_extras": same_drive_extras,
             "reclaimable_bytes": reclaimable_copies * size_bytes,
-            "catalog_bundle_warning": has_bundle,
             "locations": [
-                {"drive_name": r["drive_name"], "path": r["path"], "file_id": r["file_id"]}
+                {
+                    "drive_name": r["drive_name"],
+                    "path": r["path"],
+                    "file_id": r["file_id"],
+                    "catalog_bundle": r["catalog_bundle"],
+                }
                 for r in loc_rows
             ],
         })
@@ -462,10 +464,13 @@ def get_file_groups(
             basenames[name] = basenames.get(name, 0) + 1
         filename = max(basenames, key=basenames.get) if basenames else "unknown"
 
-        has_bundle_member = any(r["catalog_bundle"] for r in file_rows)
-
         locations = [
-            {"drive_name": r[0], "path": r[1], "file_id": r[2]}
+            {
+                "drive_name": r[0],
+                "path": r[1],
+                "file_id": r[2],
+                "catalog_bundle": r["catalog_bundle"],
+            }
             for r in file_rows
         ]
 
@@ -485,7 +490,6 @@ def get_file_groups(
             "status": file_status,
             "same_drive_extras": same_drive_extras,
             "reclaimable_bytes": reclaimable_bytes,
-            "catalog_bundle_warning": has_bundle_member,
             "locations": locations,
         })
 

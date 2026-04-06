@@ -222,37 +222,78 @@ CREATE INDEX IF NOT EXISTS idx_migration_files_status ON migration_files(plan_id
     # ------------------------------------------------------------------
     Migration(
         version=4,
-        description="Add catalog_bundle column to files table",
+        description="Add catalog_bundle column to files table (TEXT, nullable)",
         requires_rescan=True,
         sql="""\
-ALTER TABLE files ADD COLUMN catalog_bundle INTEGER DEFAULT 0;
+ALTER TABLE files ADD COLUMN catalog_bundle TEXT;
 """,
-        data_migration=lambda conn: _migrate_catalog_bundle_flags(conn),
+        data_migration=lambda conn: _migrate_catalog_bundle_paths(conn),
+    ),
+    # ------------------------------------------------------------------
+    # Version 5 — fix catalog_bundle for databases that ran old v4
+    # Old v4 stored INTEGER 0/1; this converts to TEXT bundle root paths.
+    # Safe no-op on databases that already have TEXT values.
+    # ------------------------------------------------------------------
+    Migration(
+        version=5,
+        description="Convert catalog_bundle from INTEGER flags to TEXT bundle root paths",
+        requires_rescan=True,
+        sql="SELECT 1;",
+        data_migration=lambda conn: _migrate_catalog_bundle_int_to_text(conn),
     ),
 ]
 
 
-def _migrate_catalog_bundle_flags(conn: sqlite3.Connection) -> None:
-    """Set catalog_bundle=1 for existing files inside bundle directories."""
-    from drivecatalog.scanner import is_catalog_bundle_member
+def _migrate_catalog_bundle_paths(conn: sqlite3.Connection) -> None:
+    """Set catalog_bundle to the bundle root path for existing files inside bundles."""
+    from drivecatalog.scanner import get_catalog_bundle_root
 
     rows = conn.execute("SELECT id, path FROM files").fetchall()
-    bundle_ids: list[int] = []
     for row in rows:
-        fid = row[0]
-        fpath = row[1]
-        if is_catalog_bundle_member(fpath):
-            bundle_ids.append(fid)
-
-    if bundle_ids:
-        for i in range(0, len(bundle_ids), 500):
-            chunk = bundle_ids[i : i + 500]
-            placeholders = ",".join("?" for _ in chunk)
+        root = get_catalog_bundle_root(row[1])
+        if root:
             conn.execute(
-                f"UPDATE files SET catalog_bundle = 1 WHERE id IN ({placeholders})",
-                chunk,
+                "UPDATE files SET catalog_bundle = ? WHERE id = ?",
+                (root, row[0]),
             )
-        conn.commit()
+    conn.commit()
+
+
+def _migrate_catalog_bundle_int_to_text(conn: sqlite3.Connection) -> None:
+    """Convert catalog_bundle from INTEGER (0/1) to TEXT (bundle root path / NULL).
+
+    No-op if values are already TEXT paths (i.e. fresh v4 was applied).
+    """
+    from drivecatalog.scanner import get_catalog_bundle_root
+
+    sample = conn.execute(
+        "SELECT catalog_bundle FROM files WHERE catalog_bundle IS NOT NULL LIMIT 1"
+    ).fetchone()
+    if sample is None:
+        return  # No flagged files, nothing to convert
+
+    val = str(sample[0])
+    if val not in ("0", "1"):
+        return  # Already TEXT paths — fresh v4 was applied
+
+    # Clear old INTEGER zeros
+    conn.execute(
+        "UPDATE files SET catalog_bundle = NULL "
+        "WHERE catalog_bundle = '0' OR catalog_bundle = 0"
+    )
+
+    # Re-derive root paths for flagged files
+    rows = conn.execute(
+        "SELECT id, path FROM files "
+        "WHERE catalog_bundle = '1' OR catalog_bundle = 1"
+    ).fetchall()
+    for row in rows:
+        root = get_catalog_bundle_root(row[1])
+        conn.execute(
+            "UPDATE files SET catalog_bundle = ? WHERE id = ?",
+            (root, row[0]),
+        )
+    conn.commit()
 
 
 # ---------------------------------------------------------------------------

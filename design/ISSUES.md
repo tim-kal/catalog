@@ -80,3 +80,87 @@ Auto-captured system issues. Review periodically and close resolved items.
 **Impact:** Task needs rework
 **Details:** Zero acceptance criteria met — no code was implemented; diff contains only design file bookkeeping (ISSUES.md and SIGNALS.md updates).
 
+## 2026-04-06 13:33 UTC — Reviewer changes_requested: DC-008
+**Category:** quality
+**Task:** DC-008
+**Impact:** Task needs rework
+**Details:** Zero acceptance criteria met — executor self-reported "blocked" and produced no code; the only commit (1b62274) contains ISSUES.md and SIGNALS.md bookkeeping, not implementation.
+
+## 2026-04-06 13:33 UTC — Executor failed: DC-008
+**Category:** operational
+**Task:** DC-008
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:41 UTC — Executor failed: DC-002
+**Category:** operational
+**Task:** DC-002
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:41 UTC — Executor failed: DC-003
+**Category:** operational
+**Task:** DC-003
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:41 UTC — Executor failed: DC-004
+**Category:** operational
+**Task:** DC-004
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:41 UTC — Executor failed: DC-008
+**Category:** operational
+**Task:** DC-008
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:41 UTC — Executor failed: DC-002
+**Category:** operational
+**Task:** DC-002
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:41 UTC — Executor failed: DC-003
+**Category:** operational
+**Task:** DC-003
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:41 UTC — Executor failed: DC-004
+**Category:** operational
+**Task:** DC-004
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:41 UTC — Executor failed: DC-008
+**Category:** operational
+**Task:** DC-008
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:41 UTC — Executor failed: DC-002
+**Category:** operational
+**Task:** DC-002
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:41 UTC — Executor failed: DC-003
+**Category:** operational
+**Task:** DC-003
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:41 UTC — Executor failed: DC-004
+**Category:** operational
+**Task:** DC-004
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:41 UTC — Executor failed: DC-008
+**Category:** operational
+**Task:** DC-008
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
