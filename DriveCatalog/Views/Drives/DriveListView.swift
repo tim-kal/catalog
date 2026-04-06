@@ -1391,6 +1391,16 @@ struct DriveListView: View {
     @State private var driveQuickChecks: [String: DriveCheckInfo] = [:]
     /// Whether the activity log disclosure is expanded.
     @State private var showActivityLog = false
+    /// Ambiguous recognition — shown when a mounted volume matches multiple registered drives.
+    @State private var ambiguousMatch: AmbiguousMatchInfo?
+    /// Weak recognition warning banner text.
+    @State private var weakMatchBanner: String?
+
+    private struct AmbiguousMatchInfo: Identifiable {
+        let id = UUID()
+        let mountPath: String
+        let candidates: [DriveResponse]
+    }
 
     private struct QuickCheckMessage: Identifiable {
         let id = UUID()

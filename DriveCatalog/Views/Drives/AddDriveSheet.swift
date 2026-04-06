@@ -5,6 +5,8 @@ private struct MountedVolume: Identifiable {
     let name: String
     let path: String
     let totalBytes: Int64
+    /// Name of the registered drive this volume was recognized as, if any.
+    var recognizedAs: String?
     var id: String { path }
 }
 
@@ -12,7 +14,6 @@ private struct MountedVolume: Identifiable {
 /// Discovers mounted volumes and lets the user pick one.
 struct AddDriveSheet: View {
     @State private var volumes: [MountedVolume] = []
-    @State private var registeredPaths: Set<String> = []
     @State private var selectedVolume: MountedVolume?
     @State private var customName: String = ""
     @State private var isSubmitting = false
@@ -138,9 +139,9 @@ struct AddDriveSheet: View {
         }
     }
 
-    /// Volumes not yet registered.
+    /// Volumes not yet registered (recognized by cascade, not just path comparison).
     private var availableVolumes: [MountedVolume] {
-        volumes.filter { !registeredPaths.contains($0.path) }
+        volumes.filter { $0.recognizedAs == nil }
     }
 
     // MARK: - Data Loading
@@ -179,13 +180,16 @@ struct AddDriveSheet: View {
             }
         }
 
-        volumes = discovered
-
-        // 2. Fetch already-registered drives to grey them out
-        if let response = try? await APIService.shared.fetchDrives() {
-            registeredPaths = Set(response.drives.map(\.mountPath))
+        // 2. Recognize each volume using cascade endpoint to filter already-registered
+        for i in discovered.indices {
+            if let response = try? await APIService.shared.recognizeDrive(mountPath: discovered[i].path),
+               (response.status == "recognized" || response.status == "weak_match"),
+               let driveName = response.drive?.name {
+                discovered[i].recognizedAs = driveName
+            }
         }
 
+        volumes = discovered
         isLoading = false
     }
 

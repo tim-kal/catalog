@@ -176,3 +176,9 @@ Auto-captured system issues. Review periodically and close resolved items.
 **Impact:** Task not completed (324s spent)
 **Root cause:** Session crashed: Separator is found, but chunk is longer than limit
 
+## 2026-04-06 14:18 UTC — Executor failed: DC-008
+**Category:** operational
+**Task:** DC-008
+**Impact:** Task not completed (216s spent)
+**Root cause:** Session crashed: Separator is found, but chunk is longer than limit
+
