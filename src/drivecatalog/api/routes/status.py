@@ -1,6 +1,6 @@
 """Status endpoint for DriveCatalog API."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Query
 
 from drivecatalog.database import get_connection, get_db_path
 
@@ -47,3 +47,33 @@ async def get_status() -> dict:
         }
     finally:
         conn.close()
+
+
+@router.post("/reset-all")
+async def reset_all_data(
+    confirm: bool = Query(False, description="Must be true to confirm reset"),
+) -> dict:
+    """Delete ALL data: drives, files, hashes, operations, everything.
+
+    The database file is deleted and recreated with a fresh schema.
+    This is irreversible.
+    """
+    if not confirm:
+        raise HTTPException(400, "Reset requires confirmation. Add ?confirm=true.")
+
+    import os
+
+    from drivecatalog.database import init_db
+
+    db_path = get_db_path()
+
+    # Close any open connections by deleting the DB files
+    for suffix in ("", "-wal", "-shm"):
+        p = str(db_path) + suffix
+        if os.path.exists(p):
+            os.remove(p)
+
+    # Recreate fresh DB
+    init_db()
+
+    return {"status": "reset_complete", "message": "All data deleted. Database recreated."}

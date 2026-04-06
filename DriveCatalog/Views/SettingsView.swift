@@ -14,6 +14,9 @@ struct SettingsView: View {
     @State private var healthError: String?
     @State private var errorEntries: [ErrorLogEntry] = []
     @State private var isLoadingErrors = false
+    @State private var showResetConfirm = false
+    @State private var isResetting = false
+    @State private var resetComplete = false
 
     var body: some View {
         Form {
@@ -303,6 +306,32 @@ struct SettingsView: View {
                 }
             }
 
+            // Danger Zone
+            Section("Danger Zone") {
+                if resetComplete {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("All data deleted. Restart the app to begin fresh.")
+                            .font(.caption)
+                    }
+                } else {
+                    Button(role: .destructive) {
+                        showResetConfirm = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "trash.fill")
+                            Text("Reset All Data")
+                        }
+                    }
+                    .disabled(isResetting)
+
+                    Text("Deletes all registered drives, scanned files, hashes, and operations. You will need to rescan everything. This cannot be undone.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             // Bug Report
             Section("Feedback") {
                 Button {
@@ -316,6 +345,14 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .sheet(isPresented: $showBugReport) {
             BugReportView()
+        }
+        .alert("Reset All Data?", isPresented: $showResetConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete Everything", role: .destructive) {
+                Task { await performReset() }
+            }
+        } message: {
+            Text("This will permanently delete all registered drives, scanned files, hashes, and operations. You will need to rescan all drives from scratch.\n\nThis cannot be undone.")
         }
         .task(id: backend.isRunning) {
             if backend.isRunning {
@@ -346,6 +383,23 @@ struct SettingsView: View {
         }
         isLoadingHealth = false
         await loadErrors()
+    }
+
+    private func performReset() async {
+        isResetting = true
+        do {
+            let url = URL(string: "\(APIService.baseURL)/reset-all?confirm=true")!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
+                resetComplete = true
+                healthStatus = nil
+            }
+        } catch {
+            healthError = "Reset failed: \(error.localizedDescription)"
+        }
+        isResetting = false
     }
 
     private func loadErrors() async {
