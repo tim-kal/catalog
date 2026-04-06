@@ -53,6 +53,9 @@ final class UpdateService: ObservableObject {
     // MARK: - Check for Updates
 
     func checkForUpdates() async {
+        #if DEBUG
+        return  // Never check for updates in debug builds
+        #endif
         guard let url = URL(string: Self.manifestURL) else { return }
 
         do {
