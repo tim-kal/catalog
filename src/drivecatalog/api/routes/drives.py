@@ -154,19 +154,58 @@ async def create_drive(request: DriveCreateRequest) -> DriveResponse:
 
 
 @router.patch("/{name}/rename")
-async def rename_drive(name: str, new_name: str = Query(..., description="New drive name")) -> dict:
-    """Rename a drive in the catalog."""
+async def rename_drive(
+    name: str,
+    new_name: str = Query(..., description="New drive name"),
+    rename_volume: bool = Query(False, description="Also rename the macOS volume in Finder"),
+) -> dict:
+    """Rename a drive in the catalog, optionally also on macOS."""
     conn = get_connection()
     try:
-        drive = conn.execute("SELECT id FROM drives WHERE name = ?", (name,)).fetchone()
+        drive = conn.execute("SELECT id, mount_path FROM drives WHERE name = ?", (name,)).fetchone()
         if not drive:
             raise HTTPException(404, f"Drive '{name}' not found")
         existing = conn.execute("SELECT id FROM drives WHERE name = ?", (new_name,)).fetchone()
         if existing:
             raise HTTPException(409, f"A drive named '{new_name}' already exists")
+
+        # Rename in DB
         conn.execute("UPDATE drives SET name = ? WHERE id = ?", (new_name, drive["id"]))
         conn.commit()
-        return {"old_name": name, "new_name": new_name}
+
+        # Optionally rename the macOS volume
+        volume_renamed = False
+        volume_error = None
+        if rename_volume and drive["mount_path"] and Path(drive["mount_path"]).exists():
+            import subprocess
+            try:
+                result = subprocess.run(
+                    ["diskutil", "rename", drive["mount_path"], new_name],
+                    capture_output=True, text=True, timeout=10,
+                )
+                if result.returncode == 0:
+                    volume_renamed = True
+                    # Update mount_path to new /Volumes/new_name
+                    new_mount = f"/Volumes/{new_name}"
+                    if Path(new_mount).exists():
+                        conn.execute(
+                            "UPDATE drives SET mount_path = ? WHERE id = ?",
+                            (new_mount, drive["id"]),
+                        )
+                        conn.commit()
+                else:
+                    volume_error = result.stderr.strip() or "diskutil rename failed"
+            except subprocess.TimeoutExpired:
+                volume_error = "diskutil rename timed out"
+            except OSError as e:
+                volume_error = str(e)
+
+        return {
+            "old_name": name,
+            "new_name": new_name,
+            "volume_renamed": volume_renamed,
+            "volume_error": volume_error,
+        }
     finally:
         conn.close()
 

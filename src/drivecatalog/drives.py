@@ -269,11 +269,15 @@ def _update_drive_identifiers(
     mount_path: Path,
     ids: DriveIdentifiers,
 ) -> None:
-    """Update a drive's identifiers and mount info to latest values."""
+    """Update a drive's identifiers and mount info to latest values.
+
+    NEVER overwrites the user-assigned drive name — only updates mount_path,
+    total_bytes, and identifier columns.
+    """
     total_bytes = get_drive_size(mount_path)
     conn.execute(
         """UPDATE drives SET
-            name = ?, mount_path = ?, total_bytes = ?,
+            mount_path = ?, total_bytes = ?,
             uuid = COALESCE(?, uuid),
             disk_uuid = COALESCE(?, disk_uuid),
             device_serial = COALESCE(?, device_serial),
@@ -281,7 +285,6 @@ def _update_drive_identifiers(
             fs_fingerprint = COALESCE(?, fs_fingerprint)
         WHERE id = ?""",
         (
-            mount_path.name,
             str(mount_path),
             total_bytes,
             ids.volume_uuid,
@@ -329,7 +332,7 @@ def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionRe
             drive = dict(row)
             _update_drive_identifiers(conn, drive["id"], mount_path, ids)
             drive["mount_path"] = str(mount_path)
-            drive["name"] = mount_path.name
+            # Keep user-assigned name — don't overwrite with Finder volume name
             return RecognitionResult(drive=drive, confidence="certain")
 
     # 2. DiskUUID match
@@ -341,7 +344,7 @@ def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionRe
             drive = dict(row)
             _update_drive_identifiers(conn, drive["id"], mount_path, ids)
             drive["mount_path"] = str(mount_path)
-            drive["name"] = mount_path.name
+            # Keep user-assigned name — don't overwrite with Finder volume name
             return RecognitionResult(drive=drive, confidence="certain")
 
     # 3. Device Serial + Partition Index
@@ -354,7 +357,7 @@ def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionRe
             drive = dict(row)
             _update_drive_identifiers(conn, drive["id"], mount_path, ids)
             drive["mount_path"] = str(mount_path)
-            drive["name"] = mount_path.name
+            # Keep user-assigned name — don't overwrite with Finder volume name
             return RecognitionResult(drive=drive, confidence="certain")
 
     # 4/5. FS Fingerprint match
@@ -363,19 +366,28 @@ def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionRe
             f"SELECT {cols} FROM drives WHERE fs_fingerprint = ?",
             (ids.fs_fingerprint,),
         ).fetchall()
-        if len(rows) == 1:
-            drive = dict(rows[0])
+
+        # Filter out candidates whose mount_path is currently mounted (= different physical drive)
+        candidates_not_mounted = [
+            r for r in rows
+            if not r["mount_path"] or not Path(r["mount_path"]).exists()
+            or str(mount_path) == r["mount_path"]
+        ]
+
+        if len(candidates_not_mounted) == 1:
+            drive = dict(candidates_not_mounted[0])
             _update_drive_identifiers(conn, drive["id"], mount_path, ids)
             drive["mount_path"] = str(mount_path)
-            drive["name"] = mount_path.name
             logger.warning(
                 "Drive '%s' recognized by FS fingerprint only (probable match)",
                 mount_path.name,
             )
             return RecognitionResult(drive=drive, confidence="probable")
-        if len(rows) > 1:
+
+        # Multiple candidates or all currently mounted → ambiguous, ask user
+        if rows:
             from drivecatalog.errors import log_error
-            log_error("DC-E008", {"mount_path": str(mount_path), "candidate_count": len(rows)})
+            log_error("DC-E010", {"mount_path": str(mount_path), "candidate_count": len(rows)})
             candidates = [dict(r) for r in rows]
             return RecognitionResult(
                 drive=None, confidence="ambiguous", candidates=candidates
