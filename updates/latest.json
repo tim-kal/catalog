@@ -1,7 +1,7 @@
 {
-  "version": "1.2.0",
-  "build": 1,
-  "url": "https://github.com/tim-kal/DriveCatalog/releases/download/v1.2.0/DriveCatalog.zip",
-  "notes": "Initial release with drive cataloging, backup analysis, and insights.",
-  "min_os": "13.0"
+  "version": "1.3.0",
+  "build": 3,
+  "url": "https://github.com/tim-kal/catalog/releases/download/v1.3.0/DriveCatalog.zip",
+  "notes": "Folder duplicates, catalog protection, manage page, robust drive recognition, parallel scanning, migration safety.",
+  "min_os": "14.0"
 }
