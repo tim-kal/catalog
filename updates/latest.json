@@ -1,7 +1,7 @@
 {
-  "version": "1.3.7",
-  "build": 13,
-  "url": "https://github.com/tim-kal/catalog/releases/download/v1.3.7/DriveCatalog.zip",
-  "notes": "Correct disk capacity and usage when drive is disconnected. Unique drive names. Faster polling. Error logging.",
+  "version": "1.3.8",
+  "build": 14,
+  "url": "https://github.com/tim-kal/catalog/releases/download/v1.3.8/DriveCatalog.zip",
+  "notes": "Fixed: disk capacity and usage now correct when drive is disconnected.",
   "min_os": "14.0"
 }
