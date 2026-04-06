@@ -12,11 +12,24 @@ private struct DiskSpace {
     }
 
     static func read(path: String) -> DiskSpace? {
+        // Verify this is a real mounted volume, not a phantom directory
+        // After unmount, macOS can leave an empty dir that returns boot disk values
+        guard isRealMount(path) else { return nil }
         guard let attrs = try? FileManager.default.attributesOfFileSystem(forPath: path),
               let total = attrs[.systemSize] as? Int64,
               let free = attrs[.systemFreeSize] as? Int64
         else { return nil }
         return DiskSpace(totalBytes: total, freeBytes: free)
+    }
+
+    /// Check if path is a real mount point by comparing device IDs.
+    /// A phantom leftover directory has the same device as /Volumes (root FS).
+    private static func isRealMount(_ path: String) -> Bool {
+        var pathStat = stat()
+        var volumesStat = stat()
+        guard lstat(path, &pathStat) == 0,
+              lstat("/Volumes", &volumesStat) == 0 else { return false }
+        return pathStat.st_dev != volumesStat.st_dev
     }
 }
 

@@ -129,6 +129,25 @@ def _get_device_serial_from_ioreg(disk_name: str) -> str | None:
     return None
 
 
+def is_real_mount(path: str | Path) -> bool:
+    """Check if a path is a real mounted volume, not a phantom leftover directory.
+
+    After unmount, macOS can briefly leave an empty directory at the mount point.
+    statvfs on such a phantom directory returns the ROOT filesystem values (boot disk),
+    which would corrupt our stored drive data. This check uses st_dev to verify
+    the path is on a different device than /Volumes itself.
+    """
+    path_str = str(path)
+    if not os.path.exists(path_str):
+        return False
+    try:
+        stat_path = os.stat(path_str)
+        stat_volumes = os.stat("/Volumes")
+        return stat_path.st_dev != stat_volumes.st_dev
+    except OSError:
+        return False
+
+
 def get_drive_uuid(path: Path) -> str | None:
     """Get the VolumeUUID for a mounted volume.
 
@@ -310,18 +329,22 @@ def _update_drive_identifiers(
     NEVER overwrites the user-assigned drive name — only updates mount_path,
     total_bytes, used_bytes, and identifier columns.
     """
-    total_bytes = get_drive_size(mount_path)
-    # Persist disk usage so it's available when drive is disconnected
-    try:
-        stat = os.statvfs(mount_path)
-        free = stat.f_frsize * stat.f_bavail
-        used_bytes = total_bytes - free
-    except OSError:
+    # Only read live disk stats if the mount is real (not a phantom directory)
+    if is_real_mount(mount_path):
+        total_bytes = get_drive_size(mount_path)
+        try:
+            stat = os.statvfs(mount_path)
+            free = stat.f_frsize * stat.f_bavail
+            used_bytes = total_bytes - free
+        except OSError:
+            used_bytes = None
+    else:
+        total_bytes = None
         used_bytes = None
 
     conn.execute(
         """UPDATE drives SET
-            mount_path = ?, total_bytes = ?, used_bytes = COALESCE(?, used_bytes),
+            mount_path = ?, total_bytes = COALESCE(?, total_bytes), used_bytes = COALESCE(?, used_bytes),
             uuid = COALESCE(?, uuid),
             disk_uuid = COALESCE(?, disk_uuid),
             device_serial = COALESCE(?, device_serial),

@@ -13,6 +13,7 @@ from drivecatalog.drives import (
     collect_drive_identifiers,
     get_drive_info,
     get_smart_status,
+    is_real_mount,
     recognize_drive,
     validate_mount_path,
 )
@@ -65,7 +66,7 @@ async def list_drives() -> DriveListResponse:
 
             # For mounted drives: read live disk usage and persist to DB
             mp = row["mount_path"]
-            if mp and Path(mp).exists():
+            if mp and is_real_mount(mp):
                 try:
                     stat = os.statvfs(mp)
                     total = stat.f_frsize * stat.f_blocks
@@ -513,7 +514,7 @@ async def get_drive_status(name: str) -> DriveStatusResponse:
         mount_path = drive["mount_path"]
 
         # Check if drive is mounted (mount_path exists)
-        mounted = Path(mount_path).exists() if mount_path else False
+        mounted = is_real_mount(mount_path) if mount_path else False
 
         # Get file statistics with media type breakdown by extension
         stats = conn.execute(
@@ -811,7 +812,7 @@ async def trigger_scan(name: str, background_tasks: BackgroundTasks) -> dict:
             raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
 
         mount_path = drive["mount_path"]
-        if not mount_path or not Path(mount_path).exists():
+        if not mount_path or not is_real_mount(mount_path):
             raise HTTPException(
                 status_code=400, detail=f"Drive '{name}' is not currently mounted"
             )
@@ -966,7 +967,7 @@ async def auto_scan_drive(name: str, background_tasks: BackgroundTasks) -> dict:
             raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
 
         mount_path = drive["mount_path"]
-        if not mount_path or not Path(mount_path).exists():
+        if not mount_path or not is_real_mount(mount_path):
             raise HTTPException(
                 status_code=400, detail=f"Drive '{name}' is not currently mounted"
             )
@@ -1096,7 +1097,7 @@ async def trigger_hash(
             raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
 
         mount_path = drive["mount_path"]
-        if not mount_path or not Path(mount_path).exists():
+        if not mount_path or not is_real_mount(mount_path):
             raise HTTPException(
                 status_code=400, detail=f"Drive '{name}' is not currently mounted"
             )
@@ -1242,7 +1243,7 @@ async def trigger_media_extraction(
             raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
 
         mount_path = drive["mount_path"]
-        if not mount_path or not Path(mount_path).exists():
+        if not mount_path or not is_real_mount(mount_path):
             raise HTTPException(
                 status_code=400, detail=f"Drive '{name}' is not currently mounted"
             )
@@ -1389,7 +1390,7 @@ async def trigger_verify(
             raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
 
         mount_path = drive["mount_path"]
-        if not mount_path or not Path(mount_path).exists():
+        if not mount_path or not is_real_mount(mount_path):
             raise HTTPException(
                 status_code=400, detail=f"Drive '{name}' is not currently mounted"
             )
@@ -1502,7 +1503,7 @@ async def trigger_verify_integrity(
             raise HTTPException(status_code=404, detail=f"Drive '{name}' not found")
 
         mount_path = drive["mount_path"]
-        if not mount_path or not Path(mount_path).exists():
+        if not mount_path or not is_real_mount(mount_path):
             raise HTTPException(
                 status_code=400, detail=f"Drive '{name}' is not currently mounted"
             )
