@@ -126,9 +126,14 @@ final class UpdateService: ObservableObject {
 
             downloadProgress = 1.0
 
-            // 5. Quit the app — the script handles the rest
+            // 5. Stop backend, then force quit — the script handles the rest
+            BackendService.shared.stop()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // Use exit() as fallback if terminate is blocked by sheets/dialogs
                 NSApplication.shared.terminate(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    exit(0)
+                }
             }
         } catch {
             updateError = "Update failed: \(error.localizedDescription)"
@@ -140,13 +145,20 @@ final class UpdateService: ObservableObject {
     // MARK: - Self-Replacement Script
 
     private func launchReplacer(newApp: String, oldApp: String) throws {
+        let pid = ProcessInfo.processInfo.processIdentifier
         let script = """
         #!/bin/bash
-        # Wait for the old app to quit
-        sleep 2
-        # Replace old app with new
+        # Wait for the old app to fully quit (poll by PID, max 30s)
+        for i in $(seq 1 60); do
+            if ! kill -0 \(pid) 2>/dev/null; then
+                break
+            fi
+            sleep 0.5
+        done
+        # Replace old app with new (use cp+rm instead of mv for cross-volume safety)
         rm -rf "\(oldApp)"
-        mv "\(newApp)" "\(oldApp)"
+        cp -R "\(newApp)" "\(oldApp)"
+        rm -rf "\(newApp)"
         # Remove quarantine attribute
         xattr -cr "\(oldApp)" 2>/dev/null
         # Relaunch
@@ -156,12 +168,19 @@ final class UpdateService: ObservableObject {
         """
 
         let scriptPath = FileManager.default.temporaryDirectory
-            .appendingPathComponent("drivecatalog_update.sh")
+            .appendingPathComponent("drivecatalog_update_\(UUID().uuidString).sh")
         try script.write(to: scriptPath, atomically: true, encoding: .utf8)
+
+        // Make executable
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: scriptPath.path
+        )
 
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/bin/bash")
         proc.arguments = [scriptPath.path]
+        proc.standardOutput = FileHandle.nullDevice
+        proc.standardError = FileHandle.nullDevice
         try proc.run()
     }
 
