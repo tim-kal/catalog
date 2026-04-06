@@ -213,7 +213,46 @@ CREATE INDEX IF NOT EXISTS idx_migration_files_plan_id ON migration_files(plan_i
 CREATE INDEX IF NOT EXISTS idx_migration_files_status ON migration_files(plan_id, status);
 """,
     ),
+    # ------------------------------------------------------------------
+    # Version 4 — catalog_bundle flag on files
+    # Marks files inside macOS bundles (.cocatalog, .photoslibrary, .RDC)
+    # as catalog-protected so duplicate detection can warn before deletion.
+    # requires_rescan=True because existing file rows need the flag set
+    # based on their path; the data_migration handles this in-place.
+    # ------------------------------------------------------------------
+    Migration(
+        version=4,
+        description="Add catalog_bundle column to files table",
+        requires_rescan=True,
+        sql="""\
+ALTER TABLE files ADD COLUMN catalog_bundle INTEGER DEFAULT 0;
+""",
+        data_migration=lambda conn: _migrate_catalog_bundle_flags(conn),
+    ),
 ]
+
+
+def _migrate_catalog_bundle_flags(conn: sqlite3.Connection) -> None:
+    """Set catalog_bundle=1 for existing files inside bundle directories."""
+    from drivecatalog.scanner import is_catalog_bundle_member
+
+    rows = conn.execute("SELECT id, path FROM files").fetchall()
+    bundle_ids: list[int] = []
+    for row in rows:
+        fid = row[0]
+        fpath = row[1]
+        if is_catalog_bundle_member(fpath):
+            bundle_ids.append(fid)
+
+    if bundle_ids:
+        for i in range(0, len(bundle_ids), 500):
+            chunk = bundle_ids[i : i + 500]
+            placeholders = ",".join("?" for _ in chunk)
+            conn.execute(
+                f"UPDATE files SET catalog_bundle = 1 WHERE id IN ({placeholders})",
+                chunk,
+            )
+        conn.commit()
 
 
 # ---------------------------------------------------------------------------

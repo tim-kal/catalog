@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS files (
     partial_hash TEXT,
     full_hash TEXT,
     is_media INTEGER DEFAULT 0,
+    catalog_bundle INTEGER DEFAULT 0,
     first_seen TEXT NOT NULL DEFAULT (datetime('now')),
     last_verified TEXT,
     UNIQUE(drive_id, path)

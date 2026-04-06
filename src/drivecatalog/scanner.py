@@ -19,6 +19,28 @@ SKIP_DIRECTORIES = {
     ".DocumentRevisions-V100",
 }
 
+# macOS bundle extensions whose internal files are catalog-protected.
+# Files inside these bundles should not be treated as regular duplicates
+# because deleting them would corrupt the containing library/catalog.
+CATALOG_BUNDLE_EXTENSIONS = {".cocatalog", ".photoslibrary", ".RDC"}
+
+
+def is_catalog_bundle_member(rel_path: str) -> bool:
+    """Check if a file path is inside a catalog bundle directory.
+
+    Examines each path component to see if it ends with a known bundle
+    extension (case-insensitive for the extension check).
+    """
+    parts = rel_path.split("/")
+    # Check all parent components (not the file itself)
+    for part in parts[:-1]:
+        dot = part.rfind(".")
+        if dot >= 0:
+            ext = part[dot:].lower()
+            if ext in {e.lower() for e in CATALOG_BUNDLE_EXTENSIONS}:
+                return True
+    return False
+
 
 @dataclass
 class ScanResult:
@@ -80,6 +102,8 @@ def _process_directory_files(
             mtime = datetime.fromtimestamp(stat_info.st_mtime).isoformat()
             rel_path = str(file_path.relative_to(mount_path_obj))
 
+            bundle_flag = 1 if is_catalog_bundle_member(rel_path) else 0
+
             existing = conn.execute(
                 "SELECT id, size_bytes, mtime FROM files WHERE drive_id = ? AND path = ?",
                 (drive_id, rel_path),
@@ -87,9 +111,9 @@ def _process_directory_files(
 
             if existing is None:
                 conn.execute(
-                    "INSERT INTO files (drive_id, path, filename, size_bytes, mtime) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    (drive_id, rel_path, filename, size_bytes, mtime),
+                    "INSERT INTO files (drive_id, path, filename, size_bytes, mtime, catalog_bundle) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (drive_id, rel_path, filename, size_bytes, mtime, bundle_flag),
                 )
                 result.new_files += 1
             elif existing["size_bytes"] != size_bytes or existing["mtime"] != mtime:
@@ -380,6 +404,7 @@ def smart_scan_drive(
                     mtime = datetime.fromtimestamp(stat_info.st_mtime).isoformat()
                     rel_path = str(Path(entry.path).relative_to(mount_path_obj))
                     seen_paths.add(rel_path)
+                    bundle_flag = 1 if is_catalog_bundle_member(rel_path) else 0
 
                     existing = conn.execute(
                         "SELECT id, size_bytes, mtime FROM files "
@@ -389,9 +414,9 @@ def smart_scan_drive(
 
                     if existing is None:
                         conn.execute(
-                            "INSERT INTO files (drive_id, path, filename, size_bytes, mtime) "
-                            "VALUES (?, ?, ?, ?, ?)",
-                            (drive_id, rel_path, entry.name, size_bytes, mtime),
+                            "INSERT INTO files (drive_id, path, filename, size_bytes, mtime, catalog_bundle) "
+                            "VALUES (?, ?, ?, ?, ?, ?)",
+                            (drive_id, rel_path, entry.name, size_bytes, mtime, bundle_flag),
                         )
                         result.new_files += 1
                     elif existing["size_bytes"] != size_bytes or existing["mtime"] != mtime:

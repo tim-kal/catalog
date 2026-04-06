@@ -310,7 +310,8 @@ def get_directory_file_groups(
         # Get all locations for this hash across all drives
         loc_rows = conn.execute(
             """
-            SELECT d.name as drive_name, f.path, f.id as file_id
+            SELECT d.name as drive_name, f.path, f.id as file_id,
+                   f.catalog_bundle
             FROM files f
             JOIN drives d ON f.drive_id = d.id
             WHERE f.partial_hash = ?
@@ -327,6 +328,7 @@ def get_directory_file_groups(
         drive_count = len({r["drive_name"] for r in loc_rows})
         total_copies = len(loc_rows)
         same_drive_extras = total_copies - drive_count
+        has_bundle = any(r["catalog_bundle"] for r in loc_rows)
 
         if drive_count == 1:
             status = "same_drive_duplicate" if same_drive_extras > 0 else "unprotected"
@@ -355,6 +357,7 @@ def get_directory_file_groups(
             "status": status,
             "same_drive_extras": same_drive_extras,
             "reclaimable_bytes": reclaimable_copies * size_bytes,
+            "catalog_bundle_warning": has_bundle,
             "locations": [
                 {"drive_name": r["drive_name"], "path": r["path"], "file_id": r["file_id"]}
                 for r in loc_rows
@@ -437,7 +440,8 @@ def get_file_groups(
 
         # Get all file locations
         files_query = """
-            SELECT d.name as drive_name, f.path, f.id as file_id
+            SELECT d.name as drive_name, f.path, f.id as file_id,
+                   f.catalog_bundle
             FROM files f
             JOIN drives d ON f.drive_id = d.id
             WHERE f.partial_hash = ?
@@ -457,6 +461,8 @@ def get_file_groups(
             name = path.rsplit("/", 1)[-1] if "/" in path else path
             basenames[name] = basenames.get(name, 0) + 1
         filename = max(basenames, key=basenames.get) if basenames else "unknown"
+
+        has_bundle_member = any(r["catalog_bundle"] for r in file_rows)
 
         locations = [
             {"drive_name": r[0], "path": r[1], "file_id": r[2]}
@@ -479,6 +485,7 @@ def get_file_groups(
             "status": file_status,
             "same_drive_extras": same_drive_extras,
             "reclaimable_bytes": reclaimable_bytes,
+            "catalog_bundle_warning": has_bundle_member,
             "locations": locations,
         })
 

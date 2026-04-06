@@ -60,6 +60,7 @@ async def list_file_groups(
                 status=g["status"],
                 same_drive_extras=g["same_drive_extras"],
                 reclaimable_bytes=g["reclaimable_bytes"],
+                catalog_bundle_warning=g.get("catalog_bundle_warning", False),
                 locations=[
                     FileLocation(
                         drive_name=loc["drive_name"],
@@ -153,6 +154,7 @@ async def get_directory_files(
                 status=g["status"],
                 same_drive_extras=g["same_drive_extras"],
                 reclaimable_bytes=g["reclaimable_bytes"],
+                catalog_bundle_warning=g.get("catalog_bundle_warning", False),
                 locations=[
                     FileLocation(
                         drive_name=loc["drive_name"],

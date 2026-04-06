@@ -53,6 +53,7 @@ class FileGroup(BaseModel):
     status: str  # unprotected, same_drive_duplicate, backed_up, over_backed_up
     same_drive_extras: int
     reclaimable_bytes: int
+    catalog_bundle_warning: bool = False
     locations: list[FileLocation]
 
 
