@@ -343,12 +343,16 @@ struct BrowserView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
+            GeometryReader { geo in
             ScrollViewReader { scrollProxy in
                 ScrollView(.horizontal, showsIndicators: true) {
                     HStack(alignment: .top, spacing: 0) {
                         ForEach(Array(columns.enumerated()), id: \.element.id) { index, col in
+                            let columnWidth: CGFloat = columns.count == 1
+                                ? max(geo.size.width, 300)
+                                : max(300, min(geo.size.width / CGFloat(columns.count), 500))
                             columnView(col: col, index: index)
-                                .frame(minWidth: 260, idealWidth: 300, maxWidth: 400)
+                                .frame(width: columnWidth)
                                 .id(col.id)
 
                             if index < columns.count - 1 {
@@ -372,6 +376,7 @@ struct BrowserView: View {
                 .onKeyPress(.rightArrow) { navigateKeyboard(.right) }
                 .onKeyPress(.return) { navigateKeyboard(.activate) }
             }
+            } // GeometryReader
         }
     }
 
