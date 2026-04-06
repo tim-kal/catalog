@@ -119,6 +119,19 @@ async def create_drive(request: DriveCreateRequest) -> DriveResponse:
                 detail=f"Drive matches multiple registered drives: {names}. Resolve ambiguity first.",
             )
 
+        # De-duplicate drive name if it already exists
+        existing_name = conn.execute(
+            "SELECT id FROM drives WHERE name = ?", (drive_name,)
+        ).fetchone()
+        if existing_name:
+            suffix = 2
+            while True:
+                candidate = f"{drive_name} ({suffix})"
+                if not conn.execute("SELECT id FROM drives WHERE name = ?", (candidate,)).fetchone():
+                    drive_name = candidate
+                    break
+                suffix += 1
+
         # Insert new drive with all identifiers
         cursor = conn.execute(
             """

@@ -310,7 +310,10 @@ struct ReclaimSheet: View {
             for drive in response.drives {
                 driveMap[drive.name] = drive
             }
-        } catch {}
+        } catch {
+            // Show error state so user knows load failed
+            isLoading = false
+        }
         await checkAll()
         isLoading = false
 

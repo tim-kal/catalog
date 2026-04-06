@@ -35,6 +35,7 @@
 		7282414F5C6512B19DE9BE8C /* BetaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0AA797D544808B9A8E91152 /* BetaService.swift */; };
 		76C5E36B4948299BB3CAAB1A /* AllDrivesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 715ED35AD9E04AF3F8E71FF3 /* AllDrivesView.swift */; };
 		7AA633608CEEAC7351D945A3 /* ActionDrillDownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73AEF1B7CB3577F2BF8212A3 /* ActionDrillDownView.swift */; };
+		7EEF44666E150AA35CBEF52B /* ErrorLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43CB47F2DC2AFFCDA1AAC342 /* ErrorLog.swift */; };
 		827F45F4C95261134FB07638 /* Migration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E84AFC19B9798C3BDCDE711 /* Migration.swift */; };
 		86FC264B2FA1C6D1570EEC89 /* NavigationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 716EA4D4C6A507FB8A1815BF /* NavigationModel.swift */; };
 		9F13F7AD1A3B80C7CD58012A /* BetaRegistrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D7A708F8E0492021648297 /* BetaRegistrationView.swift */; };
@@ -69,6 +70,7 @@
 		2C2FAB16A6DFF446D013F8EB /* LicenseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseManager.swift; sourceTree = "<group>"; };
 		34CD7C828F85F5274150FA43 /* FileRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileRow.swift; sourceTree = "<group>"; };
 		3A992EDEB4EBB4554F6F9A84 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
+		43CB47F2DC2AFFCDA1AAC342 /* ErrorLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorLog.swift; sourceTree = "<group>"; };
 		487489378D0D49107F0A3F8B /* DriveCatalog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DriveCatalog.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F11E360580CED5CA06E3BCA /* CopySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopySheet.swift; sourceTree = "<group>"; };
 		535E7449AD1F81C6D8A30D5F /* DriveCatalog.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = DriveCatalog.entitlements; sourceTree = "<group>"; };
@@ -132,6 +134,7 @@
 				B85B7F678706652476162A8C /* Browse.swift */,
 				9861214D20644A219E9E8DF0 /* Consolidation.swift */,
 				CE3F74C98E8A8E2268777050 /* Drive.swift */,
+				43CB47F2DC2AFFCDA1AAC342 /* ErrorLog.swift */,
 				82AE5130560ED479C235C231 /* File.swift */,
 				60792623178546FB19AA234A /* FolderDuplicate.swift */,
 				D43AD698E7FB792AFBE3428A /* Insights.swift */,
@@ -274,11 +277,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-					C98C566942194227AAB63EF0 = {
-						ProvisioningStyle = Automatic;
-					};
-				};
 			};
 			buildConfigurationList = 4C0AA73EE2AFAA473E5FA633 /* Build configuration list for PBXProject "DriveCatalog" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -379,6 +377,7 @@
 				0262C06BDA67DBB12B96F891 /* DuplicateClusterRow.swift in Sources */,
 				4499E298FF1AF85398897603 /* DuplicateStatsHeader.swift in Sources */,
 				A9C67C3364B99B2134DB3666 /* DuplicatesView.swift in Sources */,
+				7EEF44666E150AA35CBEF52B /* ErrorLog.swift in Sources */,
 				DFF3E38475A73F6A26F5FCB7 /* File.swift in Sources */,
 				F829D4F81E0899D6AD8C9B87 /* FileDetailSheet.swift in Sources */,
 				C873AE995C5D62D9336BF844 /* FileRow.swift in Sources */,
@@ -455,7 +454,6 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -482,7 +480,7 @@
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.9;
+				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
@@ -519,7 +517,6 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -537,9 +534,10 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.9;
+				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};

@@ -265,11 +265,41 @@ ALTER TABLE drives ADD COLUMN fs_fingerprint TEXT;
 """,
         data_migration=lambda conn: _migrate_populate_drive_identifiers(conn),
     ),
+    # ------------------------------------------------------------------
+    # Version 7 — enforce unique drive names
+    # Renames any existing duplicates, then adds a UNIQUE index.
+    # ------------------------------------------------------------------
+    Migration(
+        version=7,
+        description="Enforce unique drive names",
+        requires_rescan=False,
+        sql="SELECT 1;",  # DDL handled in data_migration
+        data_migration=lambda conn: _migrate_unique_drive_names(conn),
+    ),
 ]
 
 # When adding a new migration, also update expectedSchemaVersion in
 # DriveCatalog/Services/BackendService.swift to match.
 SCHEMA_VERSION: int = len(MIGRATIONS)
+
+
+def _migrate_unique_drive_names(conn: sqlite3.Connection) -> None:
+    """Rename duplicate drive names by appending ' (2)', ' (3)' etc., then add UNIQUE index."""
+    dupes = conn.execute(
+        "SELECT name, COUNT(*) as cnt FROM drives GROUP BY name HAVING cnt > 1"
+    ).fetchall()
+    for row in dupes:
+        name = row[0]
+        ids = conn.execute(
+            "SELECT id FROM drives WHERE name = ? ORDER BY id", (name,)
+        ).fetchall()
+        # Keep the first one unchanged, rename the rest
+        for idx, id_row in enumerate(ids[1:], start=2):
+            new_name = f"{name} ({idx})"
+            conn.execute("UPDATE drives SET name = ? WHERE id = ?", (new_name, id_row[0]))
+            logger.info("Renamed duplicate drive id=%d: '%s' -> '%s'", id_row[0], name, new_name)
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_drives_name_unique ON drives(name)")
+    conn.commit()
 
 
 def _migrate_populate_drive_identifiers(conn: sqlite3.Connection) -> None:

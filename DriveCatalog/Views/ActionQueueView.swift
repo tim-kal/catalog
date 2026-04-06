@@ -399,7 +399,7 @@ struct ActionQueueView: View {
         pollTask?.cancel()
         pollTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
+                try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { break }
                 await verifyAndRefresh()
             }

@@ -2315,7 +2315,7 @@ struct DriveListView: View {
                 } catch {
                     // Silently continue polling
                 }
-                try? await Task.sleep(for: .seconds(2))
+                try? await Task.sleep(for: .seconds(1))
             }
         }
     }

@@ -1,5 +1,6 @@
 """Deterministic verification of scan, hash, and duplicate integrity."""
 
+import logging
 import os
 import random
 import sqlite3
@@ -10,6 +11,8 @@ from typing import Callable
 
 from .hasher import compute_partial_hash
 from .scanner import SKIP_DIRECTORIES
+
+logger = logging.getLogger(__name__)
 
 
 def _should_skip(name: str) -> bool:
@@ -137,8 +140,9 @@ def verify_drive(
                 stat = fpath.stat()
                 rel = str(fpath.relative_to(mount))
                 disk_files[rel] = stat.st_size
-            except (OSError, PermissionError):
-                pass
+            except (OSError, PermissionError) as e:
+                logger.warning("Verification skipped for %s: %s", fpath, e)
+                result.hash_read_errors += 1
 
     result.files_on_disk = len(disk_files)
 

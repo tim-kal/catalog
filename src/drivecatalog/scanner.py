@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 from collections.abc import Callable
@@ -9,6 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # System directories to skip during scanning
 SKIP_DIRECTORIES = {
@@ -135,7 +138,8 @@ def _process_directory_files(
             from drivecatalog.errors import log_error
             log_error("DC-E004", {"drive_id": drive_id, "file": str(file_path)})
             result.errors += 1
-        except OSError:
+        except OSError as e:
+            logger.warning("Scan error in %s: %s", dirpath, e)
             result.errors += 1
 
     return dir_file_count, dir_total_size
@@ -439,7 +443,8 @@ def smart_scan_drive(
                     from drivecatalog.errors import log_error
                     log_error("DC-E004", {"drive_id": drive_id, "file": entry.name})
                     result.errors += 1
-                except OSError:
+                except OSError as e:
+                    logger.warning("Scan error in %s: %s", entry.path, e)
                     result.errors += 1
 
             # Delete files from DB that are no longer in this directory
