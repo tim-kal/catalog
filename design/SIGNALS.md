@@ -1,4 +1,3 @@
-| 2026-04-06 13:17 UTC | DC-003 | review:changes_requested | Core structure solid (3 sections, sidebar, routing, graceful degradation), but Section 1 missing per-drive detail fields and drill-down, Section 2 missing per-drive duplicate breakdown. |
 | 2026-04-06 13:17 UTC | DC-008 | verified | verified |
 | 2026-04-06 13:18 UTC | DC-004 | review:changes_requested | DC-004 has zero implementation — none of 7 acceptance criteria are met; the only change is an unrelated issue log entry for DC-002. |
 | 2026-04-06 13:19 UTC | DC-005 | review:changes_requested | DC-005 was never implemented — executor self-reported "blocked" and produced no code; zero of 8 acceptance criteria are met. |
@@ -8,3 +7,4 @@
 | 2026-04-06 13:27 UTC | DC-005 | review:approved | All 8 acceptance criteria verifiably met — per-drive locking, 409 conflict, WAL busy_timeout, integration tests, and cancellation isolation implemented; frontend criteria confirmed pre-existing. |
 | 2026-04-06 15:30 UTC | DC-006 | verified | Implemented backend/ with Vercel serverless functions: POST /api/register, POST /api/heartbeat, POST /api/bug-report (creates GitHub Issues with structured body, labels, rate limiting 5/device/day, returns issue URL). |
 | 2026-04-06 13:30 UTC | DC-006 | verified | Implemented backend/ directory with Vercel serverless functions: POST /api/register, POST /api/heartbeat, POST /api/bug-report. Bug report endpoint creates GitHub Issues via REST API with structured body (description, app version, OS version, log snippet), labels bug-report and from-app, user email in body only, rate limiting (5 per device_id per day), and returns GitHub Issue URL. Updated SIGNALS.md. |
+| 2026-04-06 13:30 UTC | DC-008 | verified | verified |
