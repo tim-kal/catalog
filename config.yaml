@@ -1,0 +1,17 @@
+# Migrate Orchestrator Configuration
+# Project: DriveSnapshots
+
+project_name: DriveSnapshots
+migration_dir: ./DriveSnapshots
+provider:
+  name: claude-code
+  model: claude-opus-4-6
+  effort:
+    orient: high
+    plan: high
+    execute: max
+    review: high
+    spar: medium
+  timeout: 7200
+db_path: .migrate.db
+log_level: info
