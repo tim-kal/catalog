@@ -35,7 +35,39 @@ struct Sidebar: View {
             .listStyle(.sidebar)
 
             // Update banner
-            if updater.updateAvailable, let version = updater.latestVersion {
+            if updater.isDownloading {
+                Divider()
+                VStack(spacing: 6) {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Downloading update...")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    ProgressView(value: updater.downloadProgress)
+                        .progressViewStyle(.linear)
+                    if updater.downloadProgress >= 0.8 {
+                        Text("Installing — app will restart")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            } else if let error = updater.updateError {
+                Divider()
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(error)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+            } else if updater.updateAvailable, let version = updater.latestVersion {
                 Divider()
                 Button {
                     Task { await updater.downloadAndInstall() }
