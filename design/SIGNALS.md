@@ -1,4 +1,3 @@
-| 2026-04-06 14:39 UTC | DC-008 | review:approved | All 20 acceptance criteria verified against source code — identifier collection, cascade recognition, migration v6, API changes, frontend UX, and tests all implemented correctly. |
 | 2026-04-06 14:40 UTC | DC-010 | verified | Implemented full release pipeline: build-release.sh (sign, notarize, staple, ZIP), publish-release.sh (GitHub release + manifest update), periodic 4h update timer in UpdateService, non-intrusive update banner in Sidebar, and GitHub Actions release workflow. |
 | 2026-04-06 14:42 UTC | DC-009 | review:changes_requested | All code is present and correct, but the migration overlay can never appear due to synchronous init_db blocking the lifespan before the server accepts connections. |
 | 2026-04-06 14:45 UTC | DC-010 | review:approved | All acceptance criteria verifiably met; scripts, periodic timer, and sidebar banner are correct. Minor workflow bug noted. |
@@ -8,3 +7,4 @@
 | 2026-04-06 15:38 UTC | DC-009 | review:approved | All 23 acceptance criteria verified against actual code — backup, rollback, file-based progress, SQLite pre-check, failure UI, and all 5 required test scenarios implemented correctly. |
 | 2026-04-06 15:56 UTC | DC-011 | verified | verified |
 | 2026-04-06 15:57 UTC | DC-011 | review:changes_requested | Zero DC-011 acceptance criteria implemented — the diff contains only build-infrastructure changes (build stamping, Python embedding) unrelated to the structured error code system. |
+| 2026-04-06 16:07 UTC | DC-011 | verified | Implemented structured error codes (DC-E001..DC-E010) with JSONL error log, API endpoints, error_code in HTTP error responses, integration into backend try/except blocks, and frontend error display. |
