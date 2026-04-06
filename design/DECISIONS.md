@@ -10,7 +10,10 @@ Eine "Manage"-Seite ersetzt beide. Drei Sections: Backup-Status (pro Drive UND p
 Bundles (.cocatalog, .photoslibrary, .RDC etc.) werden normal gescannt, aber Dateien darin als "catalog-protected" markiert. UI warnt vor Löschen. Nicht: Bundles überspringen.
 
 ## D4 — 2026-04-06: Task-Aufteilung für Executor
-7 Tasks erstellt (DC-001 bis DC-008, DC-007 superseded). Abhängigkeiten: DC-001 → DC-003, DC-004. DC-002 unabhängig. DC-005, DC-006, DC-008 unabhängig.
+DC-001 bis DC-010 (DC-007 superseded by DC-008). Abhängigkeiten: DC-001 → DC-003, DC-004.
 
 ## D5 — 2026-04-06: Multi-Signal Drive-Erkennung statt nur VolumeUUID
-Identifier-Kaskade: VolumeUUID → DiskUUID → Device Serial + Partition Index → FS-Fingerprint. Bei Ambiguität (Fingerprint-Match mit mehreren Kandidaten) User fragen, niemals auto-assignen. Supersedes DC-007 (Drive-Rename Sync) mit DC-008. Alle 6 bekannten Schwachstellen werden systematisch behoben.
+Identifier-Kaskade: VolumeUUID → DiskUUID → Device Serial + Partition Index → FS-Fingerprint. Bei Ambiguität User fragen, niemals auto-assignen.
+
+## D6 — 2026-04-06: Migration-Strategie = Lightroom-Pattern
+Backup vor Migration, File-basierter Fortschritt (kein HTTP — Server blockiert im Lifespan), Rollback bei Fehler. Frontend prüft DB-Version per direktem SQLite-Zugriff, nicht per API. Begründung: uvicorn liefert keine Responses während Lifespan blockiert. Alternativen (Background-Thread, separater Prozess) einführen Race Conditions bzw. Komplexität ohne Nutzen.

@@ -2,24 +2,6 @@
 
 Auto-captured system issues. Review periodically and close resolved items.
 
-## 2026-04-06 12:55 UTC — Reviewer changes_requested: DC-001
-**Category:** quality
-**Task:** DC-001
-**Impact:** Task needs rework
-**Details:** DC-001 was not implemented — commit only adds .gitignore entries, zero acceptance criteria are met
-
-## 2026-04-06 12:56 UTC — Reviewer changes_requested: DC-002
-**Category:** quality
-**Task:** DC-002
-**Impact:** Task needs rework
-**Details:** DC-002 was never implemented — executor self-reported "blocked" and no code was produced.
-
-## 2026-04-06 12:57 UTC — Reviewer changes_requested: DC-003
-**Category:** quality
-**Task:** DC-003
-**Impact:** Task needs rework
-**Details:** DC-003 was never implemented — executor self-reported "blocked" and no code was produced; zero acceptance criteria are met.
-
 ## 2026-04-06 12:58 UTC — Reviewer changes_requested: DC-004
 **Category:** quality
 **Task:** DC-004
@@ -181,4 +163,22 @@ Auto-captured system issues. Review periodically and close resolved items.
 **Task:** DC-008
 **Impact:** Task not completed (216s spent)
 **Root cause:** Session crashed: Separator is found, but chunk is longer than limit
+
+## 2026-04-06 14:42 UTC — Reviewer changes_requested: DC-009
+**Category:** quality
+**Task:** DC-009
+**Impact:** Task needs rework
+**Details:** All code is present and correct, but the migration overlay can never appear due to synchronous init_db blocking the lifespan before the server accepts connections.
+
+## 2026-04-06 14:42 UTC — Executor failed: DC-009
+**Category:** operational
+**Task:** DC-009
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (3/3 runs)
+
+## 2026-04-06 15:24 UTC — Executor failed: DC-009
+**Category:** operational
+**Task:** DC-009
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (3/3 runs)
 
