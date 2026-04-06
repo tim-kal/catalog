@@ -98,18 +98,34 @@ final class UpdateService: ObservableObject {
 
             let zipPath = tempDir.appendingPathComponent("DriveCatalog.zip")
 
-            let (downloadedURL, _) = try await URLSession.shared.download(from: url)
+            let (downloadedURL, response) = try await URLSession.shared.download(from: url)
+
+            // Verify we got an actual ZIP, not an HTML error page
+            let fileSize = (try? FileManager.default.attributesOfItem(atPath: downloadedURL.path)[.size] as? Int64) ?? 0
+            logger.info("Downloaded update: \(fileSize) bytes")
+
+            if fileSize < 1_000_000 {
+                // Suspiciously small — probably an error page, not a ZIP
+                let content = (try? String(contentsOf: downloadedURL, encoding: .utf8)) ?? ""
+                logger.error("Download too small (\(fileSize) bytes), content: \(content.prefix(200))")
+                throw UpdateError.downloadCorrupt
+            }
+
             try FileManager.default.moveItem(at: downloadedURL, to: zipPath)
             downloadProgress = 0.5
 
             // 2. Unzip
             let unzipProc = Process()
+            let unzipPipe = Pipe()
             unzipProc.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-            unzipProc.arguments = ["-o", "-q", zipPath.path, "-d", tempDir.path]
+            unzipProc.arguments = ["-o", zipPath.path, "-d", tempDir.path]
+            unzipProc.standardError = unzipPipe
             try unzipProc.run()
             unzipProc.waitUntilExit()
 
-            guard unzipProc.terminationStatus == 0 else {
+            if unzipProc.terminationStatus != 0 {
+                let stderr = String(data: unzipPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                logger.error("Unzip failed (exit \(unzipProc.terminationStatus)): \(stderr)")
                 throw UpdateError.unzipFailed
             }
             downloadProgress = 0.8
@@ -187,11 +203,13 @@ final class UpdateService: ObservableObject {
     enum UpdateError: LocalizedError {
         case unzipFailed
         case noAppFound
+        case downloadCorrupt
 
         var errorDescription: String? {
             switch self {
-            case .unzipFailed: return "Failed to unzip the update"
+            case .unzipFailed: return "Failed to unzip the update. Try downloading manually from GitHub."
             case .noAppFound: return "No app found in the update package"
+            case .downloadCorrupt: return "Download was corrupted or blocked. Try downloading manually from GitHub."
             }
         }
     }
