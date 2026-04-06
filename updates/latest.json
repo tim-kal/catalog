@@ -1,7 +1,7 @@
 {
   "version": "1.4.0",
-  "build": 15,
+  "build": 16,
   "url": "https://github.com/tim-kal/catalog/releases/download/v1.4.0/DriveCatalog.zip",
-  "notes": "Drive recognition overhaul: real hardware serials, correct disk usage when disconnected, no more drive confusion.",
+  "notes": "Drive recognition overhaul, correct disk usage offline, ditto-based update extraction.",
   "min_os": "14.0"
 }
