@@ -1,7 +1,7 @@
 {
-  "version": "1.4.0",
-  "build": 16,
-  "url": "https://github.com/tim-kal/catalog/releases/download/v1.4.0/DriveCatalog.zip",
-  "notes": "Drive recognition overhaul, correct disk usage offline, ditto-based update extraction.",
+  "version": "1.4.1",
+  "build": 17,
+  "url": "https://github.com/tim-kal/catalog/releases/download/v1.4.1/DriveCatalog.zip",
+  "notes": "Fixed: disk capacity no longer shows boot disk values when drive is disconnected.",
   "min_os": "14.0"
 }
