@@ -32,3 +32,7 @@ targets:
           /usr/libexec/PlistBuddy -c "Add :BuildDate string ${BUILD_DATE}" "$PLIST" 2>/dev/null \
               || /usr/libexec/PlistBuddy -c "Set :BuildDate ${BUILD_DATE}" "$PLIST"
         name: Stamp Build Info
+    postBuildScripts:
+      - script: |
+          bash "${SRCROOT}/scripts/embed-python.sh"
+        name: Embed Python Runtime
