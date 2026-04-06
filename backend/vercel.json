@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    { "source": "/api/bug-report", "destination": "/api/bug_report" }
+  ],
+  "env": {
+    "GITHUB_TOKEN": "@github-token",
+    "GITHUB_REPO": "@github-repo"
+  }
+}
