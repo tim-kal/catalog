@@ -17,6 +17,7 @@ class DriveResponse(BaseModel):
     uuid: str | None
     mount_path: str
     total_bytes: int
+    used_bytes: int | None = None
     last_scan: datetime | None
     file_count: int
     disk_uuid: str | None = None

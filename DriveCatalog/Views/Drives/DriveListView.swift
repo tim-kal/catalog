@@ -183,11 +183,6 @@ struct DriveCard: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .fixedSize()
-            } else if let total = status?.totalBytes, total > 0 {
-                Text(formattedSize(total))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .fixedSize()
             } else if drive.totalBytes > 0 {
                 Text(formattedSize(drive.totalBytes))
                     .font(.caption2)
@@ -201,10 +196,10 @@ struct DriveCard: View {
                     used: space.usedBytes, total: space.totalBytes,
                     percent: space.usedPercent, live: true
                 )
-            } else if let used = status?.usedBytes, let total = status?.totalBytes, total > 0 {
+            } else if let used = drive.usedBytes, drive.totalBytes > 0 {
                 compactSpaceBar(
-                    used: used, total: total,
-                    percent: Double(used) / Double(total) * 100, live: false
+                    used: used, total: drive.totalBytes,
+                    percent: Double(used) / Double(drive.totalBytes) * 100, live: false
                 )
             }
 
@@ -367,11 +362,11 @@ struct DriveCard: View {
                     spaceDetail(label: "Free", bytes: space.freeBytes, color: .green)
                     spaceDetail(label: "Total", bytes: space.totalBytes, color: .secondary)
                 }
-            } else if let used = status?.usedBytes, let total = status?.totalBytes, total > 0 {
+            } else if let used = drive.usedBytes, drive.totalBytes > 0 {
                 HStack(spacing: 24) {
                     spaceDetail(label: "Used", bytes: used, color: .blue)
-                    spaceDetail(label: "Free", bytes: total - used, color: .green)
-                    spaceDetail(label: "Total", bytes: total, color: .secondary)
+                    spaceDetail(label: "Free", bytes: drive.totalBytes - used, color: .green)
+                    spaceDetail(label: "Total", bytes: drive.totalBytes, color: .secondary)
                 }
                 .opacity(0.7)
             }
@@ -1905,16 +1900,10 @@ struct DriveListView: View {
     // MARK: - Summary Bar
 
     private var driveSummaryBar: some View {
-        let totalStorage = drives.reduce(Int64(0)) { total, drive in
-            // Prefer cached status total (persisted from last mount), fall back to drive list value
-            let cached = ViewCache.load(DriveStatusResponse.self, key: "driveStatus_\(drive.name)")?.totalBytes
-            return total + (cached ?? drive.totalBytes)
-        }
+        let totalStorage = drives.reduce(Int64(0)) { $0 + $1.totalBytes }
         let totalUsed = drives.reduce(Int64(0)) { total, drive in
-            // Live disk space if mounted, otherwise cached status from DB
             let live = DiskSpace.read(path: drive.mountPath)?.usedBytes
-            let cached = ViewCache.load(DriveStatusResponse.self, key: "driveStatus_\(drive.name)")?.usedBytes
-            return total + (live ?? cached ?? 0)
+            return total + (live ?? drive.usedBytes ?? 0)
         }
         let totalFree = totalStorage - totalUsed
         let usedPercent = totalStorage > 0 ? Double(totalUsed) / Double(totalStorage) * 100 : 0

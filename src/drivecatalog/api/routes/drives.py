@@ -58,21 +58,40 @@ async def list_drives() -> DriveListResponse:
             """
         ).fetchall()
 
-        drives = [
-            DriveResponse(
+        drives = []
+        for row in rows:
+            total = row["total_bytes"] or 0
+            used = row["used_bytes"] if "used_bytes" in row.keys() else None
+
+            # For mounted drives: read live disk usage and persist to DB
+            mp = row["mount_path"]
+            if mp and Path(mp).exists():
+                try:
+                    stat = os.statvfs(mp)
+                    total = stat.f_frsize * stat.f_blocks
+                    free = stat.f_frsize * stat.f_bavail
+                    used = total - free
+                    conn.execute(
+                        "UPDATE drives SET total_bytes = ?, used_bytes = ? WHERE id = ?",
+                        (total, used, row["id"]),
+                    )
+                except OSError:
+                    pass
+
+            drives.append(DriveResponse(
                 id=row["id"],
                 name=row["name"],
                 uuid=row["uuid"],
-                mount_path=row["mount_path"] or "",
-                total_bytes=row["total_bytes"] or 0,
+                mount_path=mp or "",
+                total_bytes=total,
+                used_bytes=used,
                 last_scan=row["last_scan"],
                 file_count=row["file_count"],
                 disk_uuid=row["disk_uuid"] if "disk_uuid" in row.keys() else None,
                 device_serial=row["device_serial"] if "device_serial" in row.keys() else None,
                 fs_fingerprint=row["fs_fingerprint"] if "fs_fingerprint" in row.keys() else None,
-            )
-            for row in rows
-        ]
+            ))
+        conn.commit()
 
         return DriveListResponse(drives=drives, total=len(drives))
     finally:

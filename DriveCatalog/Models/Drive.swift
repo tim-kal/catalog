@@ -7,6 +7,7 @@ struct DriveResponse: Codable, Identifiable, Hashable {
     let uuid: String?
     let mountPath: String
     let totalBytes: Int64
+    let usedBytes: Int64?
     let lastScan: Date?
     let fileCount: Int
     let diskUuid: String?
@@ -19,6 +20,7 @@ struct DriveResponse: Codable, Identifiable, Hashable {
         case uuid
         case mountPath = "mount_path"
         case totalBytes = "total_bytes"
+        case usedBytes = "used_bytes"
         case lastScan = "last_scan"
         case fileCount = "file_count"
         case diskUuid = "disk_uuid"

@@ -446,6 +446,7 @@ struct DriveDetailView: View {
             uuid: "ABC-123-DEF",
             mountPath: "/Volumes/TestDrive",
             totalBytes: 500_000_000_000,
+            usedBytes: 250_000_000_000,
             lastScan: Date().addingTimeInterval(-3600),
             fileCount: 12345,
             diskUuid: nil,
