@@ -408,6 +408,28 @@ def _get_current_version(conn: sqlite3.Connection) -> int:
     return row[0]
 
 
+def _check_migration_integrity(conn: sqlite3.Connection) -> list[int]:
+    """Verify that columns added by past migrations actually exist.
+
+    Returns list of migration versions that need to be re-applied.
+    Empty list means everything is consistent.
+    """
+    # Map: migration version → (table, column) that should exist after it runs
+    expected_columns = {
+        2: ("drives", "used_bytes"),
+        4: ("files", "catalog_bundle"),
+        6: ("drives", "disk_uuid"),
+    }
+
+    broken = []
+    current = _get_current_version(conn)
+    for version, (table, column) in expected_columns.items():
+        if version <= current and not _column_exists(conn, table, column):
+            broken.append(version)
+
+    return broken
+
+
 def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
     """Check whether a column exists on a table."""
     cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -473,6 +495,19 @@ def apply_migrations(conn: sqlite3.Connection, *, db_path: Path | None = None) -
     current = _get_current_version(conn)
 
     pending = [m for m in MIGRATIONS if m.version > current]
+
+    # Repair check: verify that columns from past migrations actually exist.
+    # Protects against corrupt state where schema_version says "applied" but DDL was skipped.
+    repair_needed = _check_migration_integrity(conn)
+    if repair_needed:
+        logger.warning("Schema integrity check failed — re-running migrations: %s", repair_needed)
+        # Reset schema version to before the first broken migration
+        first_broken = min(repair_needed)
+        conn.execute("DELETE FROM schema_version WHERE version >= ?", (first_broken,))
+        conn.commit()
+        current = _get_current_version(conn)
+        pending = [m for m in MIGRATIONS if m.version > current]
+
     if not pending:
         return  # DB already up to date — no backup, no status file
 
