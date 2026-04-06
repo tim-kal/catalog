@@ -178,3 +178,37 @@ struct ConsolidationStrategyResponse: Codable {
         case targetDrives = "target_drives"
     }
 }
+
+// MARK: - Recommendation Models
+
+/// A single advisory move/delete recommendation.
+struct ConsolidationRecommendation: Codable, Identifiable {
+    let sourceDrive: String
+    let targetDrive: String
+    let folderPath: String
+    let sizeBytes: Int64
+    let spaceFreedAfter: Int64
+    let reason: String
+
+    var id: String { "\(sourceDrive)/\(folderPath)" }
+
+    enum CodingKeys: String, CodingKey {
+        case sourceDrive = "source_drive"
+        case targetDrive = "target_drive"
+        case folderPath = "folder_path"
+        case sizeBytes = "size_bytes"
+        case spaceFreedAfter = "space_freed_after"
+        case reason
+    }
+}
+
+/// Response wrapping the ordered recommendation list.
+struct ConsolidationRecommendationsResponse: Codable {
+    let recommendations: [ConsolidationRecommendation]
+    let totalCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case recommendations
+        case totalCount = "total_count"
+    }
+}

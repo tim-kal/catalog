@@ -6,6 +6,7 @@ struct ManageView: View {
     @ObservedObject private var backend = BackendService.shared
     @State private var insightsData: InsightsResponse?
     @State private var folderDuplicates: FolderDuplicateResponse?
+    @State private var recommendations: ConsolidationRecommendationsResponse?
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var selectedAction: RecommendedAction?
@@ -77,7 +78,12 @@ struct ManageView: View {
 
                         Divider()
 
-                        // Section 3: Empfohlene Aktionen
+                        // Section 3: Consolidation Recommendations
+                        recommendationsSection
+
+                        Divider()
+
+                        // Section 4: Empfohlene Aktionen
                         actionsSection(data.actions)
                     }
                     .padding(20)
@@ -589,7 +595,8 @@ struct ManageView: View {
 
         async let insightsFetch: Void = loadInsights()
         async let folderFetch: Void = loadFolderDuplicates()
-        _ = await (insightsFetch, folderFetch)
+        async let recsFetch: Void = loadRecommendations()
+        _ = await (insightsFetch, folderFetch, recsFetch)
 
         isLoading = false
     }
@@ -608,6 +615,103 @@ struct ManageView: View {
 
     private func loadFolderDuplicates() async {
         folderDuplicates = await APIService.shared.fetchFolderDuplicates()
+    }
+
+    private func loadRecommendations() async {
+        recommendations = await APIService.shared.fetchRecommendations()
+    }
+
+    // MARK: - Section 3: Consolidation Recommendations
+
+    private var recommendationsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Consolidation Recommendations", icon: "arrow.triangle.merge")
+
+            if let recs = recommendations, !recs.recommendations.isEmpty {
+                ForEach(recs.recommendations.prefix(10)) { rec in
+                    recommendationCard(rec)
+                }
+                if recs.totalCount > 10 {
+                    Text("\(recs.totalCount) recommendations total")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            } else {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("No consolidation recommendations")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func recommendationCard(_ rec: ConsolidationRecommendation) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: rec.folderPath == "*" ? "externaldrive.fill.badge.arrow" : "folder.fill.badge.minus")
+                .font(.title3)
+                .foregroundStyle(.purple)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 4) {
+                    Text(rec.sourceDrive)
+                        .fontWeight(.semibold)
+                    if rec.folderPath != "*" {
+                        Text("/\(rec.folderPath)")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .font(.caption)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+                Text(rec.reason)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(formattedSize(rec.spaceFreedAfter))
+                    .font(.callout)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.purple)
+                Text("freed")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+
+            // Advisory "Start" button — navigates to consolidation strategy
+            Button {
+                selectedAction = RecommendedAction(
+                    id: "consolidate_\(rec.sourceDrive)",
+                    priority: 1,
+                    title: "Consolidate \(rec.sourceDrive)",
+                    description: rec.reason,
+                    impactBytes: rec.spaceFreedAfter,
+                    actionType: "consolidate",
+                    target: rec.sourceDrive,
+                    icon: "arrow.triangle.merge",
+                    color: "purple"
+                )
+            } label: {
+                Text("Start")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.purple.opacity(0.15)))
+                    .foregroundStyle(.purple)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color(.controlBackgroundColor).opacity(0.5)))
     }
 
     // MARK: - Helpers

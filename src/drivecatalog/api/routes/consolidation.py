@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from drivecatalog.consolidation import (
     get_consolidation_candidates,
+    get_consolidation_recommendations,
     get_consolidation_strategy,
     get_drive_file_distribution,
 )
@@ -17,6 +18,8 @@ from ..models.consolidation import (
     ConsolidationStrategyResponse,
     DriveDistribution,
     DriveDistributionResponse,
+    Recommendation,
+    RecommendationsResponse,
     StrategyAssignment,
     StrategyFile,
     StrategyTargetDrive,
@@ -133,3 +136,21 @@ async def get_strategy(
             for t in raw["target_drives"]
         ],
     )
+
+
+@router.get("/recommendations", response_model=RecommendationsResponse)
+async def get_recommendations() -> RecommendationsResponse:
+    """Get ordered move/delete recommendations sorted by space freed.
+
+    Advisory only — does not execute any moves automatically.
+    """
+    conn = get_connection()
+    try:
+        raw = get_consolidation_recommendations(conn)
+        recs = [Recommendation(**r) for r in raw]
+        return RecommendationsResponse(
+            recommendations=recs,
+            total_count=len(recs),
+        )
+    finally:
+        conn.close()

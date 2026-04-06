@@ -107,3 +107,24 @@ class ConsolidationStrategyResponse(BaseModel):
     assignments: list[StrategyAssignment]
     unplaceable: list[StrategyFile]
     target_drives: list[StrategyTargetDrive]
+
+
+# --- Recommendation models ---
+
+
+class Recommendation(BaseModel):
+    """A single advisory move/delete recommendation."""
+
+    source_drive: str
+    target_drive: str
+    folder_path: str
+    size_bytes: int
+    space_freed_after: int
+    reason: str
+
+
+class RecommendationsResponse(BaseModel):
+    """Response wrapping the ordered recommendation list."""
+
+    recommendations: list[Recommendation]
+    total_count: int

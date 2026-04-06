@@ -438,6 +438,13 @@ actor APIService {
         return try await get(url: url)
     }
 
+    /// Fetch ordered consolidation recommendations sorted by space freed.
+    /// Advisory only — does not trigger any moves.
+    func fetchRecommendations() async -> ConsolidationRecommendationsResponse? {
+        guard let url = try? buildURL(path: "/consolidation/recommendations") else { return nil }
+        return try? await get(url: url)
+    }
+
     // MARK: - Migration Endpoints
 
     /// Generate a migration plan for a source drive.
