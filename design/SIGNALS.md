@@ -1,4 +1,3 @@
-| 2026-04-06 14:08 UTC | DC-008 | review:changes_requested | Executor never found the task definition (wrong path lookup) and made zero code changes across 3 runs — all acceptance criteria unmet. |
 | 2026-04-06 14:13 UTC | DC-008 | failed | Session crashed: Separator is found, but chunk is longer than limit |
 | 2026-04-06 14:18 UTC | DC-008 | failed | Session crashed: Separator is found, but chunk is longer than limit |
 | 2026-04-06 14:33 UTC | _executor | crashed | Cannot apply event 'session_done' in state 'ready' |
@@ -8,3 +7,4 @@
 | 2026-04-06 14:40 UTC | DC-010 | verified | Implemented full release pipeline: build-release.sh (sign, notarize, staple, ZIP), publish-release.sh (GitHub release + manifest update), periodic 4h update timer in UpdateService, non-intrusive update banner in Sidebar, and GitHub Actions release workflow. |
 | 2026-04-06 14:42 UTC | DC-009 | review:changes_requested | All code is present and correct, but the migration overlay can never appear due to synchronous init_db blocking the lifespan before the server accepts connections. |
 | 2026-04-06 14:45 UTC | DC-010 | review:approved | All acceptance criteria verifiably met; scripts, periodic timer, and sidebar banner are correct. Minor workflow bug noted. |
+| 2026-04-06 15:27 UTC | DC-009 | verified | Implemented migration progress indicator for app startup. Backend writes progress to ~/.drivecatalog/migration_status.json during apply_migrations() and exposes GET /migration-status endpoint (registered before lifespan so it works during init_db). Frontend polls migration status during waitForHealthy() and shows a MigrationOverlay in ContentView with progress bar, step counter, and description. Stale status files are cleaned up on startup. |
