@@ -37,10 +37,14 @@ safe than sorry when 9 drives worth of files are at stake.
 from __future__ import annotations
 
 import json
+import logging
+import shutil
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -263,6 +267,10 @@ ALTER TABLE drives ADD COLUMN fs_fingerprint TEXT;
     ),
 ]
 
+# When adding a new migration, also update expectedSchemaVersion in
+# DriveCatalog/Services/BackendService.swift to match.
+SCHEMA_VERSION: int = len(MIGRATIONS)
+
 
 def _migrate_populate_drive_identifiers(conn: sqlite3.Connection) -> None:
     """Best-effort: populate new identifier columns for currently mounted drives."""
@@ -406,12 +414,54 @@ def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
     return column in cols
 
 
-def apply_migrations(conn: sqlite3.Connection) -> None:
+def _create_backup(db_path: Path, current_version: int) -> Path:
+    """Create a pre-migration backup of the database.
+
+    Flushes the WAL into the main file first, then copies the DB.
+    Keeps at most 3 backups — deletes the oldest if more exist.
+    Returns the backup path.
+    """
+    # Flush WAL into main DB so a single-file copy is consistent
+    tmp_conn = sqlite3.connect(str(db_path), timeout=10)
+    try:
+        tmp_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    finally:
+        tmp_conn.close()
+
+    backup_path = db_path.parent / f"{db_path.name}.backup-v{current_version}"
+    shutil.copy2(str(db_path), str(backup_path))
+    logger.info("Backup created: %s", backup_path.name)
+
+    # Rotate: keep at most 3 backups
+    backups = sorted(
+        db_path.parent.glob(f"{db_path.name}.backup-v*"),
+        key=lambda p: p.stat().st_mtime,
+    )
+    while len(backups) > 3:
+        oldest = backups.pop(0)
+        oldest.unlink(missing_ok=True)
+        logger.info("Deleted old backup: %s", oldest.name)
+
+    return backup_path
+
+
+def _restore_backup(db_path: Path, backup_path: Path) -> None:
+    """Restore the database from a backup file."""
+    shutil.copy2(str(backup_path), str(db_path))
+    # Remove WAL/SHM that may be stale after restore
+    db_path.with_suffix(".db-wal").unlink(missing_ok=True)
+    db_path.with_suffix(".db-shm").unlink(missing_ok=True)
+    logger.info("Database restored from backup: %s", backup_path.name)
+
+
+def apply_migrations(conn: sqlite3.Connection, *, db_path: Path | None = None) -> None:
     """Apply all pending migrations in order.
 
     For brand-new databases every migration runs sequentially.
     For existing databases (created before the migration system) the
     IF NOT EXISTS / column-existence guards make earlier migrations safe.
+
+    Creates a backup before migrating and rolls back on failure.
 
     Raises RuntimeError if a migration has requires_rescan=True but no
     data_migration callable — this is the core guardrail.
@@ -424,79 +474,106 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
 
     pending = [m for m in MIGRATIONS if m.version > current]
     if not pending:
-        return  # DB already up to date — no status file created
+        return  # DB already up to date — no backup, no status file
+
+    # Resolve db_path from connection if not supplied
+    if db_path is None:
+        row = conn.execute("PRAGMA database_list").fetchone()
+        db_path = Path(row[2]) if row and row[2] else None
+
+    # Create backup before applying any migrations
+    backup_path: Path | None = None
+    if db_path and db_path.exists():
+        backup_path = _create_backup(db_path, current)
 
     total = len(pending)
-    _write_migration_status({"migrating": True, "current": 0, "total": total})
+    _write_migration_status({
+        "migrating": True, "current": 0, "total": total,
+        "description": "Starting...",
+    })
 
-    for idx, m in enumerate(pending, start=1):
+    try:
+        for idx, m in enumerate(pending, start=1):
 
-        # --- Guardrail: block dangerous migrations without a data fix ---
-        if m.requires_rescan and m.data_migration is None:
-            raise RuntimeError(
-                f"Migration v{m.version} ({m.description}) requires a rescan "
-                f"but no data_migration function was provided. Refusing to "
-                f"apply. Either supply a data_migration that transforms "
-                f"existing data in-place, or reconsider the schema change."
+            # --- Guardrail: block dangerous migrations without a data fix ---
+            if m.requires_rescan and m.data_migration is None:
+                raise RuntimeError(
+                    f"Migration v{m.version} ({m.description}) requires a rescan "
+                    f"but no data_migration function was provided. Refusing to "
+                    f"apply. Either supply a data_migration that transforms "
+                    f"existing data in-place, or reconsider the schema change."
+                )
+
+            # --- Apply DDL ---
+            sql = m.sql.strip()
+            sql_no_comments = "\n".join(
+                line for line in sql.splitlines()
+                if not line.strip().startswith("--")
+            ).strip()
+
+            statements = [s.strip() for s in sql_no_comments.split(";") if s.strip()]
+            all_alter_add = all(
+                s.upper().startswith("ALTER TABLE") and "ADD COLUMN" in s.upper()
+                for s in statements
             )
 
-        # --- Apply DDL ---
-        # Special handling for ALTER TABLE ADD COLUMN — skip if column exists.
-        # Supports multiple ALTER TABLE statements in one migration.
-        sql = m.sql.strip()
-        sql_no_comments = "\n".join(
-            line for line in sql.splitlines()
-            if not line.strip().startswith("--")
-        ).strip()
-
-        # Split into individual statements and handle each ALTER TABLE separately
-        statements = [s.strip() for s in sql_no_comments.split(";") if s.strip()]
-        all_alter_add = all(
-            s.upper().startswith("ALTER TABLE") and "ADD COLUMN" in s.upper()
-            for s in statements
-        )
-
-        if all_alter_add:
-            for stmt in statements:
-                parts = stmt.split()
+            if all_alter_add:
+                for stmt in statements:
+                    parts = stmt.split()
+                    table_name = parts[2]
+                    col_idx = next(
+                        i for i, p in enumerate(parts) if p.upper() == "COLUMN"
+                    ) + 1
+                    col_name = parts[col_idx]
+                    if not _column_exists(conn, table_name, col_name):
+                        conn.execute(stmt)
+                conn.commit()
+            elif sql_no_comments.upper().startswith("ALTER TABLE") and "ADD COLUMN" in sql_no_comments.upper():
+                parts = sql_no_comments.split()
                 table_name = parts[2]
                 col_idx = next(
                     i for i, p in enumerate(parts) if p.upper() == "COLUMN"
                 ) + 1
                 col_name = parts[col_idx]
                 if not _column_exists(conn, table_name, col_name):
-                    conn.execute(stmt)
-            conn.commit()
-        elif sql_no_comments.upper().startswith("ALTER TABLE") and "ADD COLUMN" in sql_no_comments.upper():
-            parts = sql_no_comments.split()
-            table_name = parts[2]
-            col_idx = next(
-                i for i, p in enumerate(parts) if p.upper() == "COLUMN"
-            ) + 1
-            col_name = parts[col_idx]
-            if not _column_exists(conn, table_name, col_name):
+                    conn.executescript(sql)
+            else:
                 conn.executescript(sql)
-        else:
-            conn.executescript(sql)
 
-        # --- Run data migration if provided ---
-        if m.data_migration is not None:
-            m.data_migration(conn)
+            # --- Run data migration if provided ---
+            if m.data_migration is not None:
+                m.data_migration(conn)
 
-        # --- Record version ---
-        conn.execute(
-            "INSERT INTO schema_version (version) VALUES (?)", (m.version,)
-        )
-        conn.commit()
+            # --- Record version ---
+            conn.execute(
+                "INSERT INTO schema_version (version) VALUES (?)", (m.version,)
+            )
+            conn.commit()
 
-        # --- Report progress ---
+            # --- Report progress ---
+            _write_migration_status({
+                "migrating": True,
+                "current": idx,
+                "total": total,
+                "description": m.description,
+            })
+
+    except Exception as exc:
+        # Rollback: restore backup and write failure status
+        if backup_path and backup_path.exists() and db_path:
+            conn.close()
+            _restore_backup(db_path, backup_path)
+        target = pending[-1].version
         _write_migration_status({
-            "migrating": True,
-            "current": idx,
-            "total": total,
-            "description": m.description,
+            "migrating": False,
+            "failed": True,
+            "error": str(exc),
+            "restored_from": backup_path.name if backup_path else None,
         })
+        raise RuntimeError(
+            f"Migration to v{target} failed: {exc}. "
+            f"Database restored from backup."
+        ) from exc
 
     # All migrations complete — clean up status file
-    _write_migration_status({"migrating": False})
     _cleanup_migration_status()

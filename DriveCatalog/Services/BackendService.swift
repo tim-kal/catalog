@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SQLite3
 import os
 
 /// Manages the Python API server lifecycle.
@@ -14,6 +15,12 @@ final class BackendService: ObservableObject {
     @Published var migrationCurrent = 0
     @Published var migrationTotal = 0
     @Published var migrationDescription = ""
+    @Published var migrationFailed = false
+    @Published var migrationError = ""
+
+    /// Must match SCHEMA_VERSION (= len(MIGRATIONS)) in migrations.py.
+    /// Update this whenever a new migration is added.
+    private let expectedSchemaVersion = 6
 
     private var process: Process?
     /// PID stored separately so forceStop can kill it from any isolation context.
@@ -77,14 +84,59 @@ final class BackendService: ObservableObject {
         return candidates.first { FileManager.default.fileExists(atPath: $0) }
     }
 
+    /// Path to ~/.drivecatalog/migration_status.json.
+    private var migrationStatusFileURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".drivecatalog/migration_status.json")
+    }
+
+    /// Path to ~/.drivecatalog/catalog.db.
+    private var catalogDBURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".drivecatalog/catalog.db")
+    }
+
+    /// Open catalog.db directly via SQLite and check if migration is needed.
+    /// Returns true if schema version < expectedSchemaVersion.
+    private func checkMigrationNeeded() -> Bool {
+        let path = catalogDBURL.path
+        guard FileManager.default.fileExists(atPath: path) else {
+            return false  // New install — migration will be fast
+        }
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
+            return true  // Can't read → assume migration needed
+        }
+        defer { sqlite3_close(db) }
+
+        var stmt: OpaquePointer?
+        let sql = "SELECT COALESCE(MAX(version), 0) FROM schema_version"
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            return true  // Table may not exist yet → migration needed
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return true }
+        let version = Int(sqlite3_column_int(stmt, 0))
+        return version < expectedSchemaVersion
+    }
+
     func start() {
         guard process == nil else { return }
         startupError = nil
+        migrationFailed = false
+        migrationError = ""
+
+        // Detect migration need BEFORE launching server (direct SQLite read)
+        if checkMigrationNeeded() {
+            isMigrating = true
+        }
 
         // Check if a server is already running on the port (e.g. from a previous app session)
         Task {
             if await checkExistingServer() {
                 logger.info("API server already running on port — reusing")
+                isMigrating = false
                 isRunning = true
                 return
             }
@@ -208,29 +260,43 @@ final class BackendService: ObservableObject {
         backendPID = 0
     }
 
-    /// Poll migration status from the backend and update published properties.
-    private func pollMigrationStatus(session: URLSession) async {
-        let statusURL = URL(string: "\(APIService.baseURL)/migration-status")!
-        do {
-            let (data, response) = try await session.data(from: statusURL)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                return
+    /// Read migration_status.json directly via FileManager and update published properties.
+    /// Returns true if migration failed (caller should stop waiting for /health).
+    private func pollMigrationStatus() -> Bool {
+        let path = migrationStatusFileURL.path
+        guard FileManager.default.fileExists(atPath: path),
+              let data = FileManager.default.contents(atPath: path),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            // File deleted → migration complete (or never started)
+            if isMigrating {
+                isMigrating = false
             }
-            let migrating = json["migrating"] as? Bool ?? false
-            isMigrating = migrating
-            if migrating {
-                migrationCurrent = json["current"] as? Int ?? 0
-                migrationTotal = json["total"] as? Int ?? 0
-                migrationDescription = json["description"] as? String ?? ""
-            }
-        } catch {
-            // Endpoint not available yet — not an error
+            return false
         }
+
+        // Check for failure
+        if json["failed"] as? Bool == true {
+            let errorMsg = json["error"] as? String ?? "Unknown error"
+            let restoredFrom = json["restored_from"] as? String ?? ""
+            isMigrating = false
+            migrationFailed = true
+            migrationError = errorMsg
+            startupError = "Migration failed: \(errorMsg)\n\nRestored from: \(restoredFrom)"
+            return true
+        }
+
+        let migrating = json["migrating"] as? Bool ?? false
+        isMigrating = migrating
+        if migrating {
+            migrationCurrent = json["current"] as? Int ?? 0
+            migrationTotal = json["total"] as? Int ?? 0
+            migrationDescription = json["description"] as? String ?? ""
+        }
+        return false
     }
 
     /// Wait for the API to respond to /health, with retries.
-    /// While waiting, polls /migration-status to show progress.
+    /// While waiting, reads migration_status.json to show progress.
     private func waitForHealthy() async {
         let healthURL = URL(string: "\(APIService.baseURL)/health")!
         let config = URLSessionConfiguration.ephemeral
@@ -238,8 +304,11 @@ final class BackendService: ObservableObject {
         config.timeoutIntervalForResource = 1
         let session = URLSession(configuration: config)
         for attempt in 1...30 {
-            // Poll migration status while waiting
-            await pollMigrationStatus(session: session)
+            // Poll migration status via file while waiting
+            if pollMigrationStatus() {
+                // Migration failed — don't keep waiting for /health
+                return
+            }
 
             // Check health
             do {
@@ -258,10 +327,9 @@ final class BackendService: ObservableObject {
         // Check if process is still alive — maybe it just needs more time
         if let proc = process, proc.isRunning {
             logger.warning("Health check failed but process still running — retrying...")
-            // One more round of checks with longer intervals
             for _ in 1...10 {
                 try? await Task.sleep(for: .seconds(1))
-                await pollMigrationStatus(session: session)
+                if pollMigrationStatus() { return }
                 do {
                     let (_, response) = try await session.data(from: healthURL)
                     if let http = response as? HTTPURLResponse, http.statusCode == 200 {

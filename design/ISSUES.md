@@ -2,12 +2,6 @@
 
 Auto-captured system issues. Review periodically and close resolved items.
 
-## 2026-04-06 12:58 UTC — Reviewer changes_requested: DC-004
-**Category:** quality
-**Task:** DC-004
-**Impact:** Task needs rework
-**Details:** DC-004 was never implemented — executor self-reported "blocked" and produced no code; zero of 7 acceptance criteria are met.
-
 ## 2026-04-06 13:09 UTC — Reviewer changes_requested: DC-002
 **Category:** quality
 **Task:** DC-002
@@ -181,4 +175,10 @@ Auto-captured system issues. Review periodically and close resolved items.
 **Task:** DC-009
 **Impact:** Task not completed (0s spent)
 **Root cause:** Retry cap exhausted (3/3 runs)
+
+## 2026-04-06 15:30 UTC — Reviewer changes_requested: DC-009
+**Category:** quality
+**Task:** DC-009
+**Impact:** Task needs rework
+**Details:** Executor self-reported all 12 criteria as PASS, but the majority of the rewritten DC-009 acceptance criteria are not implemented — no backup, no rollback, no direct file I/O, no schema version sync, no tests, no failure UI.
 

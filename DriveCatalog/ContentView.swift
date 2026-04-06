@@ -63,11 +63,13 @@ struct ContentView: View {
         }
         .frame(minWidth: 800, minHeight: 500)
 
-            if backend.isMigrating {
+            if backend.isMigrating || backend.migrationFailed {
                 MigrationOverlay(
                     current: backend.migrationCurrent,
                     total: backend.migrationTotal,
-                    description: backend.migrationDescription
+                    description: backend.migrationDescription,
+                    failed: backend.migrationFailed,
+                    errorMessage: backend.migrationError
                 )
             }
         } // ZStack
@@ -80,6 +82,8 @@ struct MigrationOverlay: View {
     let current: Int
     let total: Int
     let description: String
+    var failed: Bool = false
+    var errorMessage: String = ""
 
     var body: some View {
         ZStack {
@@ -87,36 +91,58 @@ struct MigrationOverlay: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 20) {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.secondary)
+                if failed {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.red)
 
-                Text("Updating database...")
-                    .font(.title2.weight(.semibold))
+                    Text("Database update failed")
+                        .font(.title2.weight(.semibold))
 
-                if total > 0 {
-                    ProgressView(value: Double(current), total: Double(total))
-                        .progressViewStyle(.linear)
-                        .frame(width: 300)
+                    if !errorMessage.isEmpty {
+                        Text(errorMessage)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: 400)
+                    }
 
-                    Text("Step \(current) of \(total)")
-                        .font(.headline)
-                        .monospacedDigit()
+                    Text("Your data has been restored from backup.\nPlease contact support or use the previous app version.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
                 } else {
-                    ProgressView()
-                        .controlSize(.large)
-                }
-
-                if !description.isEmpty {
-                    Text(description)
-                        .font(.subheadline)
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 40))
                         .foregroundStyle(.secondary)
-                }
 
-                Text("Your existing data is being updated for the new version.\nNo rescanning needed.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
+                    Text("Updating database...")
+                        .font(.title2.weight(.semibold))
+
+                    if total > 0 {
+                        ProgressView(value: Double(current), total: Double(total))
+                            .progressViewStyle(.linear)
+                            .frame(width: 300)
+
+                        Text("Step \(current) of \(total)")
+                            .font(.headline)
+                            .monospacedDigit()
+                    } else {
+                        ProgressView()
+                            .controlSize(.large)
+                    }
+
+                    if !description.isEmpty {
+                        Text(description)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text("Your existing data is being updated for the new version.\nNo rescanning needed.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                }
             }
             .padding(40)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))

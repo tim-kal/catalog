@@ -60,8 +60,9 @@ def init_db() -> None:
     """
     from drivecatalog.migrations import apply_migrations
 
+    db_path = get_db_path()
     conn = get_connection()
     try:
-        apply_migrations(conn)
+        apply_migrations(conn, db_path=db_path)
     finally:
         conn.close()
