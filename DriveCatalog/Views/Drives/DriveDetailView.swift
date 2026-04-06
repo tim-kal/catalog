@@ -447,7 +447,10 @@ struct DriveDetailView: View {
             mountPath: "/Volumes/TestDrive",
             totalBytes: 500_000_000_000,
             lastScan: Date().addingTimeInterval(-3600),
-            fileCount: 12345
+            fileCount: 12345,
+            diskUuid: nil,
+            deviceSerial: nil,
+            fsFingerprint: nil
         ))
     }
 }

@@ -1396,7 +1396,7 @@ struct DriveListView: View {
     /// Weak recognition warning banner text.
     @State private var weakMatchBanner: String?
 
-    private struct AmbiguousMatchInfo: Identifiable {
+    struct AmbiguousMatchInfo: Identifiable {
         let id = UUID()
         let mountPath: String
         let candidates: [DriveResponse]
@@ -1498,22 +1498,39 @@ struct DriveListView: View {
         mainContent
             .toolbar(content: driveToolbar)
             .overlay(alignment: .top) {
-                if let banner = connectionBanner {
-                    HStack(spacing: 8) {
-                        Image(systemName: "cable.connector")
-                            .foregroundStyle(.green)
-                        Text(banner)
-                            .fontWeight(.medium)
+                VStack(spacing: 6) {
+                    if let banner = connectionBanner {
+                        HStack(spacing: 8) {
+                            Image(systemName: "cable.connector")
+                                .foregroundStyle(.green)
+                            Text(banner)
+                                .fontWeight(.medium)
+                        }
+                        .font(.callout)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .shadow(radius: 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
                     }
-                    .font(.callout)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .shadow(radius: 8)
-                    .padding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    if let warning = weakMatchBanner {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Text(warning)
+                                .fontWeight(.medium)
+                        }
+                        .font(.callout)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .shadow(radius: 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                 }
+                .padding(.top, 8)
             }
         .task {
             // Show cached drive list immediately while backend starts
@@ -1543,14 +1560,36 @@ struct DriveListView: View {
             volumeRefreshTrigger += 1
             if let volumeURL = notification.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL {
                 Task {
-                    if let response = try? await APIService.shared.recognizeDrive(mountPath: volumeURL.path),
-                       response.status == "recognized" || response.status == "weak_match",
-                       let driveName = response.drive?.name {
+                    if let response = try? await APIService.shared.recognizeDrive(mountPath: volumeURL.path) {
+                        // Ambiguous: multiple fingerprint matches — ask the user
+                        if response.status == "ambiguous", let candidates = response.candidates, !candidates.isEmpty {
+                            ambiguousMatch = AmbiguousMatchInfo(
+                                mountPath: volumeURL.path,
+                                candidates: candidates
+                            )
+                            return
+                        }
+
+                        guard response.status == "recognized" || response.status == "weak_match",
+                              let driveName = response.drive?.name else { return }
+
                         driveLastConnected[driveName] = Date()
-                        withAnimation(.easeInOut) { connectionBanner = "\(driveName) connected" }
-                        Task {
-                            try? await Task.sleep(for: .seconds(4))
-                            withAnimation(.easeOut) { connectionBanner = nil }
+
+                        // Weak match: show warning banner instead of normal connection banner
+                        if response.confidence == "weak" {
+                            withAnimation(.easeInOut) {
+                                weakMatchBanner = "\(driveName) could not be reliably identified. It may be confused with other drives."
+                            }
+                            Task {
+                                try? await Task.sleep(for: .seconds(8))
+                                withAnimation(.easeOut) { weakMatchBanner = nil }
+                            }
+                        } else {
+                            withAnimation(.easeInOut) { connectionBanner = "\(driveName) connected" }
+                            Task {
+                                try? await Task.sleep(for: .seconds(4))
+                                withAnimation(.easeOut) { connectionBanner = nil }
+                            }
                         }
                         activityLog.insert(ActivityLogEntry(date: Date(), driveName: driveName, type: .connected, passed: nil), at: 0)
                         await loadDrives()
@@ -1648,6 +1687,12 @@ struct DriveListView: View {
             }
         } message: {
             Text("Enter a new name for \"\(driveToRename?.name ?? "")\"")
+        }
+        .sheet(item: $ambiguousMatch) { info in
+            AmbiguousMatchSheet(info: info) {
+                ambiguousMatch = nil
+                Task { await loadDrives() }
+            }
         }
     }
 
@@ -2505,6 +2550,116 @@ private struct DeleteDriveConfirmation: View {
                 Text(value).font(.caption).fontWeight(.medium)
             }
         }
+    }
+}
+
+// MARK: - Ambiguous Match Disambiguation Sheet
+
+/// Sheet presented when a mounted volume matches multiple registered drives.
+/// The user picks which drive this volume belongs to, or dismisses to skip.
+private struct AmbiguousMatchSheet: View {
+    let info: DriveListView.AmbiguousMatchInfo
+    var onDismiss: () -> Void
+
+    @State private var selectedCandidate: DriveResponse?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Button("Skip") {
+                    dismiss()
+                    onDismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Spacer()
+
+                Text("Identify Drive")
+                    .font(.headline)
+
+                Spacer()
+
+                Button("Confirm") {
+                    // TODO: POST resolve to backend when endpoint is added
+                    dismiss()
+                    onDismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(selectedCandidate == nil)
+            }
+            .padding()
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "questionmark.circle.fill")
+                        .foregroundStyle(.orange)
+                        .font(.title2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Is this the same drive as one of these?")
+                            .font(.headline)
+                        Text(info.mountPath)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(info.candidates) { candidate in
+                            HStack(spacing: 12) {
+                                Image(systemName: "externaldrive.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(selectedCandidate?.id == candidate.id ? .white : .secondary)
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(candidate.name)
+                                        .font(.headline)
+                                        .foregroundStyle(selectedCandidate?.id == candidate.id ? .white : .primary)
+                                    Text("\(candidate.fileCount) files")
+                                        .font(.caption)
+                                        .foregroundStyle(selectedCandidate?.id == candidate.id ? .white.opacity(0.8) : .secondary)
+                                }
+
+                                Spacer()
+
+                                if selectedCandidate?.id == candidate.id {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.title3)
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(selectedCandidate?.id == candidate.id ? Color.accentColor : Color(.controlBackgroundColor))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(selectedCandidate?.id == candidate.id ? Color.accentColor : Color.secondary.opacity(0.2), lineWidth: 1)
+                            )
+                            .onTapGesture {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    if selectedCandidate?.id == candidate.id {
+                                        selectedCandidate = nil
+                                    } else {
+                                        selectedCandidate = candidate
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .padding(.top, 12)
+        }
+        .frame(minWidth: 400, minHeight: 280)
     }
 }
 

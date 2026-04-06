@@ -1,4 +1,3 @@
-| 2026-04-06 13:49 UTC | DC-002 | verified | Addressed all 4 reviewer feedback items: added 3 missing bundle extensions (.fcpbundle, .lrcat, .dvr), changed catalog_bundle column from INTEGER to TEXT storing bundle root path, moved catalog_bundle from FileGroup to per-FileLocation in the API model, and added integration test with .photoslibrary scan. |
 | 2026-04-06 13:51 UTC | DC-002 | review:approved | All 7 acceptance criteria verified in code and tests; 19/19 tests pass. |
 | 2026-04-06 13:56 UTC | DC-003 | verified | Addressed all 4 reviewer feedback items: (1) Per-drive detail fields — added totalFiles/backedUpFiles (optional) to DriveRisk model, computed backupPercent from bytes, displayed total files, backed-up files, unprotected files, and at-risk bytes in expandable panel. (2) Per-folder drill-down — driveRiskRow is now a clickable Button with chevron; tap expands a detail panel showing file counts and coverage bar. (3) Per-drive coverage bars — replaced unprotected-bytes risk bars with green/red backup coverage progress bars showing percentage. (4) Per-drive duplicate space — aggregated folder duplicate data by drive name, displayed per-drive reclaimable bytes in Section 2. |
 | 2026-04-06 13:58 UTC | DC-003 | review:approved | All 5 acceptance criteria verifiably met in diff and source files; clean implementation with proper edge-case handling. |
@@ -8,3 +7,4 @@
 | 2026-04-06 14:08 UTC | DC-008 | review:changes_requested | Executor never found the task definition (wrong path lookup) and made zero code changes across 3 runs — all acceptance criteria unmet. |
 | 2026-04-06 14:13 UTC | DC-008 | failed | Session crashed: Separator is found, but chunk is longer than limit |
 | 2026-04-06 14:18 UTC | DC-008 | failed | Session crashed: Separator is found, but chunk is longer than limit |
+| 2026-04-06 14:33 UTC | _executor | crashed | Cannot apply event 'session_done' in state 'ready' |

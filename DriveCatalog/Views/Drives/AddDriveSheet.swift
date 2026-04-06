@@ -7,6 +7,8 @@ private struct MountedVolume: Identifiable {
     let totalBytes: Int64
     /// Name of the registered drive this volume was recognized as, if any.
     var recognizedAs: String?
+    /// True when recognition returned multiple ambiguous candidates.
+    var isAmbiguous: Bool = false
     var id: String { path }
 }
 
@@ -92,6 +94,34 @@ struct AddDriveSheet: View {
                     .padding()
                 }
 
+                // Ambiguous volumes — can't be registered until disambiguated
+                if !ambiguousVolumes.isEmpty {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Text("Ambiguous Drives")
+                                .font(.subheadline.bold())
+                        }
+                        Text("These volumes match multiple registered drives. Connect them from the main view to identify.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        ForEach(ambiguousVolumes) { volume in
+                            HStack(spacing: 8) {
+                                Image(systemName: "externaldrive.badge.questionmark")
+                                    .foregroundStyle(.orange)
+                                Text(volume.name)
+                                    .font(.callout)
+                                Spacer()
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                }
+
                 // Custom name (only when a volume is selected)
                 if selectedVolume != nil {
                     Divider()
@@ -141,7 +171,12 @@ struct AddDriveSheet: View {
 
     /// Volumes not yet registered (recognized by cascade, not just path comparison).
     private var availableVolumes: [MountedVolume] {
-        volumes.filter { $0.recognizedAs == nil }
+        volumes.filter { $0.recognizedAs == nil && !$0.isAmbiguous }
+    }
+
+    /// Volumes with ambiguous recognition — match multiple registered drives.
+    private var ambiguousVolumes: [MountedVolume] {
+        volumes.filter { $0.isAmbiguous }
     }
 
     // MARK: - Data Loading
@@ -182,10 +217,13 @@ struct AddDriveSheet: View {
 
         // 2. Recognize each volume using cascade endpoint to filter already-registered
         for i in discovered.indices {
-            if let response = try? await APIService.shared.recognizeDrive(mountPath: discovered[i].path),
-               (response.status == "recognized" || response.status == "weak_match"),
-               let driveName = response.drive?.name {
-                discovered[i].recognizedAs = driveName
+            if let response = try? await APIService.shared.recognizeDrive(mountPath: discovered[i].path) {
+                if (response.status == "recognized" || response.status == "weak_match"),
+                   let driveName = response.drive?.name {
+                    discovered[i].recognizedAs = driveName
+                } else if response.status == "ambiguous" {
+                    discovered[i].isAmbiguous = true
+                }
             }
         }
 

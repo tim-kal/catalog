@@ -10,6 +10,10 @@ final class BackendService: ObservableObject {
 
     @Published var isRunning = false
     @Published var startupError: String?
+    @Published var isMigrating = false
+    @Published var migrationCurrent = 0
+    @Published var migrationTotal = 0
+    @Published var migrationDescription = ""
 
     private var process: Process?
     /// PID stored separately so forceStop can kill it from any isolation context.
@@ -204,18 +208,44 @@ final class BackendService: ObservableObject {
         backendPID = 0
     }
 
+    /// Poll migration status from the backend and update published properties.
+    private func pollMigrationStatus(session: URLSession) async {
+        let statusURL = URL(string: "\(APIService.baseURL)/migration-status")!
+        do {
+            let (data, response) = try await session.data(from: statusURL)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return
+            }
+            let migrating = json["migrating"] as? Bool ?? false
+            isMigrating = migrating
+            if migrating {
+                migrationCurrent = json["current"] as? Int ?? 0
+                migrationTotal = json["total"] as? Int ?? 0
+                migrationDescription = json["description"] as? String ?? ""
+            }
+        } catch {
+            // Endpoint not available yet — not an error
+        }
+    }
+
     /// Wait for the API to respond to /health, with retries.
+    /// While waiting, polls /migration-status to show progress.
     private func waitForHealthy() async {
-        let url = URL(string: "\(APIService.baseURL)/health")!
+        let healthURL = URL(string: "\(APIService.baseURL)/health")!
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 1
         config.timeoutIntervalForResource = 1
         let session = URLSession(configuration: config)
         for attempt in 1...30 {
-            // Check first, then sleep — shaves off the initial delay
+            // Poll migration status while waiting
+            await pollMigrationStatus(session: session)
+
+            // Check health
             do {
-                let (_, response) = try await session.data(from: url)
+                let (_, response) = try await session.data(from: healthURL)
                 if let http = response as? HTTPURLResponse, http.statusCode == 200 {
+                    isMigrating = false
                     isRunning = true
                     logger.info("API server healthy after \(attempt) attempts")
                     return
@@ -223,7 +253,7 @@ final class BackendService: ObservableObject {
             } catch {
                 // Not ready yet
             }
-            try? await Task.sleep(for: .milliseconds(attempt < 3 ? 100 : 300))
+            try? await Task.sleep(for: .milliseconds(isMigrating ? 500 : (attempt < 3 ? 100 : 300)))
         }
         // Check if process is still alive — maybe it just needs more time
         if let proc = process, proc.isRunning {
@@ -231,9 +261,11 @@ final class BackendService: ObservableObject {
             // One more round of checks with longer intervals
             for _ in 1...10 {
                 try? await Task.sleep(for: .seconds(1))
+                await pollMigrationStatus(session: session)
                 do {
-                    let (_, response) = try await session.data(from: url)
+                    let (_, response) = try await session.data(from: healthURL)
                     if let http = response as? HTTPURLResponse, http.statusCode == 200 {
+                        isMigrating = false
                         isRunning = true
                         logger.info("API server healthy on extended retry")
                         return
@@ -242,6 +274,7 @@ final class BackendService: ObservableObject {
             }
         }
 
+        isMigrating = false
         // Read last lines from log for diagnostics
         let logPath = backendLogURL
         let logTail = (try? String(contentsOf: logPath, encoding: .utf8))

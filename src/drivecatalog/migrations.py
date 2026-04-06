@@ -36,8 +36,10 @@ safe than sorry when 9 drives worth of files are at stake.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable
 
 
@@ -339,6 +341,43 @@ def _migrate_catalog_bundle_int_to_text(conn: sqlite3.Connection) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Migration progress reporting (file-based, read by /migration-status)
+# ---------------------------------------------------------------------------
+
+def _migration_status_path() -> Path:
+    """Return the path to the migration status JSON file."""
+    return Path.home() / ".drivecatalog" / "migration_status.json"
+
+
+def _write_migration_status(status: dict) -> None:
+    """Write migration progress to the status file atomically."""
+    path = _migration_status_path()
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(status))
+    tmp.replace(path)
+
+
+def _cleanup_migration_status() -> None:
+    """Remove the migration status file (called on completion or stale cleanup)."""
+    path = _migration_status_path()
+    path.unlink(missing_ok=True)
+    # Also clean up any leftover tmp file
+    path.with_suffix(".tmp").unlink(missing_ok=True)
+
+
+def read_migration_status() -> dict:
+    """Read current migration status. Returns {"migrating": false} if no file."""
+    path = _migration_status_path()
+    if not path.exists():
+        return {"migrating": False}
+    try:
+        return json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {"migrating": False}
+
+
+# ---------------------------------------------------------------------------
 # Migration engine
 # ---------------------------------------------------------------------------
 
@@ -377,12 +416,20 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
     Raises RuntimeError if a migration has requires_rescan=True but no
     data_migration callable — this is the core guardrail.
     """
+    # Clean up stale status file from a previous crash
+    _cleanup_migration_status()
+
     _ensure_schema_version_table(conn)
     current = _get_current_version(conn)
 
-    for m in MIGRATIONS:
-        if m.version <= current:
-            continue
+    pending = [m for m in MIGRATIONS if m.version > current]
+    if not pending:
+        return  # DB already up to date — no status file created
+
+    total = len(pending)
+    _write_migration_status({"migrating": True, "current": 0, "total": total})
+
+    for idx, m in enumerate(pending, start=1):
 
         # --- Guardrail: block dangerous migrations without a data fix ---
         if m.requires_rescan and m.data_migration is None:
@@ -441,3 +488,15 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
             "INSERT INTO schema_version (version) VALUES (?)", (m.version,)
         )
         conn.commit()
+
+        # --- Report progress ---
+        _write_migration_status({
+            "migrating": True,
+            "current": idx,
+            "total": total,
+            "description": m.description,
+        })
+
+    # All migrations complete — clean up status file
+    _write_migration_status({"migrating": False})
+    _cleanup_migration_status()

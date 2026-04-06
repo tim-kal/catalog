@@ -5,11 +5,13 @@ extension Notification.Name {
 }
 
 struct ContentView: View {
+    @EnvironmentObject private var backend: BackendService
     @State private var selection: SidebarItem? = .drives
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @AppStorage("showConsolidatePage") private var showConsolidatePage = false
 
     var body: some View {
+        ZStack {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             Sidebar(selection: $selection)
         } detail: {
@@ -60,6 +62,65 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 800, minHeight: 500)
+
+            if backend.isMigrating {
+                MigrationOverlay(
+                    current: backend.migrationCurrent,
+                    total: backend.migrationTotal,
+                    description: backend.migrationDescription
+                )
+            }
+        } // ZStack
+    }
+}
+
+// MARK: - Migration Overlay
+
+struct MigrationOverlay: View {
+    let current: Int
+    let total: Int
+    let description: String
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.secondary)
+
+                Text("Updating database...")
+                    .font(.title2.weight(.semibold))
+
+                if total > 0 {
+                    ProgressView(value: Double(current), total: Double(total))
+                        .progressViewStyle(.linear)
+                        .frame(width: 300)
+
+                    Text("Step \(current) of \(total)")
+                        .font(.headline)
+                        .monospacedDigit()
+                } else {
+                    ProgressView()
+                        .controlSize(.large)
+                }
+
+                if !description.isEmpty {
+                    Text(description)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("Your existing data is being updated for the new version.\nNo rescanning needed.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(40)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        }
     }
 }
 

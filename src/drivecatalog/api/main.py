@@ -58,3 +58,15 @@ app.include_router(folder_duplicates.router)
 async def health() -> dict:
     """Health check endpoint."""
     return {"status": "ok"}
+
+
+@app.get("/migration-status")
+async def migration_status() -> dict:
+    """Return current migration progress.
+
+    Registered directly on the app (not via lifespan-dependent router)
+    so it is available before init_db() completes.
+    """
+    from drivecatalog.migrations import read_migration_status
+
+    return read_migration_status()
