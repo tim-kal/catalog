@@ -38,3 +38,9 @@ Auto-captured system issues. Review periodically and close resolved items.
 **Impact:** Task not completed (0s spent)
 **Root cause:** Retry cap exhausted (4/3 runs)
 
+## 2026-04-06 13:17 UTC — Reviewer changes_requested: DC-003
+**Category:** quality
+**Task:** DC-003
+**Impact:** Task needs rework
+**Details:** Core structure solid (3 sections, sidebar, routing, graceful degradation), but Section 1 missing per-drive detail fields and drill-down, Section 2 missing per-drive duplicate breakdown.
+
