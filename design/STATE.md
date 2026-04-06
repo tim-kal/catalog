@@ -10,22 +10,26 @@
 - **Build**: XcodeGen. Embedded Python for release, uv for dev.
 - **Comms**: HTTP localhost. APIService.swift ↔ FastAPI.
 
-## Open Design Threads (from last session)
+## Drive Recognition Deep-Dive (researched 2026-04-06)
 
-### 1. Manage Page (merge Backup + Insights)
-Decision: merge into single "Manage" page with sections: Backup Status (per folder AND per drive), Duplikate & Platzgewinn, Empfohlene Aktionen. Replaces separate Insights + Backups sidebar items.
+### How it works
+- **Primary ID**: macOS VolumeUUID via `diskutil info -plist` → stored in `drives.uuid` (UNIQUE)
+- **Registration**: AddDriveSheet lists /Volumes/, user picks volume, POST /drives stores UUID + mount_path
+- **Recognition**: `recognize_drive()` — UUID lookup first, mount_path fallback. Auto-updates name/path on UUID match.
+- **Mount detection**: watchdog on /Volumes (DirCreated/Deleted events) + polling via GET /drives/mounted
 
-### 2. Ordner-Duplikat-Erkennung
-Must be exact: full hash match on all files in both dirs = Ordner-Duplikat. Subset detection (A ⊂ B). No fuzzy thresholds — precision tool. Show on Manage page alongside file-level duplicates.
+### Known weaknesses
+1. UUID missing on FAT32/exFAT/network → falls back to mount_path which is fragile
+2. macOS can append " 1" to mount path → path-based matching breaks
+3. AddDriveSheet checks registered by path, not UUID → renamed drive shows as "new"
+4. list_mounted_drives() doesn't call recognize → renamed drives show as unmounted
+5. auto_scan_on_mount() uses path lookup, not UUID → misses renamed drives
+6. No disk-identifier fallback (DeviceIdentifier, DiskUUID for partitions)
 
-### 3. Katalog-Dateien (.cocatalog, .photoslibrary, .RDC)
-Capture One + Photos.app bundles contain real originals (esp. tethered shooting). Scanner currently traverses into bundles and finds "duplicates". Need: detect known bundle extensions, mark files inside as "catalog-protected", warn before any delete action.
+## Open Design Threads
 
-### 4. Parallel Scanning
-Currently: one scan = one BackgroundTask thread. SQLite WAL should handle concurrent writes but never tested. No per-drive lock, no UI for parallel scan status. Feature to build.
+### Phase 1 (DC-001..DC-007): synced to DB, ready for execution
+See `phases/PHASE-01-CORE-IMPROVEMENTS.md` and `phases/PHASE-02-MANAGE-PAGE.md`
 
-### 5. Feedback/Ticket Pipeline
-BugReportView exists, sends to `catalog-beta.vercel.app/api/bug-report`. Backend status unknown — may not exist yet. Goal: bug → GitHub Issue → notification to operator. Ambitious pipeline (auto-analyze, test, release) deferred.
-
-### 6. Konsolidierungs-Reihenfolge
-User wants: "where to move data, in what order, to maximize freed space". Needs Manage page + Ordner-Duplikat logic first.
+### Drive recognition robustness
+Needs decision: fix the 6 weaknesses above as a new task, or fold into DC-007 (Drive-Rename Sync)?
