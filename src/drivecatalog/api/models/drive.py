@@ -65,7 +65,8 @@ class DriveStatusResponse(BaseModel):
     video_count: int
     image_count: int
     audio_count: int
-    # Disk usage (persisted — available even when disconnected)
+    # Disk capacity and usage (persisted — available even when disconnected)
+    total_bytes: int | None = None
     used_bytes: int | None = None
     # Drive health
     smart_status: str | None = None  # "Verified", "Failing", "Not Supported"

@@ -70,7 +70,8 @@ struct DriveStatusResponse: Codable, Identifiable {
     let videoCount: Int
     let imageCount: Int
     let audioCount: Int
-    // Disk usage (persisted — available even when disconnected)
+    // Disk capacity and usage (persisted — available even when disconnected)
+    let totalBytes: Int64?
     let usedBytes: Int64?
     // Drive health
     let smartStatus: String?
@@ -90,6 +91,7 @@ struct DriveStatusResponse: Codable, Identifiable {
         case videoCount = "video_count"
         case imageCount = "image_count"
         case audioCount = "audio_count"
+        case totalBytes = "total_bytes"
         case usedBytes = "used_bytes"
         case smartStatus = "smart_status"
         case mediaType = "media_type"

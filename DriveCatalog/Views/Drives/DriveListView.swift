@@ -183,6 +183,11 @@ struct DriveCard: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .fixedSize()
+            } else if let total = status?.totalBytes, total > 0 {
+                Text(formattedSize(total))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize()
             } else if drive.totalBytes > 0 {
                 Text(formattedSize(drive.totalBytes))
                     .font(.caption2)
@@ -196,10 +201,10 @@ struct DriveCard: View {
                     used: space.usedBytes, total: space.totalBytes,
                     percent: space.usedPercent, live: true
                 )
-            } else if let used = status?.usedBytes, drive.totalBytes > 0 {
+            } else if let used = status?.usedBytes, let total = status?.totalBytes, total > 0 {
                 compactSpaceBar(
-                    used: used, total: drive.totalBytes,
-                    percent: Double(used) / Double(drive.totalBytes) * 100, live: false
+                    used: used, total: total,
+                    percent: Double(used) / Double(total) * 100, live: false
                 )
             }
 

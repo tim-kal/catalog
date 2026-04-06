@@ -584,6 +584,7 @@ async def get_drive_status(name: str) -> DriveStatusResponse:
             media_type=media_type,
             device_protocol=device_protocol,
             used_bytes=used_bytes,
+            total_bytes=drive["total_bytes"],
         )
     finally:
         conn.close()
