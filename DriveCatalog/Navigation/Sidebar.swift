@@ -3,6 +3,7 @@ import SwiftUI
 struct Sidebar: View {
     @Binding var selection: SidebarItem?
     @AppStorage("showConsolidatePage") private var showConsolidatePage = false
+    @EnvironmentObject private var updater: UpdateService
 
     private var visibleItems: [SidebarItem] {
         SidebarItem.allCases.filter { item in
@@ -18,6 +19,29 @@ struct Sidebar: View {
                     .tag(item)
             }
             .listStyle(.sidebar)
+
+            // Update banner
+            if updater.updateAvailable, let version = updater.latestVersion {
+                Divider()
+                Button {
+                    Task { await updater.downloadAndInstall() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .foregroundStyle(.white)
+                        Text("Update to v\(version)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.white)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(.blue, in: RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+            }
 
             // Version info
             Divider()

@@ -15,6 +15,7 @@ struct DriveCatalogApp: App {
                 .onAppear {
                     backend.start()
                     Task { await updater.checkForUpdates() }
+                    updater.startPeriodicChecks()
                 }
         }
         .commands {

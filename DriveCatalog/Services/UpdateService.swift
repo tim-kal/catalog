@@ -18,6 +18,10 @@ final class UpdateService: ObservableObject {
     @Published var downloadProgress: Double = 0
     @Published var updateError: String?
 
+    /// Interval for periodic background update checks (4 hours).
+    private static let checkInterval: TimeInterval = 4 * 60 * 60
+
+    private var periodicTimer: Timer?
     private let logger = Logger(subsystem: "com.drivecatalog", category: "UpdateService")
 
     var currentVersion: String {
@@ -26,6 +30,24 @@ final class UpdateService: ObservableObject {
 
     var currentBuild: Int {
         Int(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0") ?? 0
+    }
+
+    // MARK: - Periodic Check
+
+    /// Start a repeating timer that checks for updates every 4 hours.
+    func startPeriodicChecks() {
+        periodicTimer?.invalidate()
+        periodicTimer = Timer.scheduledTimer(withTimeInterval: Self.checkInterval, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                await self.checkForUpdates()
+            }
+        }
+    }
+
+    func stopPeriodicChecks() {
+        periodicTimer?.invalidate()
+        periodicTimer = nil
     }
 
     // MARK: - Check for Updates
