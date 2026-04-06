@@ -1,4 +1,3 @@
-| 2026-04-06 13:20 UTC | DC-006 | review:changes_requested | DC-006 was never implemented — executor self-reported "blocked" and no code was produced; zero of 6 acceptance criteria are met. |
 | 2026-04-06 13:20 UTC | DC-008 | review:changes_requested | Zero acceptance criteria met — no code was implemented; diff contains only design file bookkeeping (ISSUES.md and SIGNALS.md updates). |
 | 2026-04-06 13:25 UTC | DC-005 | verified | Implemented parallel drive scanning with per-drive locking, 409 conflict responses, WAL busy_timeout for concurrent writes, and integration tests. Frontend Scan All button and per-drive progress were already functional. |
 | 2026-04-06 13:27 UTC | DC-005 | review:approved | All 8 acceptance criteria verifiably met — per-drive locking, 409 conflict, WAL busy_timeout, integration tests, and cancellation isolation implemented; frontend criteria confirmed pre-existing. |
@@ -8,3 +7,4 @@
 | 2026-04-06 13:31 UTC | DC-006 | review:approved | All 6 core acceptance criteria met — bug report endpoint creates GitHub Issues with correct structure, labels, rate limiting, and URL response; register/heartbeat endpoints structurally ready but lack persistence (acceptable given external infra dependency). |
 | 2026-04-06 13:33 UTC | DC-008 | review:changes_requested | Zero acceptance criteria met — executor self-reported "blocked" and produced no code; the only commit (1b62274) contains ISSUES.md and SIGNALS.md bookkeeping, not implementation. |
 | 2026-04-06 13:49 UTC | DC-002 | verified | Addressed all 4 reviewer feedback items: added 3 missing bundle extensions (.fcpbundle, .lrcat, .dvr), changed catalog_bundle column from INTEGER to TEXT storing bundle root path, moved catalog_bundle from FileGroup to per-FileLocation in the API model, and added integration test with .photoslibrary scan. |
+| 2026-04-06 13:51 UTC | DC-002 | review:approved | All 7 acceptance criteria verified in code and tests; 19/19 tests pass. |

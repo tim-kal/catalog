@@ -68,8 +68,23 @@ struct DriveRisk: Codable, Identifiable {
     let freeBytes: Int64
     let freePercent: Double
     let riskLevel: String // critical, high, moderate, low, safe
+    let totalFiles: Int?
+    let backedUpFiles: Int?
 
     var id: String { driveName }
+
+    /// Backup coverage percentage computed from bytes.
+    var backupPercent: Double {
+        let used = max(usedBytes, 1)
+        return max(0, (1.0 - Double(unprotectedBytes) / Double(used))) * 100
+    }
+
+    /// Number of files with at least one backup copy on another drive.
+    var computedBackedUpFiles: Int {
+        if let b = backedUpFiles { return b }
+        if let t = totalFiles { return max(0, t - unprotectedFiles) }
+        return 0
+    }
 
     enum CodingKeys: String, CodingKey {
         case driveName = "drive_name"
@@ -80,6 +95,8 @@ struct DriveRisk: Codable, Identifiable {
         case freeBytes = "free_bytes"
         case freePercent = "free_percent"
         case riskLevel = "risk_level"
+        case totalFiles = "total_files"
+        case backedUpFiles = "backed_up_files"
     }
 
     var riskColor: String {

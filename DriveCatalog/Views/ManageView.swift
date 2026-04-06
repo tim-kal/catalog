@@ -10,6 +10,7 @@ struct ManageView: View {
     @State private var errorMessage: String?
     @State private var selectedAction: RecommendedAction?
     @State private var showAllDrives = false
+    @State private var expandedDrives: Set<String> = []
 
     var body: some View {
         Group {
@@ -171,7 +172,7 @@ struct ManageView: View {
     private func driveRiskSection(_ risks: [DriveRisk]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Drive Risk")
+                Text("Per-Drive Backup")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -194,35 +195,126 @@ struct ManageView: View {
     }
 
     private func driveRiskRow(_ risk: DriveRisk) -> some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(riskColor(risk.riskLevel))
-                .frame(width: 8, height: 8)
+        let isExpanded = expandedDrives.contains(risk.id)
+        return VStack(alignment: .leading, spacing: 0) {
+            // Clickable header row
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if isExpanded {
+                        expandedDrives.remove(risk.id)
+                    } else {
+                        expandedDrives.insert(risk.id)
+                    }
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 10)
 
-            Text(risk.driveName)
-                .font(.caption)
-                .fontWeight(.medium)
-                .frame(width: 70, alignment: .leading)
+                    Circle()
+                        .fill(riskColor(risk.riskLevel))
+                        .frame(width: 8, height: 8)
 
-            GeometryReader { geo in
-                let maxBytes = insightsData?.driveRisks.first?.unprotectedBytes ?? 1
-                let proportion = CGFloat(risk.unprotectedBytes) / CGFloat(max(maxBytes, 1))
-                let barWidth = proportion * geo.size.width
+                    Text(risk.driveName)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .frame(width: 70, alignment: .leading)
 
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(riskColor(risk.riskLevel).opacity(0.6))
-                    .frame(width: max(barWidth, 2), height: 6)
-                    .frame(maxHeight: .infinity, alignment: .center)
+                    // Per-drive coverage bar
+                    GeometryReader { geo in
+                        let pct = CGFloat(risk.backupPercent / 100)
+                        let greenWidth = pct * geo.size.width
+
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color.red.opacity(0.2))
+                                .frame(height: 6)
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color.green.opacity(0.7))
+                                .frame(width: max(greenWidth, 2), height: 6)
+                        }
+                        .frame(maxHeight: .infinity, alignment: .center)
+                    }
+                    .frame(height: 12)
+
+                    Text("\(risk.backupPercent, specifier: "%.0f")%")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundStyle(coverageColor(risk.backupPercent))
+                        .frame(width: 36, alignment: .trailing)
+                }
+                .padding(.vertical, 4)
             }
-            .frame(height: 12)
+            .buttonStyle(.plain)
 
-            Text(formattedSize(risk.unprotectedBytes))
-                .font(.caption2)
-                .fontWeight(.medium)
-                .foregroundStyle(riskColor(risk.riskLevel))
-                .frame(width: 60, alignment: .trailing)
+            // Expanded detail panel
+            if isExpanded {
+                driveDetailPanel(risk)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
-        .padding(.vertical, 2)
+    }
+
+    private func driveDetailPanel(_ risk: DriveRisk) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // File counts
+            HStack(spacing: 16) {
+                if let total = risk.totalFiles {
+                    detailStat(label: "Total Files", value: formatCount(total))
+                    detailStat(label: "Backed Up", value: formatCount(risk.computedBackedUpFiles), color: .green)
+                }
+                detailStat(label: "Unprotected", value: formatCount(risk.unprotectedFiles), color: .red)
+                detailStat(label: "At Risk", value: formattedSize(risk.unprotectedBytes), color: .red)
+            }
+
+            // Per-drive coverage bar (larger version)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Backup Coverage")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                GeometryReader { geo in
+                    let pct = CGFloat(risk.backupPercent / 100)
+                    let protectedWidth = pct * geo.size.width
+
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.red.opacity(0.15))
+                            .frame(height: 8)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.green)
+                            .frame(width: max(protectedWidth, 2), height: 8)
+                    }
+                }
+                .frame(height: 8)
+                HStack {
+                    Text("\(formattedSize(risk.usedBytes - risk.unprotectedBytes)) protected")
+                        .font(.caption2)
+                        .foregroundStyle(.green)
+                    Spacer()
+                    Text("\(formattedSize(risk.unprotectedBytes)) unprotected")
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .padding(.leading, 28)
+        .padding(.trailing, 4)
+        .padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color(.controlBackgroundColor).opacity(0.3)))
+    }
+
+    private func detailStat(label: String, value: String, color: Color = .primary) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(color)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
     }
 
     // MARK: - Section 2: Duplikate & Platzgewinn
@@ -246,6 +338,36 @@ struct ManageView: View {
                     label: "Reclaimable",
                     color: reclaimable > 0 ? .orange : .green
                 )
+            }
+
+            // Per-drive duplicate space breakdown
+            if let fd = folderDuplicates {
+                let perDrive = aggregateDuplicatesByDrive(fd)
+                if !perDrive.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Per-Drive Duplicate Space")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        ForEach(perDrive.sorted(by: { $0.value > $1.value }), id: \.key) { drive, bytes in
+                            HStack(spacing: 8) {
+                                Image(systemName: "externaldrive.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                                Text(drive)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                Spacer()
+                                Text(formattedSize(bytes))
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                    }
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color(.controlBackgroundColor).opacity(0.5)))
+                }
             }
 
             // Folder duplicates (from DC-001 endpoint, graceful degradation)
@@ -508,6 +630,25 @@ struct ManageView: View {
 
     private func formattedSize(_ bytes: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    /// Aggregates duplicate bytes per drive from folder duplicate data.
+    private func aggregateDuplicatesByDrive(_ fd: FolderDuplicateResponse) -> [String: Int64] {
+        var result: [String: Int64] = [:]
+        for group in fd.exactMatchGroups {
+            // Each group beyond the first copy is reclaimable per drive
+            for folder in group.folders {
+                result[folder.driveName, default: 0] += folder.totalBytes
+            }
+            // Subtract one copy (the "keeper") — attribute evenly to first folder's drive
+            if let first = group.folders.first {
+                result[first.driveName, default: 0] -= first.totalBytes
+            }
+        }
+        for pair in fd.subsetPairs {
+            result[pair.subsetFolder.driveName, default: 0] += pair.subsetFolder.totalBytes
+        }
+        return result.filter { $0.value > 0 }
     }
 
     private func formatCount(_ n: Int) -> String {
