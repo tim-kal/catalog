@@ -55,7 +55,10 @@ async def reset_all_data(
 ) -> dict:
     """Delete ALL data: drives, files, hashes, operations, everything.
 
-    The database file is deleted and recreated with a fresh schema.
+    Cancels all running operations, then signals that the app should restart.
+    The frontend handles the actual restart — on next launch, init_db() will
+    recreate a fresh database.
+
     This is irreversible.
     """
     if not confirm:
@@ -63,17 +66,26 @@ async def reset_all_data(
 
     import os
 
-    from drivecatalog.database import init_db
+    from drivecatalog.api.operations import OperationStatus, _operations, cancel_operation
 
+    # 1. Cancel all running operations
+    for op_id, op in list(_operations.items()):
+        if op.status in (OperationStatus.PENDING, OperationStatus.RUNNING):
+            cancel_operation(op_id)
+
+    # 2. Checkpoint WAL to flush all data into main DB file
+    conn = get_connection()
+    try:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    finally:
+        conn.close()
+
+    # 3. Delete database files
     db_path = get_db_path()
-
-    # Close any open connections by deleting the DB files
     for suffix in ("", "-wal", "-shm"):
         p = str(db_path) + suffix
         if os.path.exists(p):
             os.remove(p)
 
-    # Recreate fresh DB
-    init_db()
-
-    return {"status": "reset_complete", "message": "All data deleted. Database recreated."}
+    # 4. Return — frontend will restart the app, init_db() recreates fresh DB
+    return {"status": "reset_complete", "restart_required": True}

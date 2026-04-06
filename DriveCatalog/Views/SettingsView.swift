@@ -395,6 +395,20 @@ struct SettingsView: View {
             if let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
                 resetComplete = true
                 healthStatus = nil
+
+                // Restart the app after a short delay so the user sees the confirmation
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    // Relaunch: start a new instance, then terminate this one
+                    let appPath = Bundle.main.bundlePath
+                    let task = Process()
+                    task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+                    task.arguments = ["-n", appPath]
+                    try? task.run()
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        NSApplication.shared.terminate(nil)
+                    }
+                }
             }
         } catch {
             healthError = "Reset failed: \(error.localizedDescription)"
