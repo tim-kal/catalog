@@ -367,6 +367,13 @@ struct DriveCard: View {
                     spaceDetail(label: "Free", bytes: space.freeBytes, color: .green)
                     spaceDetail(label: "Total", bytes: space.totalBytes, color: .secondary)
                 }
+            } else if let used = status?.usedBytes, let total = status?.totalBytes, total > 0 {
+                HStack(spacing: 24) {
+                    spaceDetail(label: "Used", bytes: used, color: .blue)
+                    spaceDetail(label: "Free", bytes: total - used, color: .green)
+                    spaceDetail(label: "Total", bytes: total, color: .secondary)
+                }
+                .opacity(0.7)
             }
 
             // Drive health info
@@ -1643,6 +1650,8 @@ struct DriveListView: View {
                     }
                     activityLog.insert(ActivityLogEntry(date: Date(), driveName: drive.name, type: .disconnected, passed: nil), at: 0)
                 }
+                // Reload drive list so totalBytes/usedBytes are fresh from DB
+                Task { await loadDrives() }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .init("driveVerifiedNoChanges"))) { notification in
@@ -1896,7 +1905,11 @@ struct DriveListView: View {
     // MARK: - Summary Bar
 
     private var driveSummaryBar: some View {
-        let totalStorage = drives.reduce(Int64(0)) { $0 + $1.totalBytes }
+        let totalStorage = drives.reduce(Int64(0)) { total, drive in
+            // Prefer cached status total (persisted from last mount), fall back to drive list value
+            let cached = ViewCache.load(DriveStatusResponse.self, key: "driveStatus_\(drive.name)")?.totalBytes
+            return total + (cached ?? drive.totalBytes)
+        }
         let totalUsed = drives.reduce(Int64(0)) { total, drive in
             // Live disk space if mounted, otherwise cached status from DB
             let live = DiskSpace.read(path: drive.mountPath)?.usedBytes
