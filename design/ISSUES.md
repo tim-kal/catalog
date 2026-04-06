@@ -164,3 +164,15 @@ Auto-captured system issues. Review periodically and close resolved items.
 **Impact:** Task not completed (0s spent)
 **Root cause:** Retry cap exhausted (4/3 runs)
 
+## 2026-04-06 14:08 UTC — Reviewer changes_requested: DC-008
+**Category:** quality
+**Task:** DC-008
+**Impact:** Task needs rework
+**Details:** Executor never found the task definition (wrong path lookup) and made zero code changes across 3 runs — all acceptance criteria unmet.
+
+## 2026-04-06 14:13 UTC — Executor failed: DC-008
+**Category:** operational
+**Task:** DC-008
+**Impact:** Task not completed (324s spent)
+**Root cause:** Session crashed: Separator is found, but chunk is longer than limit
+

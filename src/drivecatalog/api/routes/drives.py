@@ -9,7 +9,13 @@ import os
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 from drivecatalog.database import get_connection
-from drivecatalog.drives import get_drive_info, get_smart_status, recognize_drive, validate_mount_path
+from drivecatalog.drives import (
+    collect_drive_identifiers,
+    get_drive_info,
+    get_smart_status,
+    recognize_drive,
+    validate_mount_path,
+)
 from drivecatalog.hasher import compute_partial_hash
 from drivecatalog.media import MEDIA_EXTENSIONS, check_integrity, extract_metadata
 from drivecatalog.scanner import (
@@ -22,6 +28,7 @@ from drivecatalog.verifier import verify_drive
 from ..models.drive import (
     DriveCreateRequest,
     DriveListResponse,
+    DriveRecognizeResponse,
     DriveResponse,
     DriveStatusResponse,
 )
@@ -60,6 +67,9 @@ async def list_drives() -> DriveListResponse:
                 total_bytes=row["total_bytes"] or 0,
                 last_scan=row["last_scan"],
                 file_count=row["file_count"],
+                disk_uuid=row["disk_uuid"] if "disk_uuid" in row.keys() else None,
+                device_serial=row["device_serial"] if "device_serial" in row.keys() else None,
+                fs_fingerprint=row["fs_fingerprint"] if "fs_fingerprint" in row.keys() else None,
             )
             for row in rows
         ]
@@ -88,31 +98,40 @@ async def create_drive(request: DriveCreateRequest) -> DriveResponse:
             detail=f"'{request.path}' is not a valid mount point. Must be under /Volumes/.",
         )
 
-    # Get drive information
+    # Get drive information and all identifiers
     drive_info = get_drive_info(path_obj)
+    ids = collect_drive_identifiers(path_obj)
     drive_name = request.name if request.name else drive_info["name"]
 
     conn = get_connection()
     try:
-        # Check if already registered by UUID or mount_path
-        existing = conn.execute(
-            "SELECT name FROM drives WHERE uuid = ? OR mount_path = ?",
-            (drive_info["uuid"], drive_info["mount_path"]),
-        ).fetchone()
-
-        if existing:
+        # Check if already registered using the full cascade
+        result = recognize_drive(conn, path_obj)
+        if result.drive is not None:
             raise HTTPException(
                 status_code=400,
-                detail=f"Drive already registered as '{existing['name']}'",
+                detail=f"Drive already registered as '{result.drive['name']}'",
+            )
+        if result.confidence == "ambiguous" and result.candidates:
+            names = ", ".join(c["name"] for c in result.candidates)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Drive matches multiple registered drives: {names}. Resolve ambiguity first.",
             )
 
-        # Insert new drive
+        # Insert new drive with all identifiers
         cursor = conn.execute(
             """
-            INSERT INTO drives (name, uuid, mount_path, total_bytes)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO drives (name, uuid, mount_path, total_bytes,
+                                disk_uuid, device_serial, partition_index, fs_fingerprint)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (drive_name, drive_info["uuid"], drive_info["mount_path"], drive_info["total_bytes"]),
+            (
+                drive_name, drive_info["uuid"], drive_info["mount_path"],
+                drive_info["total_bytes"],
+                ids.disk_uuid, ids.device_serial, ids.partition_index,
+                ids.fs_fingerprint,
+            ),
         )
         conn.commit()
 
@@ -126,6 +145,9 @@ async def create_drive(request: DriveCreateRequest) -> DriveResponse:
             total_bytes=drive_info["total_bytes"],
             last_scan=None,
             file_count=0,
+            disk_uuid=ids.disk_uuid,
+            device_serial=ids.device_serial,
+            fs_fingerprint=ids.fs_fingerprint,
         )
     finally:
         conn.close()
@@ -248,46 +270,53 @@ async def clear_scan_data(
 async def list_mounted_drives() -> DriveListResponse:
     """Return all registered drives that are currently mounted.
 
-    A drive is considered mounted when its mount_path exists on the filesystem.
+    Iterates /Volumes/ and uses recognize_drive() for each volume,
+    so renamed drives are correctly identified.
     """
     conn = get_connection()
     try:
-        rows = conn.execute(
-            """
-            SELECT d.*, (SELECT COUNT(*) FROM files WHERE drive_id = d.id) as file_count
-            FROM drives d ORDER BY d.name
-            """
-        ).fetchall()
-
         mounted = []
-        for row in rows:
-            mount_path = row["mount_path"]
-            if mount_path and Path(mount_path).exists():
-                mounted.append(
-                    DriveResponse(
-                        id=row["id"],
-                        name=row["name"],
-                        uuid=row["uuid"],
-                        mount_path=mount_path,
-                        total_bytes=row["total_bytes"] or 0,
-                        last_scan=row["last_scan"],
-                        file_count=row["file_count"],
+        seen_ids: set[int] = set()
+        volumes_dir = Path("/Volumes")
+
+        if volumes_dir.exists():
+            for entry in volumes_dir.iterdir():
+                if entry.name.startswith(".") or not entry.is_dir():
+                    continue
+                result = recognize_drive(conn, entry)
+                if result.drive is not None and result.drive["id"] not in seen_ids:
+                    seen_ids.add(result.drive["id"])
+                    file_count = conn.execute(
+                        "SELECT COUNT(*) FROM files WHERE drive_id = ?",
+                        (result.drive["id"],),
+                    ).fetchone()[0]
+                    mounted.append(
+                        DriveResponse(
+                            id=result.drive["id"],
+                            name=result.drive["name"],
+                            uuid=result.drive.get("uuid"),
+                            mount_path=str(entry),
+                            total_bytes=result.drive.get("total_bytes") or 0,
+                            last_scan=result.drive.get("last_scan"),
+                            file_count=file_count,
+                            disk_uuid=result.drive.get("disk_uuid"),
+                            device_serial=result.drive.get("device_serial"),
+                            fs_fingerprint=result.drive.get("fs_fingerprint"),
+                        )
                     )
-                )
 
         return DriveListResponse(drives=mounted, total=len(mounted))
     finally:
         conn.close()
 
 
-@router.post("/recognize")
-async def recognize_mounted_drive(mount_path: str = Query(..., description="Mount path of the volume")) -> dict:
-    """Recognize a mounted volume against registered drives using UUID.
+@router.post("/recognize", response_model=DriveRecognizeResponse)
+async def recognize_mounted_drive(
+    mount_path: str = Query(..., description="Mount path of the volume"),
+) -> DriveRecognizeResponse:
+    """Recognize a mounted volume using multi-signal identifier cascade.
 
-    Matches by UUID first (survives renames), then falls back to mount_path.
-    If the drive was renamed, automatically updates the registration.
-
-    Returns the recognized drive info or a 'not_found' status.
+    Returns confidence level and, for ambiguous matches, a candidate list.
     """
     path_obj = Path(mount_path)
     if not path_obj.exists():
@@ -295,27 +324,68 @@ async def recognize_mounted_drive(mount_path: str = Query(..., description="Moun
 
     conn = get_connection()
     try:
-        drive = recognize_drive(conn, path_obj)
+        result = recognize_drive(conn, path_obj)
 
-        if drive is None:
-            return {"status": "not_found", "mount_path": mount_path}
+        if result.drive is None and result.confidence != "ambiguous":
+            return DriveRecognizeResponse(
+                status="not_found",
+                confidence="none",
+                mount_path=mount_path,
+            )
 
+        if result.confidence == "ambiguous" and result.candidates:
+            candidate_responses = []
+            for c in result.candidates:
+                fc = conn.execute(
+                    "SELECT COUNT(*) FROM files WHERE drive_id = ?", (c["id"],)
+                ).fetchone()[0]
+                candidate_responses.append(
+                    DriveResponse(
+                        id=c["id"],
+                        name=c["name"],
+                        uuid=c.get("uuid"),
+                        mount_path=c.get("mount_path") or "",
+                        total_bytes=c.get("total_bytes") or 0,
+                        last_scan=c.get("last_scan"),
+                        file_count=fc,
+                        disk_uuid=c.get("disk_uuid"),
+                        device_serial=c.get("device_serial"),
+                        fs_fingerprint=c.get("fs_fingerprint"),
+                    )
+                )
+            return DriveRecognizeResponse(
+                status="ambiguous",
+                confidence="ambiguous",
+                candidates=candidate_responses,
+                mount_path=mount_path,
+            )
+
+        drive = result.drive
         file_count = conn.execute(
             "SELECT COUNT(*) FROM files WHERE drive_id = ?", (drive["id"],)
         ).fetchone()[0]
 
-        return {
-            "status": "recognized",
-            "drive": DriveResponse(
+        status = "recognized"
+        if result.confidence == "weak":
+            status = "weak_match"
+
+        return DriveRecognizeResponse(
+            status=status,
+            confidence=result.confidence,
+            drive=DriveResponse(
                 id=drive["id"],
                 name=drive["name"],
-                uuid=drive["uuid"],
-                mount_path=drive["mount_path"],
-                total_bytes=drive["total_bytes"] or 0,
-                last_scan=drive["last_scan"],
+                uuid=drive.get("uuid"),
+                mount_path=drive.get("mount_path") or "",
+                total_bytes=drive.get("total_bytes") or 0,
+                last_scan=drive.get("last_scan"),
                 file_count=file_count,
-            ).model_dump(),
-        }
+                disk_uuid=drive.get("disk_uuid"),
+                device_serial=drive.get("device_serial"),
+                fs_fingerprint=drive.get("fs_fingerprint"),
+            ),
+            mount_path=mount_path,
+        )
     finally:
         conn.close()
 
@@ -344,6 +414,9 @@ async def get_drive(name: str) -> DriveResponse:
             total_bytes=row["total_bytes"] or 0,
             last_scan=row["last_scan"],
             file_count=row["file_count"],
+            disk_uuid=row["disk_uuid"] if "disk_uuid" in row.keys() else None,
+            device_serial=row["device_serial"] if "device_serial" in row.keys() else None,
+            fs_fingerprint=row["fs_fingerprint"] if "fs_fingerprint" in row.keys() else None,
         )
     finally:
         conn.close()

@@ -2,11 +2,95 @@
 
 from __future__ import annotations
 
+import hashlib
+import logging
 import os
 import plistlib
+import re
 import sqlite3
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class DriveIdentifiers:
+    """All available identifiers for a mounted volume."""
+
+    volume_uuid: str | None = None
+    disk_uuid: str | None = None
+    device_serial: str | None = None
+    partition_index: int | None = None
+    fs_fingerprint: str | None = None
+
+
+@dataclass
+class RecognitionResult:
+    """Result of recognizing a mounted volume against registered drives."""
+
+    drive: dict | None = None
+    confidence: str = "none"  # certain|probable|ambiguous|weak|none
+    candidates: list[dict] | None = None
+
+
+def _get_diskutil_plist(path: str) -> dict | None:
+    """Run diskutil info -plist on a path and return the parsed plist dict."""
+    try:
+        result = subprocess.run(
+            ["diskutil", "info", "-plist", path],
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            return None
+        return plistlib.loads(result.stdout)
+    except (plistlib.InvalidFileException, OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def collect_drive_identifiers(path: Path) -> DriveIdentifiers:
+    """Collect all available identifiers for a mounted volume.
+
+    Calls diskutil info -plist once and extracts every identifier signal.
+    For device_serial, makes a second call on the parent whole disk.
+    """
+    ids = DriveIdentifiers()
+    plist = _get_diskutil_plist(str(path))
+    if plist is None:
+        return ids
+
+    ids.volume_uuid = plist.get("VolumeUUID")
+    ids.disk_uuid = plist.get("DiskUUID")
+
+    # Extract partition index from DeviceIdentifier (e.g. "disk2s1" → 1)
+    dev_id = plist.get("DeviceIdentifier", "")
+    m = re.search(r"s(\d+)$", dev_id)
+    if m:
+        ids.partition_index = int(m.group(1))
+
+    # FS fingerprint: hash of (TotalSize + FilesystemType + AllocationBlockSize)
+    total_size = plist.get("TotalSize")
+    fs_type = plist.get("FilesystemType")
+    block_size = plist.get("VolumeAllocationBlockSize")
+    if total_size is not None and fs_type is not None and block_size is not None:
+        raw = f"{total_size}:{fs_type}:{block_size}"
+        ids.fs_fingerprint = hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+    # Device serial: look up parent whole disk
+    parent_disk = plist.get("ParentWholeDisk")
+    if parent_disk:
+        parent_plist = _get_diskutil_plist(f"/dev/{parent_disk}")
+        if parent_plist:
+            serial = parent_plist.get("IORegistryEntryName") or parent_plist.get(
+                "MediaName"
+            )
+            if serial and serial not in ("", "Untitled"):
+                ids.device_serial = serial
+
+    return ids
 
 
 def get_drive_uuid(path: Path) -> str | None:
@@ -179,52 +263,130 @@ def get_drive_by_uuid(conn: sqlite3.Connection, uuid: str) -> dict | None:
     return dict(row)
 
 
-def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> dict | None:
-    """Recognize a mounted volume against registered drives using UUID.
+def _update_drive_identifiers(
+    conn: sqlite3.Connection,
+    drive_id: int,
+    mount_path: Path,
+    ids: DriveIdentifiers,
+) -> None:
+    """Update a drive's identifiers and mount info to latest values."""
+    total_bytes = get_drive_size(mount_path)
+    conn.execute(
+        """UPDATE drives SET
+            name = ?, mount_path = ?, total_bytes = ?,
+            uuid = COALESCE(?, uuid),
+            disk_uuid = COALESCE(?, disk_uuid),
+            device_serial = COALESCE(?, device_serial),
+            partition_index = COALESCE(?, partition_index),
+            fs_fingerprint = COALESCE(?, fs_fingerprint)
+        WHERE id = ?""",
+        (
+            mount_path.name,
+            str(mount_path),
+            total_bytes,
+            ids.volume_uuid,
+            ids.disk_uuid,
+            ids.device_serial,
+            ids.partition_index,
+            ids.fs_fingerprint,
+            drive_id,
+        ),
+    )
+    conn.commit()
 
-    If the UUID matches a registered drive whose mount_path or name differs
-    (e.g. drive was renamed in Finder), automatically update the registration.
 
-    Args:
-        conn: Database connection.
-        mount_path: Current mount path of the volume.
+def _drive_select_columns() -> str:
+    """Column list for drive queries including new identifier columns."""
+    return (
+        "id, name, mount_path, uuid, total_bytes, last_scan, "
+        "disk_uuid, device_serial, partition_index, fs_fingerprint"
+    )
 
-    Returns:
-        Dict with drive info (potentially updated) or None if not registered.
+
+def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionResult:
+    """Recognize a mounted volume using multi-signal identifier cascade.
+
+    Priority:
+      1. VolumeUUID match → certain
+      2. DiskUUID match → certain
+      3. Device Serial + Partition Index → certain
+      4. FS Fingerprint, single candidate → probable
+      5. FS Fingerprint, multiple candidates → ambiguous
+      6. mount_path only match → weak
+      7. No match → none
+
+    On successful recognition the stored identifiers are updated.
     """
-    uuid = get_drive_uuid(mount_path)
+    ids = collect_drive_identifiers(mount_path)
+    cols = _drive_select_columns()
 
-    # Try UUID match first (survives renames)
-    drive = None
-    if uuid:
-        drive = get_drive_by_uuid(conn, uuid)
+    # 1. VolumeUUID match
+    if ids.volume_uuid:
+        row = conn.execute(
+            f"SELECT {cols} FROM drives WHERE uuid = ?", (ids.volume_uuid,)
+        ).fetchone()
+        if row:
+            drive = dict(row)
+            _update_drive_identifiers(conn, drive["id"], mount_path, ids)
+            drive["mount_path"] = str(mount_path)
+            drive["name"] = mount_path.name
+            return RecognitionResult(drive=drive, confidence="certain")
 
-    # Fall back to mount_path match
-    if drive is None:
-        drive = get_drive_by_mount_path(conn, mount_path)
+    # 2. DiskUUID match
+    if ids.disk_uuid:
+        row = conn.execute(
+            f"SELECT {cols} FROM drives WHERE disk_uuid = ?", (ids.disk_uuid,)
+        ).fetchone()
+        if row:
+            drive = dict(row)
+            _update_drive_identifiers(conn, drive["id"], mount_path, ids)
+            drive["mount_path"] = str(mount_path)
+            drive["name"] = mount_path.name
+            return RecognitionResult(drive=drive, confidence="certain")
 
-    if drive is None:
-        return None
+    # 3. Device Serial + Partition Index
+    if ids.device_serial and ids.partition_index is not None:
+        row = conn.execute(
+            f"SELECT {cols} FROM drives WHERE device_serial = ? AND partition_index = ?",
+            (ids.device_serial, ids.partition_index),
+        ).fetchone()
+        if row:
+            drive = dict(row)
+            _update_drive_identifiers(conn, drive["id"], mount_path, ids)
+            drive["mount_path"] = str(mount_path)
+            drive["name"] = mount_path.name
+            return RecognitionResult(drive=drive, confidence="certain")
 
-    # Auto-update if mount_path or name changed
-    current_mount = str(mount_path)
-    current_name = mount_path.name
-    needs_update = False
+    # 4/5. FS Fingerprint match
+    if ids.fs_fingerprint:
+        rows = conn.execute(
+            f"SELECT {cols} FROM drives WHERE fs_fingerprint = ?",
+            (ids.fs_fingerprint,),
+        ).fetchall()
+        if len(rows) == 1:
+            drive = dict(rows[0])
+            _update_drive_identifiers(conn, drive["id"], mount_path, ids)
+            drive["mount_path"] = str(mount_path)
+            drive["name"] = mount_path.name
+            logger.warning(
+                "Drive '%s' recognized by FS fingerprint only (probable match)",
+                mount_path.name,
+            )
+            return RecognitionResult(drive=drive, confidence="probable")
+        if len(rows) > 1:
+            candidates = [dict(r) for r in rows]
+            return RecognitionResult(
+                drive=None, confidence="ambiguous", candidates=candidates
+            )
 
-    if drive["mount_path"] != current_mount:
-        needs_update = True
-    if drive["name"] != current_name:
-        needs_update = True
+    # 6. mount_path fallback
+    row = conn.execute(
+        f"SELECT {cols} FROM drives WHERE mount_path = ?", (str(mount_path),)
+    ).fetchone()
+    if row:
+        drive = dict(row)
+        _update_drive_identifiers(conn, drive["id"], mount_path, ids)
+        return RecognitionResult(drive=drive, confidence="weak")
 
-    if needs_update:
-        total_bytes = get_drive_size(mount_path)
-        conn.execute(
-            "UPDATE drives SET name = ?, mount_path = ?, total_bytes = ? WHERE id = ?",
-            (current_name, current_mount, total_bytes, drive["id"]),
-        )
-        conn.commit()
-        drive["name"] = current_name
-        drive["mount_path"] = current_mount
-        drive["total_bytes"] = total_bytes
-
-    return drive
+    # 7. No match
+    return RecognitionResult()

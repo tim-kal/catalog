@@ -145,27 +145,15 @@ actor APIService {
         return try await postEmpty(url: url)
     }
 
-    /// Recognize a mounted volume by UUID, auto-updating registration if renamed.
-    /// Returns the recognized drive name, or nil if the volume isn't registered.
-    func recognizeDrive(mountPath: String) async throws -> String? {
+    /// Recognize a mounted volume using multi-signal identifier cascade.
+    /// Returns the full recognition response with confidence and candidates.
+    func recognizeDrive(mountPath: String) async throws -> DriveRecognizeResponse {
         let url = try buildURL(path: "/drives/recognize", queryItems: [
             URLQueryItem(name: "mount_path", value: mountPath)
         ])
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            return nil
-        }
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let status = json["status"] as? String,
-              status == "recognized",
-              let drive = json["drive"] as? [String: Any],
-              let name = drive["name"] as? String else {
-            return nil
-        }
-        return name
+        return try await perform(request: request)
     }
 
     /// Fetch detailed status for a drive.

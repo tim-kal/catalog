@@ -19,6 +19,9 @@ class DriveResponse(BaseModel):
     total_bytes: int
     last_scan: datetime | None
     file_count: int
+    disk_uuid: str | None = None
+    device_serial: str | None = None
+    fs_fingerprint: str | None = None
 
 
 class DriveListResponse(BaseModel):
@@ -33,6 +36,16 @@ class DriveCreateRequest(BaseModel):
 
     path: str
     name: str | None = None
+
+
+class DriveRecognizeResponse(BaseModel):
+    """Response model for drive recognition."""
+
+    status: str  # recognized, not_found, ambiguous, weak_match
+    confidence: str  # certain, probable, ambiguous, weak, none
+    drive: DriveResponse | None = None
+    candidates: list[DriveResponse] | None = None
+    mount_path: str | None = None
 
 
 class DriveStatusResponse(BaseModel):

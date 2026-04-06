@@ -9,6 +9,9 @@ struct DriveResponse: Codable, Identifiable, Hashable {
     let totalBytes: Int64
     let lastScan: Date?
     let fileCount: Int
+    let diskUuid: String?
+    let deviceSerial: String?
+    let fsFingerprint: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -18,6 +21,26 @@ struct DriveResponse: Codable, Identifiable, Hashable {
         case totalBytes = "total_bytes"
         case lastScan = "last_scan"
         case fileCount = "file_count"
+        case diskUuid = "disk_uuid"
+        case deviceSerial = "device_serial"
+        case fsFingerprint = "fs_fingerprint"
+    }
+}
+
+/// Response model for drive recognition.
+struct DriveRecognizeResponse: Codable {
+    let status: String  // recognized, not_found, ambiguous, weak_match
+    let confidence: String  // certain, probable, ambiguous, weak, none
+    let drive: DriveResponse?
+    let candidates: [DriveResponse]?
+    let mountPath: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case confidence
+        case drive
+        case candidates
+        case mountPath = "mount_path"
     }
 }
 

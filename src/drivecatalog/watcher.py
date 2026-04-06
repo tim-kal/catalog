@@ -11,7 +11,7 @@ from watchdog.events import DirCreatedEvent, DirDeletedEvent, FileSystemEventHan
 from watchdog.observers import Observer
 
 from drivecatalog.config import load_config
-from drivecatalog.drives import get_drive_by_mount_path
+from drivecatalog.drives import recognize_drive
 from drivecatalog.scanner import scan_drive
 
 # Path to monitor for mount/unmount events
@@ -151,11 +151,12 @@ def auto_scan_on_mount(mount_path: Path, conn: sqlite3.Connection) -> None:
     ):
         return
 
-    # Look up drive by mount path
-    drive = get_drive_by_mount_path(conn, mount_path)
-    if drive is None:
+    # Recognize drive using multi-signal cascade
+    result = recognize_drive(conn, mount_path)
+    if result.drive is None:
         # Not a registered drive, skip
         return
+    drive = result.drive
 
     # Perform scan
     console.print(f"[bold blue]Auto-scanning '{drive['name']}'...[/bold blue]")

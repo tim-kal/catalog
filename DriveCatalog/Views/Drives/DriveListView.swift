@@ -1533,7 +1533,9 @@ struct DriveListView: View {
             volumeRefreshTrigger += 1
             if let volumeURL = notification.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL {
                 Task {
-                    if let driveName = try? await APIService.shared.recognizeDrive(mountPath: volumeURL.path) {
+                    if let response = try? await APIService.shared.recognizeDrive(mountPath: volumeURL.path),
+                       response.status == "recognized" || response.status == "weak_match",
+                       let driveName = response.drive?.name {
                         driveLastConnected[driveName] = Date()
                         withAnimation(.easeInOut) { connectionBanner = "\(driveName) connected" }
                         Task {

@@ -1,6 +1,3 @@
-| 2026-04-06 13:30 UTC | DC-006 | verified | Implemented backend/ directory with Vercel serverless functions: POST /api/register, POST /api/heartbeat, POST /api/bug-report. Bug report endpoint creates GitHub Issues via REST API with structured body (description, app version, OS version, log snippet), labels bug-report and from-app, user email in body only, rate limiting (5 per device_id per day), and returns GitHub Issue URL. Updated SIGNALS.md. |
-| 2026-04-06 13:30 UTC | DC-008 | verified | verified |
-| 2026-04-06 13:31 UTC | DC-006 | review:approved | All 6 core acceptance criteria met — bug report endpoint creates GitHub Issues with correct structure, labels, rate limiting, and URL response; register/heartbeat endpoints structurally ready but lack persistence (acceptable given external infra dependency). |
 | 2026-04-06 13:33 UTC | DC-008 | review:changes_requested | Zero acceptance criteria met — executor self-reported "blocked" and produced no code; the only commit (1b62274) contains ISSUES.md and SIGNALS.md bookkeeping, not implementation. |
 | 2026-04-06 13:49 UTC | DC-002 | verified | Addressed all 4 reviewer feedback items: added 3 missing bundle extensions (.fcpbundle, .lrcat, .dvr), changed catalog_bundle column from INTEGER to TEXT storing bundle root path, moved catalog_bundle from FileGroup to per-FileLocation in the API model, and added integration test with .photoslibrary scan. |
 | 2026-04-06 13:51 UTC | DC-002 | review:approved | All 7 acceptance criteria verified in code and tests; 19/19 tests pass. |
@@ -8,3 +5,6 @@
 | 2026-04-06 13:58 UTC | DC-003 | review:approved | All 5 acceptance criteria verifiably met in diff and source files; clean implementation with proper edge-case handling. |
 | 2026-04-06 14:05 UTC | DC-004 | verified | Implemented GET /consolidation/recommendations endpoint with full-stack support: core algorithm in consolidation.py considering full-duplicate folders, subset folders, and consolidation candidates; Pydantic models; FastAPI route; Swift model + APIService method; ManageView UI section with per-item advisory Start button. Sorted by space_freed descending. Target-fill safety check excludes recommendations that would overfill drives. |
 | 2026-04-06 14:06 UTC | DC-008 | verified | verified |
+| 2026-04-06 14:07 UTC | DC-004 | review:approved | All 7 acceptance criteria verifiably met; full-stack implementation with tests passing |
+| 2026-04-06 14:08 UTC | DC-008 | review:changes_requested | Executor never found the task definition (wrong path lookup) and made zero code changes across 3 runs — all acceptance criteria unmet. |
+| 2026-04-06 14:13 UTC | DC-008 | failed | Session crashed: Separator is found, but chunk is longer than limit |

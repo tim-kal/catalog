@@ -241,7 +241,49 @@ ALTER TABLE files ADD COLUMN catalog_bundle TEXT;
         sql="SELECT 1;",
         data_migration=lambda conn: _migrate_catalog_bundle_int_to_text(conn),
     ),
+    # ------------------------------------------------------------------
+    # Version 6 — multi-signal drive identifiers
+    # Adds columns for DiskUUID, device serial, partition index, and
+    # FS fingerprint. All nullable — no existing data is invalidated.
+    # Best-effort population of currently mounted drives.
+    # ------------------------------------------------------------------
+    Migration(
+        version=6,
+        description="Add multi-signal drive identifier columns (disk_uuid, device_serial, partition_index, fs_fingerprint)",
+        requires_rescan=False,
+        sql="""\
+ALTER TABLE drives ADD COLUMN disk_uuid TEXT;
+ALTER TABLE drives ADD COLUMN device_serial TEXT;
+ALTER TABLE drives ADD COLUMN partition_index INTEGER;
+ALTER TABLE drives ADD COLUMN fs_fingerprint TEXT;
+""",
+        data_migration=lambda conn: _migrate_populate_drive_identifiers(conn),
+    ),
 ]
+
+
+def _migrate_populate_drive_identifiers(conn: sqlite3.Connection) -> None:
+    """Best-effort: populate new identifier columns for currently mounted drives."""
+    from pathlib import Path
+
+    from drivecatalog.drives import collect_drive_identifiers
+
+    rows = conn.execute("SELECT id, mount_path FROM drives").fetchall()
+    for row in rows:
+        mount_path = row[1]
+        if not mount_path or not Path(mount_path).exists():
+            continue
+        ids = collect_drive_identifiers(Path(mount_path))
+        conn.execute(
+            """UPDATE drives SET
+                disk_uuid = COALESCE(?, disk_uuid),
+                device_serial = COALESCE(?, device_serial),
+                partition_index = COALESCE(?, partition_index),
+                fs_fingerprint = COALESCE(?, fs_fingerprint)
+            WHERE id = ?""",
+            (ids.disk_uuid, ids.device_serial, ids.partition_index, ids.fs_fingerprint, row[0]),
+        )
+    conn.commit()
 
 
 def _migrate_catalog_bundle_paths(conn: sqlite3.Connection) -> None:
@@ -353,14 +395,32 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
 
         # --- Apply DDL ---
         # Special handling for ALTER TABLE ADD COLUMN — skip if column exists.
-        # Strip SQL comment lines before detection (comments break startswith).
+        # Supports multiple ALTER TABLE statements in one migration.
         sql = m.sql.strip()
         sql_no_comments = "\n".join(
             line for line in sql.splitlines()
             if not line.strip().startswith("--")
         ).strip()
 
-        if sql_no_comments.upper().startswith("ALTER TABLE") and "ADD COLUMN" in sql_no_comments.upper():
+        # Split into individual statements and handle each ALTER TABLE separately
+        statements = [s.strip() for s in sql_no_comments.split(";") if s.strip()]
+        all_alter_add = all(
+            s.upper().startswith("ALTER TABLE") and "ADD COLUMN" in s.upper()
+            for s in statements
+        )
+
+        if all_alter_add:
+            for stmt in statements:
+                parts = stmt.split()
+                table_name = parts[2]
+                col_idx = next(
+                    i for i, p in enumerate(parts) if p.upper() == "COLUMN"
+                ) + 1
+                col_name = parts[col_idx]
+                if not _column_exists(conn, table_name, col_name):
+                    conn.execute(stmt)
+            conn.commit()
+        elif sql_no_comments.upper().startswith("ALTER TABLE") and "ADD COLUMN" in sql_no_comments.upper():
             parts = sql_no_comments.split()
             table_name = parts[2]
             col_idx = next(
