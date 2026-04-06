@@ -8,6 +8,11 @@ settings:
   SWIFT_VERSION: "5.9"
   CODE_SIGN_STYLE: Automatic
   MACOSX_DEPLOYMENT_TARGET: "14.0"
+  configs:
+    Debug:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+    Release:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: ""
 
 targets:
   DriveCatalog:
