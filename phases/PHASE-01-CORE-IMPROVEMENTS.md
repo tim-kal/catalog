@@ -11,3 +11,4 @@ Independent backend and infrastructure work that unblocks later UI tasks.
 - [ ] DC-008 — Robuste Drive-Erkennung: Multi-Signal Identifier-Kaskade (VolumeUUID, DiskUUID, Device Serial, FS-Fingerprint), alle 6 Recognition-Schwachstellen fixen, ersetzt DC-007
 - [ ] DC-009 — Migrations-Ladeindikator: Fortschrittsanzeige beim App-Start wenn DB-Migrationen laufen, file-basiert + polling endpoint
 - [ ] DC-010 — Release-Pipeline: build-release.sh mit Signierung und Notarisierung, publish-release.sh, periodischer Update-Check alle 4h, optional GitHub Action
+- [ ] DC-011 — Strukturierte Fehlercodes: Error-Code-Registry, JSONL-Errorlog, Codes in API-Responses und UI, auto-include in Bug-Reports
