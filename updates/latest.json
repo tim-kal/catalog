@@ -1,7 +1,7 @@
 {
-  "version": "1.3.6",
-  "build": 12,
-  "url": "https://github.com/tim-kal/catalog/releases/download/v1.3.6/DriveCatalog.zip",
-  "notes": "Unique drive names enforced, faster polling, error logging improvements, drive recognition fixes.",
+  "version": "1.3.7",
+  "build": 13,
+  "url": "https://github.com/tim-kal/catalog/releases/download/v1.3.7/DriveCatalog.zip",
+  "notes": "Correct disk capacity and usage when drive is disconnected. Unique drive names. Faster polling. Error logging.",
   "min_os": "14.0"
 }
