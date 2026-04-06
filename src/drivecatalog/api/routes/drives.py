@@ -620,11 +620,21 @@ def _run_scan(operation_id: str, drive_id: int, mount_path: str, drive_name: str
                 )
                 return
 
-            # Update last_scan timestamp
-            conn.execute(
-                "UPDATE drives SET last_scan = datetime('now') WHERE id = ?",
-                (drive_id,),
-            )
+            # Update last_scan timestamp and persist disk usage for offline display
+            try:
+                stat = os.statvfs(mount_path)
+                total = stat.f_frsize * stat.f_blocks
+                free = stat.f_frsize * stat.f_bavail
+                used = total - free
+                conn.execute(
+                    "UPDATE drives SET last_scan = datetime('now'), total_bytes = ?, used_bytes = ? WHERE id = ?",
+                    (total, used, drive_id),
+                )
+            except OSError:
+                conn.execute(
+                    "UPDATE drives SET last_scan = datetime('now') WHERE id = ?",
+                    (drive_id,),
+                )
             conn.commit()
 
             scan_result = {
@@ -832,11 +842,21 @@ def _run_smart_scan(operation_id: str, drive_id: int, mount_path: str, drive_nam
                 )
                 return
 
-            # Update last_scan timestamp
-            conn.execute(
-                "UPDATE drives SET last_scan = datetime('now') WHERE id = ?",
-                (drive_id,),
-            )
+            # Update last_scan timestamp and persist disk usage for offline display
+            try:
+                stat = os.statvfs(mount_path)
+                total = stat.f_frsize * stat.f_blocks
+                free = stat.f_frsize * stat.f_bavail
+                used = total - free
+                conn.execute(
+                    "UPDATE drives SET last_scan = datetime('now'), total_bytes = ?, used_bytes = ? WHERE id = ?",
+                    (total, used, drive_id),
+                )
+            except OSError:
+                conn.execute(
+                    "UPDATE drives SET last_scan = datetime('now') WHERE id = ?",
+                    (drive_id,),
+                )
             conn.commit()
 
             scan_result = {
