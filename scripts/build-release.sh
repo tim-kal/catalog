@@ -69,35 +69,6 @@ if [ "$SKIP_SIGN" = false ]; then
     echo "==> Signing identity: $DEVELOPER_ID_APPLICATION"
 fi
 
-# ---------- Update Info.plist if requested ----------
-
-PLIST="$PROJECT_DIR/DriveCatalog/Info.plist"
-
-if [ -n "$VERSION" ]; then
-    echo "==> Setting version to $VERSION"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$PLIST"
-fi
-
-if [ -n "$BUILD_NUMBER" ]; then
-    echo "==> Setting build number to $BUILD_NUMBER"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$PLIST"
-fi
-
-# ---------- Stamp build metadata (git commit + date) ----------
-
-GIT_HASH=$(cd "$PROJECT_DIR" && git rev-parse --short=7 HEAD 2>/dev/null || echo "unknown")
-BUILD_DATE=$(date +"%Y-%m-%d")
-
-echo "==> Stamping build: $GIT_HASH · $BUILD_DATE"
-
-# Add or update GitCommitHash
-/usr/libexec/PlistBuddy -c "Add :GitCommitHash string $GIT_HASH" "$PLIST" 2>/dev/null \
-    || /usr/libexec/PlistBuddy -c "Set :GitCommitHash $GIT_HASH" "$PLIST"
-
-# Add or update BuildDate
-/usr/libexec/PlistBuddy -c "Add :BuildDate string $BUILD_DATE" "$PLIST" 2>/dev/null \
-    || /usr/libexec/PlistBuddy -c "Set :BuildDate $BUILD_DATE" "$PLIST"
-
 # ---------- Bundle Python runtime ----------
 
 echo "==> Bundling Python runtime..."
@@ -115,6 +86,29 @@ if command -v xcodegen &>/dev/null; then
 else
     echo "WARNING: xcodegen not found. Using existing .xcodeproj."
 fi
+
+# ---------- Stamp Info.plist (AFTER xcodegen, which overwrites it) ----------
+
+PLIST="$PROJECT_DIR/DriveCatalog/Info.plist"
+
+if [ -n "$VERSION" ]; then
+    echo "==> Setting version to $VERSION"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$PLIST"
+fi
+
+if [ -n "$BUILD_NUMBER" ]; then
+    echo "==> Setting build number to $BUILD_NUMBER"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$PLIST"
+fi
+
+GIT_HASH=$(cd "$PROJECT_DIR" && git rev-parse --short=7 HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE=$(date +"%Y-%m-%d")
+echo "==> Stamping build: $GIT_HASH · $BUILD_DATE"
+
+/usr/libexec/PlistBuddy -c "Add :GitCommitHash string $GIT_HASH" "$PLIST" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Set :GitCommitHash $GIT_HASH" "$PLIST"
+/usr/libexec/PlistBuddy -c "Add :BuildDate string $BUILD_DATE" "$PLIST" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Set :BuildDate $BUILD_DATE" "$PLIST"
 
 # ---------- Clean & Build ----------
 
