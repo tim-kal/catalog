@@ -79,18 +79,54 @@ def collect_drive_identifiers(path: Path) -> DriveIdentifiers:
         raw = f"{total_size}:{fs_type}:{block_size}"
         ids.fs_fingerprint = hashlib.sha256(raw.encode()).hexdigest()[:16]
 
-    # Device serial: look up parent whole disk
+    # Device serial: get the REAL hardware serial number via ioreg.
+    # diskutil only gives the product name (e.g. "SanDisk Extreme Pro Media")
+    # which is identical for all drives of the same model.
+    # The actual per-device serial is in IOKit: Device Characteristics → Serial Number.
     parent_disk = plist.get("ParentWholeDisk")
     if parent_disk:
-        parent_plist = _get_diskutil_plist(f"/dev/{parent_disk}")
-        if parent_plist:
-            serial = parent_plist.get("IORegistryEntryName") or parent_plist.get(
-                "MediaName"
-            )
-            if serial and serial not in ("", "Untitled"):
-                ids.device_serial = serial
+        ids.device_serial = _get_device_serial_from_ioreg(parent_disk)
 
     return ids
+
+
+def _get_device_serial_from_ioreg(disk_name: str) -> str | None:
+    """Extract the hardware serial number for a disk from IOKit via ioreg.
+
+    Parses ioreg output to find a Serial Number near the BSD Name matching
+    our disk. Each physical device has a unique serial — this is the only
+    reliable way to distinguish two identical USB drives.
+
+    Args:
+        disk_name: e.g. "disk4" (the parent whole disk, not a partition)
+
+    Returns:
+        Per-device serial string, or None if not available.
+    """
+    try:
+        result = subprocess.run(
+            ["ioreg", "-r", "-c", "IOBlockStorageDevice", "-l"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode != 0:
+            return None
+
+        lines = result.stdout.splitlines()
+        for i, line in enumerate(lines):
+            serial_m = re.search(r'"Serial Number"\s*=\s*"([^"]+)"', line)
+            if not serial_m:
+                continue
+            # Check nearby lines (within context window) for our BSD Name
+            context = lines[max(0, i - 10): i + 50]
+            for cl in context:
+                bsd_m = re.search(r'"BSD Name"\s*=\s*"' + re.escape(disk_name) + r'"', cl)
+                if bsd_m:
+                    return serial_m.group(1).strip()
+
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+    return None
 
 
 def get_drive_uuid(path: Path) -> str | None:
@@ -349,12 +385,18 @@ def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionRe
 
     # 3. Device Serial + Partition Index
     if ids.device_serial and ids.partition_index is not None:
-        row = conn.execute(
+        rows = conn.execute(
             f"SELECT {cols} FROM drives WHERE device_serial = ? AND partition_index = ?",
             (ids.device_serial, ids.partition_index),
-        ).fetchone()
-        if row:
-            drive = dict(row)
+        ).fetchall()
+        # Filter out candidates that are currently mounted elsewhere
+        candidates = [
+            r for r in rows
+            if not r["mount_path"] or not Path(r["mount_path"]).exists()
+            or str(mount_path) == r["mount_path"]
+        ]
+        if len(candidates) == 1:
+            drive = dict(candidates[0])
             _update_drive_identifiers(conn, drive["id"], mount_path, ids)
             drive["mount_path"] = str(mount_path)
             # Keep user-assigned name — don't overwrite with Finder volume name
