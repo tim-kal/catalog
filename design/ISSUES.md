@@ -2,12 +2,6 @@
 
 Auto-captured system issues. Review periodically and close resolved items.
 
-## 2026-04-06 13:09 UTC — Reviewer changes_requested: DC-002
-**Category:** quality
-**Task:** DC-002
-**Impact:** Task needs rework
-**Details:** 3 missing bundle extensions, column type is INTEGER/boolean instead of TEXT with bundle root path per AC, API field is group-level instead of per-file
-
 ## 2026-04-06 13:15 UTC — Executor failed: DC-002
 **Category:** operational
 **Task:** DC-002
@@ -181,4 +175,10 @@ Auto-captured system issues. Review periodically and close resolved items.
 **Task:** DC-009
 **Impact:** Task needs rework
 **Details:** Executor self-reported all 12 criteria as PASS, but the majority of the rewritten DC-009 acceptance criteria are not implemented — no backup, no rollback, no direct file I/O, no schema version sync, no tests, no failure UI.
+
+## 2026-04-06 15:57 UTC — Reviewer changes_requested: DC-011
+**Category:** quality
+**Task:** DC-011
+**Impact:** Task needs rework
+**Details:** Zero DC-011 acceptance criteria implemented — the diff contains only build-infrastructure changes (build stamping, Python embedding) unrelated to the structured error code system.
 

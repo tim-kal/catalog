@@ -280,8 +280,8 @@ final class BackendService: ObservableObject {
             let restoredFrom = json["restored_from"] as? String ?? ""
             isMigrating = false
             migrationFailed = true
-            migrationError = errorMsg
-            startupError = "Migration failed: \(errorMsg)\n\nRestored from: \(restoredFrom)"
+            migrationError = "DC-E006: \(errorMsg)"
+            startupError = "DC-E006 Migration Failed: \(errorMsg)\n\nRestored from: \(restoredFrom)"
             return true
         }
 
@@ -347,10 +347,22 @@ final class BackendService: ObservableObject {
         let logPath = backendLogURL
         let logTail = (try? String(contentsOf: logPath, encoding: .utf8))
             .flatMap { log in
-                let lines = log.components(separatedBy: .newlines).suffix(5)
+                let lines = log.components(separatedBy: .newlines).suffix(10)
                 return lines.isEmpty ? nil : lines.joined(separator: "\n")
             } ?? "No log output"
-        startupError = "Backend failed to start.\n\nLog: \(logPath.path)\n\n\(logTail)"
+
+        // Detect structured error codes in log tail
+        let errorCodePattern = try? NSRegularExpression(pattern: "DC-E\\d{3,4}")
+        let detectedCodes: [String] = {
+            guard let pattern = errorCodePattern else { return [] }
+            let matches = pattern.matches(in: logTail, range: NSRange(logTail.startIndex..., in: logTail))
+            return Array(Set(matches.compactMap { match in
+                Range(match.range, in: logTail).map { String(logTail[$0]) }
+            }))
+        }()
+        let codePrefix = detectedCodes.isEmpty ? "" : "[\(detectedCodes.joined(separator: ", "))] "
+
+        startupError = "\(codePrefix)Backend failed to start.\n\nLog: \(logPath.path)\n\n\(logTail)"
         logger.error("API server failed health check. Log: \(logPath.path)")
     }
 }

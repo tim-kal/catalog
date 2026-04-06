@@ -374,6 +374,8 @@ def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionRe
             )
             return RecognitionResult(drive=drive, confidence="probable")
         if len(rows) > 1:
+            from drivecatalog.errors import log_error
+            log_error("DC-E008", {"mount_path": str(mount_path), "candidate_count": len(rows)})
             candidates = [dict(r) for r in rows]
             return RecognitionResult(
                 drive=None, confidence="ambiguous", candidates=candidates

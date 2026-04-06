@@ -5,7 +5,7 @@ enum APIError: Error, LocalizedError {
     case invalidURL
     case requestFailed(Error)
     case invalidResponse
-    case httpError(Int, String)
+    case httpError(Int, String, String?)  // status, message, error_code
     case decodingFailed(Error)
 
     var errorDescription: String? {
@@ -16,11 +16,20 @@ enum APIError: Error, LocalizedError {
             return "Request failed: \(error.localizedDescription)"
         case .invalidResponse:
             return "Invalid response from server"
-        case .httpError(let code, let message):
+        case .httpError(let code, let message, let errorCode):
+            if let errorCode {
+                return "\(errorCode): HTTP \(code) — \(message)"
+            }
             return "HTTP \(code): \(message)"
         case .decodingFailed(let error):
             return "Failed to decode response: \(error.localizedDescription)"
         }
+    }
+
+    /// The structured error code if present.
+    var errorCode: String? {
+        if case .httpError(_, _, let code) = self { return code }
+        return nil
     }
 }
 
@@ -134,8 +143,8 @@ actor APIService {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
-            let message = parseErrorMessage(from: data) ?? "Unknown error"
-            throw APIError.httpError((response as? HTTPURLResponse)?.statusCode ?? 0, message)
+            let details = parseErrorDetails(from: data)
+            throw APIError.httpError((response as? HTTPURLResponse)?.statusCode ?? 0, details.message ?? "Unknown error", details.errorCode)
         }
     }
 
@@ -638,8 +647,8 @@ actor APIService {
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
-            let message = parseErrorMessage(from: data) ?? "Unknown error"
-            throw APIError.httpError(httpResponse.statusCode, message)
+            let details = parseErrorDetails(from: data)
+            throw APIError.httpError(httpResponse.statusCode, details.message ?? "Unknown error", details.errorCode)
         }
     }
 
@@ -659,8 +668,8 @@ actor APIService {
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
-            let message = parseErrorMessage(from: data) ?? "Unknown error"
-            throw APIError.httpError(httpResponse.statusCode, message)
+            let details = parseErrorDetails(from: data)
+            throw APIError.httpError(httpResponse.statusCode, details.message ?? "Unknown error", details.errorCode)
         }
 
         do {
@@ -670,13 +679,44 @@ actor APIService {
         }
     }
 
-    /// Parse error message from API response body.
-    /// The API returns errors as JSON with a "detail" field.
-    private func parseErrorMessage(from data: Data) -> String? {
+    // MARK: - Error Log Endpoints
+
+    /// Fetch recent error log entries from the backend.
+    func fetchErrors(limit: Int = 50) async throws -> [ErrorLogEntry] {
+        let url = try buildURL(path: "/errors", queryItems: [
+            URLQueryItem(name: "limit", value: String(limit))
+        ])
+        return try await get(url: url)
+    }
+
+    /// Fetch error summary (counts by code and severity).
+    func fetchErrorSummary() async throws -> ErrorSummaryResponse {
+        let url = try buildURL(path: "/errors/summary")
+        return try await get(url: url)
+    }
+
+    // MARK: - Private Helpers (continued)
+
+    /// Parse error details from API response body.
+    /// The API returns errors as JSON with "detail" and optional "error_code" fields.
+    private func parseErrorDetails(from data: Data) -> (message: String?, errorCode: String?) {
         struct ErrorResponse: Decodable {
             let detail: String
+            let errorCode: String?
+            enum CodingKeys: String, CodingKey {
+                case detail
+                case errorCode = "error_code"
+            }
         }
 
-        return try? JSONDecoder().decode(ErrorResponse.self, from: data).detail
+        guard let parsed = try? JSONDecoder().decode(ErrorResponse.self, from: data) else {
+            return (nil, nil)
+        }
+        return (parsed.detail, parsed.errorCode)
+    }
+
+    /// Legacy helper for callers that only need the message.
+    private func parseErrorMessage(from data: Data) -> String? {
+        parseErrorDetails(from: data).message
     }
 }

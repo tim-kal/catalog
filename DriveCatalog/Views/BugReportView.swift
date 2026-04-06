@@ -9,6 +9,7 @@ struct BugReportView: View {
     @State private var includeLog = true
     @State private var isSubmitting = false
     @State private var submitted = false
+    @State private var recentErrors: [ErrorLogEntry] = []
 
     var body: some View {
         VStack(spacing: 20) {
@@ -48,6 +49,23 @@ struct BugReportView: View {
 
                     Toggle("Include backend log (helps us debug)", isOn: $includeLog)
                         .font(.caption)
+
+                    if !recentErrors.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Recent errors (auto-included)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            ForEach(recentErrors.prefix(5)) { entry in
+                                HStack(spacing: 4) {
+                                    Text(entry.code)
+                                        .font(.system(.caption2, design: .monospaced))
+                                    Text(entry.title)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
                 }
 
                 HStack {
@@ -76,6 +94,9 @@ struct BugReportView: View {
             }
         }
         .padding(20)
-        .frame(width: 450, height: 400)
+        .frame(width: 450, height: 420)
+        .task {
+            recentErrors = (try? await APIService.shared.fetchErrors(limit: 10)) ?? []
+        }
     }
 }

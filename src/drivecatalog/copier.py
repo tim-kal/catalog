@@ -69,6 +69,10 @@ def copy_file_verified(
         # Compare hashes
         verified = source_hash == dest_hash
 
+        if not verified:
+            from drivecatalog.errors import log_error
+            log_error("DC-E007", {"source": str(source), "dest": str(dest)})
+
         return CopyResult(
             source_hash=source_hash,
             dest_hash=dest_hash,
@@ -77,6 +81,8 @@ def copy_file_verified(
         )
 
     except (OSError, PermissionError) as e:
+        from drivecatalog.errors import log_error
+        log_error("DC-E005", {"source": str(source), "dest": str(dest), "error": str(e)})
         return CopyResult(
             source_hash="",
             dest_hash="",

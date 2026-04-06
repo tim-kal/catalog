@@ -82,7 +82,7 @@ final class BetaService: ObservableObject {
 
     // MARK: - Bug Report
 
-    /// Submit a bug report with optional log attachment.
+    /// Submit a bug report with optional log attachment and recent error codes.
     func submitBugReport(title: String, description: String, includeLog: Bool) async -> Bool {
         var body: [String: Any] = [
             "email": userEmail,
@@ -99,6 +99,18 @@ final class BetaService: ObservableObject {
             let logURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
                 .appendingPathComponent("DriveCatalog/backend.log")
             body["backend_log"] = (try? String(contentsOf: logURL, encoding: .utf8))?.suffix(5000).description
+        }
+
+        // Auto-include last 10 error codes
+        if let errors = try? await APIService.shared.fetchErrors(limit: 10), !errors.isEmpty {
+            body["recent_errors"] = errors.map { entry in
+                [
+                    "code": entry.code,
+                    "title": entry.title,
+                    "severity": entry.severity,
+                    "timestamp": entry.timestamp
+                ]
+            }
         }
 
         do {

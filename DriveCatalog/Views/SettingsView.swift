@@ -12,6 +12,8 @@ struct SettingsView: View {
     @State private var healthStatus: HealthStatusResponse?
     @State private var isLoadingHealth = true
     @State private var healthError: String?
+    @State private var errorEntries: [ErrorLogEntry] = []
+    @State private var isLoadingErrors = false
 
     var body: some View {
         Form {
@@ -251,6 +253,56 @@ struct SettingsView: View {
                 .padding(.vertical, 4)
             }
 
+            // Error Log
+            if backend.isRunning {
+                Section("Error Log") {
+                    if isLoadingErrors {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else if errorEntries.isEmpty {
+                        Text("No errors recorded")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    } else {
+                        ForEach(errorEntries.prefix(10)) { entry in
+                            HStack(alignment: .top, spacing: 8) {
+                                Circle()
+                                    .fill(colorForSeverity(entry.severity))
+                                    .frame(width: 8, height: 8)
+                                    .padding(.top, 4)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack {
+                                        Text(entry.code)
+                                            .font(.system(.caption, design: .monospaced))
+                                            .fontWeight(.medium)
+                                        Text(entry.title)
+                                            .font(.caption)
+                                    }
+                                    Text(entry.timestamp.prefix(19).replacingOccurrences(of: "T", with: " "))
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
+                                Spacer()
+                                Button {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(entry.copyText, forType: .string)
+                                } label: {
+                                    Image(systemName: "doc.on.doc")
+                                        .font(.caption)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Copy error details")
+                            }
+                        }
+                        if errorEntries.count > 10 {
+                            Text("\(errorEntries.count - 10) more errors...")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+            }
+
             // Bug Report
             Section("Feedback") {
                 Button {
@@ -293,6 +345,26 @@ struct SettingsView: View {
             healthError = error.localizedDescription
         }
         isLoadingHealth = false
+        await loadErrors()
+    }
+
+    private func loadErrors() async {
+        isLoadingErrors = true
+        do {
+            errorEntries = try await APIService.shared.fetchErrors(limit: 50)
+        } catch {
+            errorEntries = []
+        }
+        isLoadingErrors = false
+    }
+
+    private func colorForSeverity(_ severity: String) -> Color {
+        switch severity {
+        case "critical": return .red
+        case "error": return .orange
+        case "warning": return .yellow
+        default: return .gray
+        }
     }
 }
 

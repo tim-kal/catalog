@@ -570,6 +570,8 @@ def apply_migrations(conn: sqlite3.Connection, *, db_path: Path | None = None) -
             "error": str(exc),
             "restored_from": backup_path.name if backup_path else None,
         })
+        from drivecatalog.errors import log_error
+        log_error("DC-E006", {"target_version": target, "error": str(exc)})
         raise RuntimeError(
             f"Migration to v{target} failed: {exc}. "
             f"Database restored from backup."
