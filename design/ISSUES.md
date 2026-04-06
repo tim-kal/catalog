@@ -44,3 +44,39 @@ Auto-captured system issues. Review periodically and close resolved items.
 **Impact:** Task needs rework
 **Details:** Core structure solid (3 sections, sidebar, routing, graceful degradation), but Section 1 missing per-drive detail fields and drill-down, Section 2 missing per-drive duplicate breakdown.
 
+## 2026-04-06 13:17 UTC — Executor failed: DC-003
+**Category:** operational
+**Task:** DC-003
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:18 UTC — Reviewer changes_requested: DC-004
+**Category:** quality
+**Task:** DC-004
+**Impact:** Task needs rework
+**Details:** DC-004 has zero implementation — none of 7 acceptance criteria are met; the only change is an unrelated issue log entry for DC-002.
+
+## 2026-04-06 13:18 UTC — Executor failed: DC-004
+**Category:** operational
+**Task:** DC-004
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
+
+## 2026-04-06 13:19 UTC — Reviewer changes_requested: DC-005
+**Category:** quality
+**Task:** DC-005
+**Impact:** Task needs rework
+**Details:** DC-005 was never implemented — executor self-reported "blocked" and produced no code; zero of 8 acceptance criteria are met.
+
+## 2026-04-06 13:20 UTC — Reviewer changes_requested: DC-006
+**Category:** quality
+**Task:** DC-006
+**Impact:** Task needs rework
+**Details:** DC-006 was never implemented — executor self-reported "blocked" and no code was produced; zero of 6 acceptance criteria are met.
+
+## 2026-04-06 13:20 UTC — Reviewer changes_requested: DC-008
+**Category:** quality
+**Task:** DC-008
+**Impact:** Task needs rework
+**Details:** Zero acceptance criteria met — no code was implemented; diff contains only design file bookkeeping (ISSUES.md and SIGNALS.md updates).
+

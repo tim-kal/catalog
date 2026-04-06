@@ -27,8 +27,11 @@ from ..models.drive import (
 )
 from ..operations import (
     OperationStatus,
+    acquire_scan_lock,
     create_operation,
+    get_active_scan,
     is_cancelled,
+    release_scan_lock,
     update_operation,
     update_progress,
 )
@@ -461,7 +464,7 @@ async def get_drive_status(name: str) -> DriveStatusResponse:
         conn.close()
 
 
-def _run_scan(operation_id: str, drive_id: int, mount_path: str) -> None:
+def _run_scan(operation_id: str, drive_id: int, mount_path: str, drive_name: str) -> None:
     """Run scan in background thread with progress tracking and auto-hash."""
     update_operation(
         operation_id,
@@ -547,6 +550,8 @@ def _run_scan(operation_id: str, drive_id: int, mount_path: str) -> None:
             error=str(e),
             completed_at=datetime.now(),
         )
+    finally:
+        release_scan_lock(drive_name)
 
 
 def _run_auto_hash(
@@ -630,7 +635,16 @@ async def trigger_scan(name: str, background_tasks: BackgroundTasks) -> dict:
     """Trigger a scan of the drive as a background task.
 
     Returns immediately with an operation_id that can be used to poll for status.
+    Returns 409 if this specific drive is already being scanned.
     """
+    # Check per-drive lock before touching the DB
+    existing_op = get_active_scan(name)
+    if existing_op:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Drive '{name}' is already being scanned (operation {existing_op})",
+        )
+
     conn = get_connection()
     try:
         # Look up drive by name
@@ -647,9 +661,15 @@ async def trigger_scan(name: str, background_tasks: BackgroundTasks) -> dict:
                 status_code=400, detail=f"Drive '{name}' is not currently mounted"
             )
 
-        # Create operation and start background task
+        # Create operation and acquire per-drive lock
         op = create_operation("scan", name)
-        background_tasks.add_task(_run_scan, op.id, drive["id"], mount_path)
+        if not acquire_scan_lock(name, op.id):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Drive '{name}' is already being scanned",
+            )
+
+        background_tasks.add_task(_run_scan, op.id, drive["id"], mount_path, name)
 
         return {
             "operation_id": op.id,
@@ -660,7 +680,7 @@ async def trigger_scan(name: str, background_tasks: BackgroundTasks) -> dict:
         conn.close()
 
 
-def _run_smart_scan(operation_id: str, drive_id: int, mount_path: str) -> None:
+def _run_smart_scan(operation_id: str, drive_id: int, mount_path: str, drive_name: str) -> None:
     """Run smart (incremental) scan in background with progress tracking and auto-hash."""
     update_operation(
         operation_id,
@@ -744,6 +764,8 @@ def _run_smart_scan(operation_id: str, drive_id: int, mount_path: str) -> None:
             error=str(e),
             completed_at=datetime.now(),
         )
+    finally:
+        release_scan_lock(drive_name)
 
 
 @router.post("/{name}/auto-scan")
@@ -756,11 +778,19 @@ async def auto_scan_drive(name: str, background_tasks: BackgroundTasks) -> dict:
     on large drives.
 
     If no folder_stats exist yet (first scan), falls back to a full scan.
+    Returns 409 if this specific drive is already being scanned.
 
     Returns:
         operation_id: The ID of the started operation.
         status: "started"
     """
+    existing_op = get_active_scan(name)
+    if existing_op:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Drive '{name}' is already being scanned (operation {existing_op})",
+        )
+
     conn = get_connection()
     try:
         drive = conn.execute(
@@ -778,7 +808,13 @@ async def auto_scan_drive(name: str, background_tasks: BackgroundTasks) -> dict:
 
         # Use smart scan — it handles the full-scan fallback internally
         op = create_operation("smart-scan", name)
-        background_tasks.add_task(_run_smart_scan, op.id, drive["id"], mount_path)
+        if not acquire_scan_lock(name, op.id):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Drive '{name}' is already being scanned",
+            )
+
+        background_tasks.add_task(_run_smart_scan, op.id, drive["id"], mount_path, name)
 
         return {
             "operation_id": op.id,
