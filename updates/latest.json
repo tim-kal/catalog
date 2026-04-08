@@ -1,7 +1,7 @@
 {
-  "version": "1.4.1",
-  "build": 17,
-  "url": "https://github.com/tim-kal/catalog/releases/download/v1.4.1/DriveCatalog.zip",
-  "notes": "Fixed: disk capacity no longer shows boot disk values when drive is disconnected.",
+  "version": "1.4.2",
+  "build": 18,
+  "url": "https://github.com/tim-kal/catalog/releases/download/v1.4.2/DriveCatalog.zip",
+  "notes": "Fix Samsung T7 recognition collisions: safer fingerprint matching, ambiguous resolution from Add Drive, and stale serial cleanup migration.",
   "min_os": "14.0"
 }
