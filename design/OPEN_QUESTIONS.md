@@ -29,3 +29,8 @@ Also added AddDriveSheet disambiguation + force-new path and resolve-ambiguous s
 ## Q7: Canonical beta API host
 Which hostname should replace `catalog-beta.vercel.app` as the long-term beta backend endpoint?
 Current app mitigation opens GitHub issue drafts, but proper API endpoint still needed for silent in-app submit.
+
+## Q8: Is fixed release actually active on affected machine?
+Local evidence shows `schema_version = 6` in `~/.drivecatalog/catalog.db`, which implies
+the v9 migration from release `v1.4.2` has not been applied there yet. Need to confirm the
+running app build and backend process version before judging dialog UX/fix effectiveness.

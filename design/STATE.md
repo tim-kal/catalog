@@ -59,6 +59,13 @@ returns Drive A as probable match).
     `https://github.com/tim-kal/catalog/releases/tag/v1.4.2`
   - `updates/latest.json` updated to v1.4.2
 
+### Post-release verification note (local machine) 2026-04-08
+- Local DB at `~/.drivecatalog/catalog.db` still reports `schema_version = 6` and still
+  contains stale product-name serials (`Samsung PSSD T7 Media`, `Lexar ES5 Media`,
+  `LaCie Rugged Mini USB3 Media`) plus Samsung fingerprint collision.
+- Interpretation: this local installation has not yet run the v9 migration path from
+  release `v1.4.2` (or is still running an older app binary/backend).
+
 ## Open Design Threads
 
 ## Beta Bug Reporting — CONFIRMED INFRA ISSUE 2026-04-08
