@@ -2,18 +2,6 @@
 
 Auto-captured system issues. Review periodically and close resolved items.
 
-## 2026-04-06 13:15 UTC — Executor failed: DC-002
-**Category:** operational
-**Task:** DC-002
-**Impact:** Task not completed (0s spent)
-**Root cause:** Retry cap exhausted (4/3 runs)
-
-## 2026-04-06 13:17 UTC — Reviewer changes_requested: DC-003
-**Category:** quality
-**Task:** DC-003
-**Impact:** Task needs rework
-**Details:** Core structure solid (3 sections, sidebar, routing, graceful degradation), but Section 1 missing per-drive detail fields and drill-down, Section 2 missing per-drive duplicate breakdown.
-
 ## 2026-04-06 13:17 UTC — Executor failed: DC-003
 **Category:** operational
 **Task:** DC-003
@@ -181,4 +169,16 @@ Auto-captured system issues. Review periodically and close resolved items.
 **Task:** DC-011
 **Impact:** Task needs rework
 **Details:** Zero DC-011 acceptance criteria implemented — the diff contains only build-infrastructure changes (build stamping, Python embedding) unrelated to the structured error code system.
+
+## 2026-04-06 16:09 UTC — Reviewer changes_requested: DC-011
+**Category:** quality
+**Task:** DC-011
+**Impact:** Task needs rework
+**Details:** All acceptance criteria structurally met; type mismatch bug between Python int context values and Swift [String: String] model will break error log display
+
+## 2026-04-06 16:09 UTC — Executor failed: DC-011
+**Category:** operational
+**Task:** DC-011
+**Impact:** Task not completed (0s spent)
+**Root cause:** Retry cap exhausted (4/3 runs)
 

@@ -123,7 +123,7 @@ def log_error(code: str, context: dict | None = None) -> None:
         "severity": error_def.severity,
     }
     if context:
-        entry["context"] = context
+        entry["context"] = {k: str(v) for k, v in context.items()}
 
     try:
         ERROR_LOG_PATH.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
