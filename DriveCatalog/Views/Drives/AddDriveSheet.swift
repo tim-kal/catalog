@@ -9,15 +9,23 @@ private struct MountedVolume: Identifiable {
     var recognizedAs: String?
     /// True when recognition returned multiple ambiguous candidates.
     var isAmbiguous: Bool = false
+    /// Candidate registered drives returned by ambiguous recognition.
+    var ambiguousCandidates: [DriveResponse] = []
     var id: String { path }
 }
 
 /// Sheet for adding a new drive to the catalog.
 /// Discovers mounted volumes and lets the user pick one.
 struct AddDriveSheet: View {
+    private struct AmbiguousSelectionInfo: Identifiable {
+        let volume: MountedVolume
+        var id: String { volume.id }
+    }
+
     @State private var volumes: [MountedVolume] = []
     @State private var selectedVolume: MountedVolume?
     @State private var customName: String = ""
+    @State private var ambiguousSelection: AmbiguousSelectionInfo?
     @State private var isSubmitting = false
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -108,14 +116,28 @@ struct AddDriveSheet: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         ForEach(ambiguousVolumes) { volume in
-                            HStack(spacing: 8) {
-                                Image(systemName: "externaldrive.badge.questionmark")
-                                    .foregroundStyle(.orange)
-                                Text(volume.name)
-                                    .font(.callout)
-                                Spacer()
+                            Button {
+                                ambiguousSelection = AmbiguousSelectionInfo(volume: volume)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "externaldrive.badge.questionmark")
+                                        .foregroundStyle(.orange)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(volume.name)
+                                            .font(.callout)
+                                            .foregroundStyle(.primary)
+                                        Text("Matches \(volume.ambiguousCandidates.count) registered drives")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(.secondary)
+                                        .font(.caption)
+                                }
+                                .padding(.vertical, 4)
                             }
-                            .padding(.vertical, 4)
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal)
@@ -166,6 +188,15 @@ struct AddDriveSheet: View {
         .frame(minWidth: 440, minHeight: 340)
         .task {
             await loadVolumes()
+        }
+        .sheet(item: $ambiguousSelection) { info in
+            AmbiguousDriveResolveSheet(
+                volume: info.volume,
+                onResolved: {
+                    await onAdded()
+                    await loadVolumes()
+                }
+            )
         }
     }
 
@@ -223,6 +254,7 @@ struct AddDriveSheet: View {
                     discovered[i].recognizedAs = driveName
                 } else if response.status == "ambiguous" {
                     discovered[i].isAmbiguous = true
+                    discovered[i].ambiguousCandidates = response.candidates ?? []
                 }
             }
         }
@@ -235,12 +267,144 @@ struct AddDriveSheet: View {
 
     private func addDrive() async {
         guard let volume = selectedVolume else { return }
+        await addDrive(volume: volume, forceNew: false)
+    }
+
+    private func addDrive(volume: MountedVolume, forceNew: Bool) async {
         isSubmitting = true
         errorMessage = nil
         do {
             let name = customName.isEmpty ? nil : customName
-            _ = try await APIService.shared.createDrive(path: volume.path, name: name)
+            _ = try await APIService.shared.createDrive(path: volume.path, name: name, forceNew: forceNew)
             await onAdded()
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isSubmitting = false
+    }
+}
+
+// MARK: - Ambiguous Resolve Sheet
+
+private struct AmbiguousDriveResolveSheet: View {
+    let volume: MountedVolume
+    var onResolved: () async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedCandidate: DriveResponse?
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+
+                Spacer()
+
+                Text("Identify Drive")
+                    .font(.headline)
+
+                Spacer()
+
+                Button("Confirm") {
+                    Task { await resolveToExisting() }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(selectedCandidate == nil || isSubmitting)
+            }
+            .padding()
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(volume.path)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(volume.ambiguousCandidates) { candidate in
+                            HStack(spacing: 12) {
+                                Image(systemName: "externaldrive.fill")
+                                    .foregroundStyle(selectedCandidate?.id == candidate.id ? .white : .secondary)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(candidate.name)
+                                        .foregroundStyle(selectedCandidate?.id == candidate.id ? .white : .primary)
+                                    Text("\(candidate.fileCount) files")
+                                        .font(.caption)
+                                        .foregroundStyle(selectedCandidate?.id == candidate.id ? .white.opacity(0.8) : .secondary)
+                                }
+                                Spacer()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(selectedCandidate?.id == candidate.id ? Color.accentColor : Color(.controlBackgroundColor))
+                            )
+                            .onTapGesture {
+                                selectedCandidate = (selectedCandidate?.id == candidate.id) ? nil : candidate
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+
+                Divider()
+                    .padding(.top, 4)
+
+                Button("None of these — register as new drive") {
+                    Task { await registerAsNew() }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+                .disabled(isSubmitting)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+                }
+            }
+        }
+        .frame(minWidth: 420, minHeight: 340)
+    }
+
+    private func resolveToExisting() async {
+        guard let selectedCandidate else { return }
+        isSubmitting = true
+        errorMessage = nil
+        do {
+            try await APIService.shared.resolveAmbiguousDrive(
+                mountPath: volume.path,
+                driveId: selectedCandidate.id
+            )
+            await onResolved()
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isSubmitting = false
+    }
+
+    private func registerAsNew() async {
+        isSubmitting = true
+        errorMessage = nil
+        do {
+            _ = try await APIService.shared.createDrive(
+                path: volume.path,
+                name: nil,
+                forceNew: true
+            )
+            await onResolved()
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

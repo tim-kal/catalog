@@ -374,6 +374,35 @@ def _drive_select_columns() -> str:
     )
 
 
+def _has_identifier_overlap(row: sqlite3.Row, ids: DriveIdentifiers) -> bool:
+    """Return True when a stored row shares at least one strong identifier with scanned ids."""
+    if ids.volume_uuid and row["uuid"] and ids.volume_uuid == row["uuid"]:
+        return True
+    if ids.disk_uuid and row["disk_uuid"] and ids.disk_uuid == row["disk_uuid"]:
+        return True
+    if (
+        ids.device_serial
+        and row["device_serial"]
+        and ids.device_serial == row["device_serial"]
+        and ids.partition_index is not None
+        and row["partition_index"] is not None
+        and ids.partition_index == row["partition_index"]
+    ):
+        return True
+    return False
+
+
+def _candidate_available_for_match(row: sqlite3.Row, mount_path: Path, ids: DriveIdentifiers) -> bool:
+    """True when the candidate is unmounted or safely re-recognized on the same path."""
+    stored_mount = row["mount_path"]
+    if not stored_mount:
+        return True
+    if not Path(stored_mount).exists():
+        return True
+    # Same-path re-recognition is allowed only with corroborating identifiers.
+    return str(mount_path) == stored_mount and _has_identifier_overlap(row, ids)
+
+
 def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionResult:
     """Recognize a mounted volume using multi-signal identifier cascade.
 
@@ -381,8 +410,8 @@ def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionRe
       1. VolumeUUID match → certain
       2. DiskUUID match → certain
       3. Device Serial + Partition Index → certain
-      4. FS Fingerprint, single candidate → probable
-      5. FS Fingerprint, multiple candidates → ambiguous
+      4. FS Fingerprint + corroborating signal, single candidate → probable
+      5. FS Fingerprint only / multiple candidates → ambiguous
       6. mount_path only match → weak
       7. No match → none
 
@@ -421,11 +450,11 @@ def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionRe
             f"SELECT {cols} FROM drives WHERE device_serial = ? AND partition_index = ?",
             (ids.device_serial, ids.partition_index),
         ).fetchall()
-        # Filter out candidates that are currently mounted elsewhere
+        # Filter out candidates that are currently mounted elsewhere.
+        # Same-path re-recognition is only allowed with corroborating identifiers.
         candidates = [
             r for r in rows
-            if not r["mount_path"] or not Path(r["mount_path"]).exists()
-            or str(mount_path) == r["mount_path"]
+            if _candidate_available_for_match(r, mount_path, ids)
         ]
         if len(candidates) == 1:
             drive = dict(candidates[0])
@@ -441,24 +470,22 @@ def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionRe
             (ids.fs_fingerprint,),
         ).fetchall()
 
-        # Filter out candidates whose mount_path is currently mounted (= different physical drive)
-        candidates_not_mounted = [
-            r for r in rows
-            if not r["mount_path"] or not Path(r["mount_path"]).exists()
-            or str(mount_path) == r["mount_path"]
-        ]
+        # Fingerprint-only matching is collision-prone. Never auto-recognize without an
+        # additional corroborating identifier overlap.
+        candidates_not_mounted = [r for r in rows if _candidate_available_for_match(r, mount_path, ids)]
+        corroborated = [r for r in candidates_not_mounted if _has_identifier_overlap(r, ids)]
 
-        if len(candidates_not_mounted) == 1:
-            drive = dict(candidates_not_mounted[0])
+        if len(corroborated) == 1:
+            drive = dict(corroborated[0])
             _update_drive_identifiers(conn, drive["id"], mount_path, ids)
             drive["mount_path"] = str(mount_path)
             logger.warning(
-                "Drive '%s' recognized by FS fingerprint only (probable match)",
+                "Drive '%s' recognized by FS fingerprint + corroborating signal (probable match)",
                 mount_path.name,
             )
             return RecognitionResult(drive=drive, confidence="probable")
 
-        # Multiple candidates or all currently mounted → ambiguous, ask user
+        # Fingerprint match without corroboration (or multiple candidates) is ambiguous.
         if rows:
             from drivecatalog.errors import log_error
             log_error("DC-E010", {"mount_path": str(mount_path), "candidate_count": len(rows)})

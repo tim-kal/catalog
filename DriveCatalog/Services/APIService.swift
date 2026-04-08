@@ -122,8 +122,9 @@ actor APIService {
     ///   - path: Mount path of the drive (must be under /Volumes/).
     ///   - name: Optional custom name for the drive.
     /// - Returns: The created drive response.
-    func createDrive(path: String, name: String? = nil) async throws -> DriveResponse {
-        let url = try buildURL(path: "/drives")
+    func createDrive(path: String, name: String? = nil, forceNew: Bool = false) async throws -> DriveResponse {
+        let query = forceNew ? [URLQueryItem(name: "force_new", value: "true")] : nil
+        let url = try buildURL(path: "/drives", queryItems: query)
         let request = DriveCreateRequest(path: path, name: name)
         return try await post(url: url, body: request)
     }
@@ -168,6 +169,21 @@ actor APIService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         return try await perform(request: request)
+    }
+
+    /// Resolve an ambiguous match by selecting the correct registered drive id.
+    func resolveAmbiguousDrive(mountPath: String, driveId: Int) async throws {
+        let url = try buildURL(path: "/drives/resolve-ambiguous", queryItems: [
+            URLQueryItem(name: "mount_path", value: mountPath),
+            URLQueryItem(name: "drive_id", value: String(driveId)),
+        ])
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
     }
 
     /// Fetch detailed status for a drive.

@@ -208,3 +208,25 @@ class TestNoBackupWhenUpToDate:
 
         backups = list(db_file.parent.glob("*.backup-*"))
         assert len(backups) == 0, f"Unexpected backups: {backups}"
+
+
+def test_migrate_clear_stale_device_serials(migration_db):
+    """v9 data migration clears non-unique product-name serial placeholders."""
+    conn, _ = migration_db
+    apply_migrations(conn)
+    conn.execute(
+        "INSERT INTO drives (name, uuid, mount_path, total_bytes, device_serial) VALUES (?, ?, ?, ?, ?)",
+        ("StaleSerial", "uuid-stale", "/Volumes/Stale", 123, "Samsung PSSD T7 Media"),
+    )
+    conn.execute(
+        "INSERT INTO drives (name, uuid, mount_path, total_bytes, device_serial) VALUES (?, ?, ?, ?, ?)",
+        ("RealSerial", "uuid-real", "/Volumes/Real", 123, "SN-ABC-12345"),
+    )
+    conn.commit()
+
+    migrations_mod._migrate_clear_stale_device_serials(conn)
+
+    stale = conn.execute("SELECT device_serial FROM drives WHERE name = 'StaleSerial'").fetchone()[0]
+    real = conn.execute("SELECT device_serial FROM drives WHERE name = 'RealSerial'").fetchone()[0]
+    assert stale is None
+    assert real == "SN-ABC-12345"

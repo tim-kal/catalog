@@ -100,7 +100,10 @@ async def list_drives() -> DriveListResponse:
 
 
 @router.post("", response_model=DriveResponse, status_code=201)
-async def create_drive(request: DriveCreateRequest) -> DriveResponse:
+async def create_drive(
+    request: DriveCreateRequest,
+    force_new: bool = Query(False, description="Allow creating a new drive even when recognition is ambiguous"),
+) -> DriveResponse:
     """Register a new drive for cataloging.
 
     The path must be a valid mount point under /Volumes/.
@@ -133,11 +136,14 @@ async def create_drive(request: DriveCreateRequest) -> DriveResponse:
                 detail=f"Drive already registered as '{result.drive['name']}'",
             )
         if result.confidence == "ambiguous" and result.candidates:
-            names = ", ".join(c["name"] for c in result.candidates)
-            raise HTTPException(
-                status_code=400,
-                detail=f"Drive matches multiple registered drives: {names}. Resolve ambiguity first.",
-            )
+            if force_new:
+                pass
+            else:
+                names = ", ".join(c["name"] for c in result.candidates)
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Drive matches multiple registered drives: {names}. Resolve ambiguity first.",
+                )
 
         # De-duplicate drive name if it already exists
         existing_name = conn.execute(
@@ -484,7 +490,9 @@ async def resolve_ambiguous(
     conn = get_connection()
     try:
         drive = conn.execute(
-            "SELECT id, name FROM drives WHERE id = ?", (drive_id,)
+            "SELECT id, name, uuid, disk_uuid, device_serial, partition_index, fs_fingerprint, total_bytes "
+            "FROM drives WHERE id = ?",
+            (drive_id,),
         ).fetchone()
         if not drive:
             raise HTTPException(404, f"Drive with id {drive_id} not found")
@@ -492,6 +500,41 @@ async def resolve_ambiguous(
         from drivecatalog.drives import _update_drive_identifiers, collect_drive_identifiers
 
         ids = collect_drive_identifiers(path_obj)
+
+        # Safety check: reject accidental identity overwrite when nothing matches.
+        live_info = get_drive_info(path_obj)
+        strong_overlap = (
+            (drive["uuid"] and ids.volume_uuid and drive["uuid"] == ids.volume_uuid)
+            or (drive["disk_uuid"] and ids.disk_uuid and drive["disk_uuid"] == ids.disk_uuid)
+            or (
+                drive["device_serial"]
+                and ids.device_serial
+                and drive["device_serial"] == ids.device_serial
+                and drive["partition_index"] is not None
+                and ids.partition_index is not None
+                and drive["partition_index"] == ids.partition_index
+            )
+        )
+        fingerprint_shape_overlap = (
+            drive["fs_fingerprint"]
+            and ids.fs_fingerprint
+            and drive["fs_fingerprint"] == ids.fs_fingerprint
+            and drive["partition_index"] is not None
+            and ids.partition_index is not None
+            and drive["partition_index"] == ids.partition_index
+            and drive["total_bytes"] is not None
+            and live_info["total_bytes"] is not None
+            and int(drive["total_bytes"]) == int(live_info["total_bytes"])
+        )
+        if not (strong_overlap or fingerprint_shape_overlap):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Selected drive identifiers do not match the mounted volume. "
+                    "Refusing to overwrite drive identity."
+                ),
+            )
+
         _update_drive_identifiers(conn, drive_id, path_obj, ids)
 
         return {

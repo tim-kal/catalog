@@ -288,6 +288,18 @@ ALTER TABLE drives ADD COLUMN fs_fingerprint TEXT;
         sql="SELECT 1;",
         data_migration=lambda conn: _migrate_repopulate_drive_identifiers(conn),
     ),
+    # ------------------------------------------------------------------
+    # Version 9 — clear stale product-name serials
+    # Old rows may contain diskutil media names (e.g. "... Media") instead
+    # of per-device hardware serial numbers. Clear those non-unique values.
+    # ------------------------------------------------------------------
+    Migration(
+        version=9,
+        description="Clear stale non-unique device_serial values",
+        requires_rescan=False,
+        sql="SELECT 1;",
+        data_migration=lambda conn: _migrate_clear_stale_device_serials(conn),
+    ),
 ]
 
 # When adding a new migration, also update expectedSchemaVersion in
@@ -344,6 +356,23 @@ def _migrate_repopulate_drive_identifiers(conn: sqlite3.Connection) -> None:
             (ids.volume_uuid, ids.disk_uuid, ids.device_serial,
              ids.partition_index, ids.fs_fingerprint, row[0]),
         )
+    conn.commit()
+
+
+def _migrate_clear_stale_device_serials(conn: sqlite3.Connection) -> None:
+    """Clear known non-unique serial placeholders left by older extraction code."""
+    conn.execute(
+        """
+        UPDATE drives
+        SET device_serial = NULL
+        WHERE device_serial IS NOT NULL
+          AND (
+              TRIM(device_serial) = ''
+              OR device_serial = 'Untitled'
+              OR device_serial LIKE '% Media'
+          )
+        """
+    )
     conn.commit()
 
 

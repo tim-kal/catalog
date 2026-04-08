@@ -2,6 +2,8 @@
 
 from unittest.mock import patch
 
+from drivecatalog.drives import DriveIdentifiers, RecognitionResult
+
 
 def _insert_drive(client, name="TestDrive", mount_path="/Volumes/TestDrive"):
     """Helper to insert a drive directly into the DB via the test client's app."""
@@ -134,6 +136,71 @@ def test_create_drive_nonexistent_path(test_client):
     """POST /drives with non-existent path returns 404."""
     resp = test_client.post("/drives", json={"path": "/Volumes/NonExistent_XYZ_999"})
     assert resp.status_code == 404
+
+
+def test_create_drive_force_new_when_ambiguous(test_client, tmp_path):
+    """POST /drives?force_new=true bypasses ambiguous block and creates a new row."""
+    drive_mount = tmp_path / "AmbiguousDrive"
+    drive_mount.mkdir()
+
+    fake_candidates = [{"id": 1, "name": "Old A"}, {"id": 2, "name": "Old B"}]
+    with patch("drivecatalog.api.routes.drives.validate_mount_path", return_value=True), \
+         patch("drivecatalog.api.routes.drives.get_drive_info", return_value={
+             "uuid": "new-uuid-123",
+             "total_bytes": 500_000_000,
+             "name": "AmbiguousDrive",
+             "mount_path": str(drive_mount),
+         }), \
+         patch("drivecatalog.api.routes.drives.collect_drive_identifiers", return_value=DriveIdentifiers()), \
+         patch("drivecatalog.api.routes.drives.recognize_drive", return_value=RecognitionResult(
+             drive=None, confidence="ambiguous", candidates=fake_candidates
+         )):
+        resp = test_client.post("/drives?force_new=true", json={"path": str(drive_mount)})
+
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["name"] == "AmbiguousDrive"
+
+
+def test_resolve_ambiguous_rejects_mismatch(test_client, tmp_path):
+    """resolve-ambiguous must reject when selected drive identifiers do not overlap."""
+    _insert_drive(test_client, "DriveA", "/Volumes/DriveA")
+
+    from drivecatalog.database import get_connection
+    conn = get_connection()
+    try:
+        conn.execute(
+            """
+            UPDATE drives
+            SET total_bytes = ?, fs_fingerprint = ?, partition_index = ?, uuid = ?, disk_uuid = ?, device_serial = ?
+            WHERE name = ?
+            """,
+            (1_000_000, "aaaa1111bbbb2222", 1, "UUID-A", "DISK-A", "SERIAL-A", "DriveA"),
+        )
+        drive_id = conn.execute("SELECT id FROM drives WHERE name = 'DriveA'").fetchone()[0]
+        conn.commit()
+    finally:
+        conn.close()
+
+    mount = tmp_path / "MountedB"
+    mount.mkdir()
+    with patch("drivecatalog.api.routes.drives.collect_drive_identifiers", return_value=DriveIdentifiers(
+        volume_uuid="UUID-B",
+        disk_uuid="DISK-B",
+        device_serial="SERIAL-B",
+        partition_index=2,
+        fs_fingerprint="ffff1111eeee2222",
+    )), patch("drivecatalog.api.routes.drives.get_drive_info", return_value={
+        "uuid": "UUID-B",
+        "total_bytes": 2_000_000,
+        "name": "MountedB",
+        "mount_path": str(mount),
+    }):
+        resp = test_client.post(
+            f"/drives/resolve-ambiguous?mount_path={mount}&drive_id={drive_id}"
+        )
+
+    assert resp.status_code == 409
 
 
 def test_trigger_scan_not_found(test_client):

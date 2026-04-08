@@ -103,17 +103,19 @@ class TestCollectDriveIdentifiers:
 
     def test_apfs_all_fields(self, apfs_plist, parent_disk_plist):
         """APFS drive returns all identifiers."""
-        calls = []
-
         def mock_run(cmd, **kwargs):
-            calls.append(cmd)
             class R:
                 returncode = 0
             r = R()
-            if "/dev/" in cmd[3]:
-                r.stdout = _make_plist_bytes(parent_disk_plist)
-            else:
+            if cmd[:3] == ["diskutil", "info", "-plist"]:
                 r.stdout = _make_plist_bytes(apfs_plist)
+            elif cmd[:4] == ["ioreg", "-r", "-c", "IOBlockStorageDevice"]:
+                r.stdout = '\n'.join([
+                    '"Serial Number" = "USB2.0 Flash Disk SN12345"',
+                    '"BSD Name" = "disk2"',
+                ])
+            else:
+                r.stdout = ""
             return r
 
         with patch("drivecatalog.drives.subprocess.run", side_effect=mock_run):
@@ -131,10 +133,15 @@ class TestCollectDriveIdentifiers:
             class R:
                 returncode = 0
             r = R()
-            if "/dev/" in cmd[3]:
-                r.stdout = _make_plist_bytes(parent_disk_plist)
-            else:
+            if cmd[:3] == ["diskutil", "info", "-plist"]:
                 r.stdout = _make_plist_bytes(fat32_plist)
+            elif cmd[:4] == ["ioreg", "-r", "-c", "IOBlockStorageDevice"]:
+                r.stdout = '\n'.join([
+                    '"Serial Number" = "USB2.0 Flash Disk SN12345"',
+                    '"BSD Name" = "disk3"',
+                ])
+            else:
+                r.stdout = ""
             return r
 
         with patch("drivecatalog.drives.subprocess.run", side_effect=mock_run):
@@ -152,10 +159,15 @@ class TestCollectDriveIdentifiers:
             class R:
                 returncode = 0
             r = R()
-            if "/dev/" in cmd[3]:
-                r.stdout = _make_plist_bytes(parent_disk_plist)
-            else:
+            if cmd[:3] == ["diskutil", "info", "-plist"]:
                 r.stdout = _make_plist_bytes(exfat_plist)
+            elif cmd[:4] == ["ioreg", "-r", "-c", "IOBlockStorageDevice"]:
+                r.stdout = '\n'.join([
+                    '"Serial Number" = "USB2.0 Flash Disk SN12345"',
+                    '"BSD Name" = "disk4"',
+                ])
+            else:
+                r.stdout = ""
             return r
 
         with patch("drivecatalog.drives.subprocess.run", side_effect=mock_run):
@@ -251,8 +263,8 @@ class TestRecognizeDriveCascade:
         assert result.confidence == "certain"
         assert result.drive["id"] == drive["id"]
 
-    def test_fingerprint_single_candidate_probable(self, tmp_db):
-        """Single FS fingerprint match returns probable confidence."""
+    def test_fingerprint_single_candidate_without_overlap_is_ambiguous(self, tmp_db):
+        """Single FS fingerprint match without corroboration must stay ambiguous."""
         fp = _make_fingerprint(500_000_000_000, "apfs", 4096)
         _insert_drive(tmp_db, "FPDrive", fs_fingerprint=fp)
 
@@ -260,8 +272,10 @@ class TestRecognizeDriveCascade:
         with _mock_collect(ids), _mock_drive_size():
             result = recognize_drive(tmp_db, Path("/Volumes/FP"))
 
-        assert result.confidence == "probable"
-        assert result.drive is not None
+        assert result.confidence == "ambiguous"
+        assert result.drive is None
+        assert result.candidates is not None
+        assert len(result.candidates) == 1
 
     def test_fingerprint_multiple_candidates_ambiguous(self, tmp_db):
         """Multiple FS fingerprint matches return ambiguous with candidate list."""
@@ -277,6 +291,24 @@ class TestRecognizeDriveCascade:
         assert result.drive is None
         assert result.candidates is not None
         assert len(result.candidates) == 2
+
+    def test_fingerprint_same_path_without_identifier_overlap_stays_ambiguous(self, tmp_db):
+        """Same-path mount must not auto-reinclude a fingerprint row without overlap."""
+        fp = _make_fingerprint(500_000_000_000, "apfs", 4096)
+        _insert_drive(
+            tmp_db,
+            "FPDrive",
+            mount_path="/Volumes/Samsung T7",
+            fs_fingerprint=fp,
+        )
+        ids = DriveIdentifiers(fs_fingerprint=fp)
+
+        with _mock_collect(ids), _mock_drive_size(), \
+                patch("drivecatalog.drives.Path.exists", return_value=True):
+            result = recognize_drive(tmp_db, Path("/Volumes/Samsung T7"))
+
+        assert result.confidence == "ambiguous"
+        assert result.drive is None
 
     def test_mount_path_only_weak(self, tmp_db):
         """mount_path-only match returns weak confidence."""
@@ -319,7 +351,8 @@ class TestRecognizeDriveCascade:
         row = tmp_db.execute(
             "SELECT name, mount_path FROM drives WHERE id = ?", (drive["id"],)
         ).fetchone()
-        assert row["name"] == "NewName"
+        # Recognition must preserve user-assigned drive names.
+        assert row["name"] == "OldName"
         assert row["mount_path"] == "/Volumes/NewName"
 
     def test_identifiers_updated_on_recognition(self, tmp_db):
