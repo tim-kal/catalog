@@ -20,3 +20,6 @@ Backup vor Migration, File-basierter Fortschritt (kein HTTP — Server blockiert
 
 ## D7 — 2026-04-08: Bug-Report Fallback auf GitHub Draft
 Wenn Beta-API fehlschlägt (Domain falsch/dead), öffnet die App einen vorbefüllten GitHub-Issue-Draft (`tim-kal/catalog`) statt Report still zu verlieren. UI zeigt explizit, ob Backend-Submit oder Fallback genutzt wurde.
+
+## D8 — 2026-04-08: Samsung-Kollision fixen ohne Fingerprint-Autoassign
+`fs_fingerprint` darf ohne corroborating identifier nicht mehr automatisch erkennen. Ambiguous wird explizit auflösbar (AddDriveSheet), `resolve-ambiguous` bekommt 409-Sicherheitscheck gegen falsches Überschreiben, und Migration v9 löscht alte Produktnamen-Serials (`% Media`, `Untitled`, leer).

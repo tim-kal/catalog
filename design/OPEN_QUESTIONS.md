@@ -22,15 +22,9 @@ Possibilities for why `_get_device_serial_from_ioreg` returns None:
 (d) Samsung firmware reports an empty "" for Serial Number
 Must capture real output before fixing. No point guessing.
 
-## Q6: Fix scope for fs_fingerprint collision
-Three possible fixes — which to pick?
-(a) Demote step 4 to always-ambiguous when multiple candidates share a fingerprint OR
-    when the only candidate has no confirming signal (null serial, stale product-name serial)
-(b) Store a per-drive content-sampled hash (first N files' sizes+mtimes) as a stronger
-    fingerprint. Costs an IO pass on every recognize.
-(c) Require user to ALWAYS disambiguate when cascade reaches step 4. Safer but adds friction
-    for legitimate re-recognitions on exFAT/FAT32 (which have no VolumeUUID).
-Pick (a) as default, (c) for exFAT/FAT32 only?
+## Q6: Fix scope for fs_fingerprint collision — RESOLVED 2026-04-08
+Implemented (a): fingerprint-only matches no longer auto-assign without corroboration.
+Also added AddDriveSheet disambiguation + force-new path and resolve-ambiguous safety guard.
 
 ## Q7: Canonical beta API host
 Which hostname should replace `catalog-beta.vercel.app` as the long-term beta backend endpoint?

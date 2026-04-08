@@ -41,6 +41,24 @@ returns Drive A as probable match).
   if drive is already mounted when app starts, ambiguous dialog never appears, and
   AddDriveSheet shows a dead-end message.
 
+### Samsung collision fix implemented 2026-04-08
+- `recognize_drive()` hardened:
+  - Same-path re-recognition now requires identifier overlap.
+  - `fs_fingerprint` no longer auto-recognizes without corroborating identifiers.
+- `POST /drives/resolve-ambiguous` now sanity-checks selected drive vs mounted volume and
+  rejects identity overwrites with HTTP 409 when no overlap exists.
+- Added migration v9 to clear stale non-unique `device_serial` placeholders (`% Media`,
+  `Untitled`, empty string) from old rows.
+- AddDriveSheet now allows resolving ambiguous drives directly and supports
+  "None of these — register as new drive" (`force_new=true` path).
+- Verification:
+  - `uv run pytest -q tests/test_drive_recognition.py tests/test_api_drives.py tests/test_migrations.py` → 38 passed
+  - `xcodebuild ... build` (DriveCatalog scheme) → success
+- Release shipped:
+  - `v1.4.2` (build `18`) published at
+    `https://github.com/tim-kal/catalog/releases/tag/v1.4.2`
+  - `updates/latest.json` updated to v1.4.2
+
 ## Open Design Threads
 
 ## Beta Bug Reporting — CONFIRMED INFRA ISSUE 2026-04-08
