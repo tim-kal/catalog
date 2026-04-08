@@ -31,3 +31,7 @@ Three possible fixes — which to pick?
 (c) Require user to ALWAYS disambiguate when cascade reaches step 4. Safer but adds friction
     for legitimate re-recognitions on exFAT/FAT32 (which have no VolumeUUID).
 Pick (a) as default, (c) for exFAT/FAT32 only?
+
+## Q7: Canonical beta API host
+Which hostname should replace `catalog-beta.vercel.app` as the long-term beta backend endpoint?
+Current app mitigation opens GitHub issue drafts, but proper API endpoint still needed for silent in-app submit.

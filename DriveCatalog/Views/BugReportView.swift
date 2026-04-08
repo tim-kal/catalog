@@ -9,6 +9,9 @@ struct BugReportView: View {
     @State private var includeLog = true
     @State private var isSubmitting = false
     @State private var submitted = false
+    @State private var submissionHeadline = "Bug report submitted!"
+    @State private var submissionDetail = "Thank you for helping improve Catalog."
+    @State private var submitError: String?
     @State private var recentErrors: [ErrorLogEntry] = []
 
     var body: some View {
@@ -26,9 +29,9 @@ struct BugReportView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 36))
                         .foregroundStyle(.green)
-                    Text("Bug report submitted!")
+                    Text(submissionHeadline)
                         .font(.headline)
-                    Text("Thank you for helping improve Catalog.")
+                    Text(submissionDetail)
                         .foregroundStyle(.secondary)
                     Button("Done") { dismiss() }
                         .buttonStyle(.borderedProminent)
@@ -66,20 +69,38 @@ struct BugReportView: View {
                             }
                         }
                     }
+
+                    if let submitError {
+                        Text(submitError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
                 }
 
                 HStack {
                     Spacer()
                     Button {
                         isSubmitting = true
+                        submitError = nil
                         Task {
-                            let success = await beta.submitBugReport(
+                            let result = await beta.submitBugReport(
                                 title: title,
                                 description: description,
                                 includeLog: includeLog
                             )
                             isSubmitting = false
-                            if success { submitted = true }
+                            switch result {
+                            case .backend:
+                                submissionHeadline = "Bug report submitted!"
+                                submissionDetail = "Thank you for helping improve Catalog."
+                                submitted = true
+                            case .githubDraft:
+                                submissionHeadline = "GitHub issue draft opened"
+                                submissionDetail = "The beta endpoint is unavailable. Please click Submit on the opened GitHub page."
+                                submitted = true
+                            case .failed:
+                                submitError = "Could not submit report. Please try again."
+                            }
                         }
                     } label: {
                         if isSubmitting {

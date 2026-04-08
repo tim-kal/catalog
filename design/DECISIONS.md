@@ -17,3 +17,6 @@ Identifier-Kaskade: VolumeUUID → DiskUUID → Device Serial + Partition Index 
 
 ## D6 — 2026-04-06: Migration-Strategie = Lightroom-Pattern
 Backup vor Migration, File-basierter Fortschritt (kein HTTP — Server blockiert im Lifespan), Rollback bei Fehler. Frontend prüft DB-Version per direktem SQLite-Zugriff, nicht per API. Begründung: uvicorn liefert keine Responses während Lifespan blockiert. Alternativen (Background-Thread, separater Prozess) einführen Race Conditions bzw. Komplexität ohne Nutzen.
+
+## D7 — 2026-04-08: Bug-Report Fallback auf GitHub Draft
+Wenn Beta-API fehlschlägt (Domain falsch/dead), öffnet die App einen vorbefüllten GitHub-Issue-Draft (`tim-kal/catalog`) statt Report still zu verlieren. UI zeigt explizit, ob Backend-Submit oder Fallback genutzt wurde.

@@ -5,10 +5,17 @@ import os
 /// Manages beta access: invite codes, registration, usage tracking, and bug reports.
 @MainActor
 final class BetaService: ObservableObject {
+    enum BugReportSubmissionResult {
+        case backend
+        case githubDraft
+        case failed
+    }
+
     static let shared = BetaService()
 
     /// Backend URL for beta management. Set to your actual endpoint.
     static let apiURL = "https://catalog-beta.vercel.app/api"
+    static let fallbackGitHubRepo = "tim-kal/catalog"
 
     @Published var isRegistered = false
     @Published var userName: String = ""
@@ -83,7 +90,8 @@ final class BetaService: ObservableObject {
     // MARK: - Bug Report
 
     /// Submit a bug report with optional log attachment and recent error codes.
-    func submitBugReport(title: String, description: String, includeLog: Bool) async -> Bool {
+    /// Falls back to opening a prefilled GitHub issue draft when beta backend is unavailable.
+    func submitBugReport(title: String, description: String, includeLog: Bool) async -> BugReportSubmissionResult {
         var body: [String: Any] = [
             "email": userEmail,
             "name": userName,
@@ -115,10 +123,97 @@ final class BetaService: ObservableObject {
 
         do {
             let result = try await post(endpoint: "/bug-report", body: body)
-            return result["success"] as? Bool ?? false
+            if result["success"] as? Bool == true || result["status"] as? String == "created" {
+                return .backend
+            }
         } catch {
+            logger.warning("Backend bug report failed, trying GitHub draft fallback: \(error.localizedDescription)")
+        }
+
+        if openGitHubIssueDraft(title: title, description: description, payload: body) {
+            return .githubDraft
+        }
+
+        return .failed
+    }
+
+    private func openGitHubIssueDraft(title: String, description: String, payload: [String: Any]) -> Bool {
+        let appVersion = payload["app_version"] as? String ?? "unknown"
+        let osVersion = payload["os_version"] as? String ?? "unknown"
+        let deviceId = payload["device_id"] as? String ?? "unknown"
+        let email = (payload["email"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let backendLog = payload["backend_log"] as? String ?? ""
+
+        var issueBody = """
+        ## Bug Report
+
+        **Description:** \(description)
+
+        ### Environment
+        - **App Version:** \(appVersion)
+        - **OS Version:** \(osVersion)
+        - **Device ID:** \(deviceId)
+        """
+
+        if !email.isEmpty {
+            issueBody += "\n- **Reporter email:** \(email)"
+        }
+
+        if let recentErrors = payload["recent_errors"] as? [[String: Any]], !recentErrors.isEmpty {
+            issueBody += "\n\n### Recent Errors"
+            for error in recentErrors.prefix(10) {
+                let code = error["code"] as? String ?? "unknown"
+                let errorTitle = error["title"] as? String ?? "unknown"
+                issueBody += "\n- `\(code)`: \(errorTitle)"
+            }
+        }
+
+        if !backendLog.isEmpty {
+            issueBody += "\n\n### Backend Log Snippet\n```\n\(backendLog)\n```"
+        }
+
+        issueBody += "\n\n---\n*Submitted via in-app bug reporter (GitHub fallback path)*"
+
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "github.com"
+        components.path = "/\(Self.fallbackGitHubRepo)/issues/new"
+        components.queryItems = [
+            URLQueryItem(name: "title", value: title),
+            URLQueryItem(name: "body", value: issueBody),
+            URLQueryItem(name: "labels", value: "bug-report,from-app")
+        ]
+
+        guard let url = components.url else {
+            logger.error("Failed to build GitHub issue draft URL")
             return false
         }
+
+        return NSWorkspace.shared.open(url)
+    }
+
+    private func post(endpoint: String, body: [String: Any]) async throws -> [String: Any] {
+        guard let url = URL(string: Self.apiURL + endpoint) else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        request.timeoutInterval = 10
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            let fallback = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+            let detail = fallback["error"] as? String ?? "HTTP \(http.statusCode)"
+            throw NSError(
+                domain: "BetaService",
+                code: http.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: detail]
+            )
+        }
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 
     // MARK: - Helpers
@@ -134,19 +229,5 @@ final class BetaService: ObservableObject {
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0"
-    }
-
-    private func post(endpoint: String, body: [String: Any]) async throws -> [String: Any] {
-        guard let url = URL(string: Self.apiURL + endpoint) else {
-            throw URLError(.badURL)
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        request.timeoutInterval = 10
-
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 }

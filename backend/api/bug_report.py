@@ -99,7 +99,7 @@ class handler(BaseHTTPRequestHandler):
         # --- Build structured issue body ---
         app_version = body.get("app_version", "unknown")
         os_version = body.get("os_version", "unknown")
-        log_snippet = body.get("log_snippet", "")
+        log_snippet = body.get("log_snippet") or body.get("backend_log", "")
         email = body.get("email", "")
 
         issue_body_parts = [

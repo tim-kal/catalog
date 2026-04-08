@@ -50,5 +50,15 @@ returns Drive A as probable match).
 - Browser GET shows Russian flower catalog content on same host.
 - Result: in-app bug reports do not reach GitHub issue creation backend from this domain.
 
+### Mitigation implemented 2026-04-08
+- App now falls back to opening a prefilled GitHub issue draft at
+  `https://github.com/tim-kal/catalog/issues/new` when backend submission fails.
+- Bug report UI now tells user whether it was submitted to backend, opened as GitHub draft,
+  or failed entirely.
+- Backend function now accepts both `log_snippet` and `backend_log` payload keys.
+- Verification:
+  - `uv run pytest -q tests/test_backend_endpoints.py` → 12 passed
+  - `xcodebuild ... build` (DriveCatalog scheme) → success
+
 ### Phase 1 (DC-001..DC-007): synced to DB, ready for execution
 See `phases/PHASE-01-CORE-IMPROVEMENTS.md` and `phases/PHASE-02-MANAGE-PAGE.md`
