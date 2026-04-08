@@ -1,7 +1,8 @@
 # Open Questions
 
-## Q1: Vercel backend status
-Does `catalog-beta.vercel.app` actually exist and handle bug reports? If not, reports go nowhere.
+## Q1: Vercel backend status — RESOLVED 2026-04-08
+`catalog-beta.vercel.app` is live but currently serves unrelated website content.
+`POST /api/bug-report` returns HTTP 405 HTML, so bug reports from app currently go nowhere.
 
 ## Q2: Sidebar restructure scope
 Merging Insights + Backups into Manage — do we also absorb Consolidate and Action Queue, or keep those separate?

@@ -43,5 +43,12 @@ returns Drive A as probable match).
 
 ## Open Design Threads
 
+## Beta Bug Reporting — CONFIRMED INFRA ISSUE 2026-04-08
+
+- `POST https://catalog-beta.vercel.app/api/bug-report` returns `HTTP 405` with
+  `Content-Type: text/html` (Vercel-served website), not API JSON.
+- Browser GET shows Russian flower catalog content on same host.
+- Result: in-app bug reports do not reach GitHub issue creation backend from this domain.
+
 ### Phase 1 (DC-001..DC-007): synced to DB, ready for execution
 See `phases/PHASE-01-CORE-IMPROVEMENTS.md` and `phases/PHASE-02-MANAGE-PAGE.md`
