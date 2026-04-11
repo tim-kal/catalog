@@ -83,5 +83,14 @@ returns Drive A as probable match).
 - Tests: `uv run pytest -q tests/test_api_bug_report.py` → 3 passed
 - **Setup required**: user must add `github_token` and `github_repo` to `~/.drivecatalog/config.yaml`
 
-### Phase 1 (DC-001..DC-007): synced to DB, ready for execution
+### Phase 1 (DC-001..DC-011): core improvements, mostly complete
 See `phases/PHASE-01-CORE-IMPROVEMENTS.md` and `phases/PHASE-02-MANAGE-PAGE.md`
+
+### Phase 3 (DC-012..DC-016): Safe Verified Transfers — designed 2026-04-11
+See `phases/PHASE-03-SAFE-TRANSFERS.md` and `design/RESEARCH-safe-transfers.md`
+- DC-012: Harden copier (fsync, atomic write, 1MB buffer, metadata)
+- DC-013: Create planned_actions table (migration v10)
+- DC-014: Batch transfer engine (depends on DC-012, DC-013)
+- DC-015: Transfer verification report (depends on DC-014)
+- DC-016: Frontend transfer UI (depends on DC-015)
+- All task tickets written to `migration/TASKS/DC-01{2..6}/ticket.md`

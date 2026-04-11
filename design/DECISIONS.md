@@ -23,3 +23,6 @@ Wenn Beta-API fehlschlägt (Domain falsch/dead), öffnet die App einen vorbefül
 
 ## D8 — 2026-04-08: Samsung-Kollision fixen ohne Fingerprint-Autoassign
 `fs_fingerprint` darf ohne corroborating identifier nicht mehr automatisch erkennen. Ambiguous wird explizit auflösbar (AddDriveSheet), `resolve-ambiguous` bekommt 409-Sicherheitscheck gegen falsches Überschreiben, und Migration v9 löscht alte Produktnamen-Serials (`% Media`, `Untitled`, leer).
+
+## D9 — 2026-04-11: Safe Transfer Architektur
+Pattern: stream-hash source while writing + fsync + re-read dest hash (wie ChronoSync/CCC). Atomic temp-file (.dctmp) + rename. 1MB Buffer statt 64KB. Metadata via shutil.copystat + xattr. Batch-Engine über planned_actions Tabelle mit transfer_id Gruppierung. Sequentielle I/O (kein Parallel-Copy — schlechter auf HDD). SHA-256 für Verifikation, xxHash bleibt für Dedup.
