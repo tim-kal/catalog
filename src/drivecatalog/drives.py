@@ -93,9 +93,13 @@ def collect_drive_identifiers(path: Path) -> DriveIdentifiers:
 def _get_device_serial_from_ioreg(disk_name: str) -> str | None:
     """Extract the hardware serial number for a disk from IOKit via ioreg.
 
-    Parses ioreg output to find a Serial Number near the BSD Name matching
-    our disk. Each physical device has a unique serial — this is the only
-    reliable way to distinguish two identical USB drives.
+    Uses structured plist output (-a flag) for deterministic parsing — no
+    regex sliding windows. Walks IOBlockStorageDevice nodes, finds the one
+    whose child tree contains the target BSD Name, and returns its Serial
+    Number from Device Characteristics.
+
+    Falls back to IOUSBHostDevice if IOBlockStorageDevice has no serial
+    (some USB drives only expose it at the USB level).
 
     Args:
         disk_name: e.g. "disk4" (the parent whole disk, not a partition)
@@ -103,28 +107,76 @@ def _get_device_serial_from_ioreg(disk_name: str) -> str | None:
     Returns:
         Per-device serial string, or None if not available.
     """
+    # Try IOBlockStorageDevice first (most drives)
+    serial = _serial_from_iokit_class("IOBlockStorageDevice", disk_name)
+    if serial:
+        return serial
+    # Fallback: some USB drives only expose serial at the USB host level
+    serial = _serial_from_iokit_class("IOUSBHostDevice", disk_name)
+    if serial:
+        return serial
+    return None
+
+
+def _serial_from_iokit_class(iokit_class: str, disk_name: str) -> str | None:
+    """Query an IOKit class for the serial number associated with a BSD disk name."""
     try:
         result = subprocess.run(
-            ["ioreg", "-r", "-c", "IOBlockStorageDevice", "-l"],
-            capture_output=True, text=True, timeout=10,
+            ["ioreg", "-r", "-c", iokit_class, "-l", "-a"],
+            capture_output=True, timeout=10,
         )
-        if result.returncode != 0:
+        if result.returncode != 0 or not result.stdout:
             return None
 
-        lines = result.stdout.splitlines()
-        for i, line in enumerate(lines):
-            serial_m = re.search(r'"Serial Number"\s*=\s*"([^"]+)"', line)
-            if not serial_m:
-                continue
-            # Check nearby lines (within context window) for our BSD Name
-            context = lines[max(0, i - 10): i + 50]
-            for cl in context:
-                bsd_m = re.search(r'"BSD Name"\s*=\s*"' + re.escape(disk_name) + r'"', cl)
-                if bsd_m:
-                    return serial_m.group(1).strip()
+        import plistlib
+        try:
+            devices = plistlib.loads(result.stdout)
+        except Exception:
+            return None
+
+        if not isinstance(devices, list):
+            return None
+
+        for device in devices:
+            if _device_contains_bsd(device, disk_name):
+                serial = _extract_serial(device)
+                if serial:
+                    return serial
 
     except (OSError, subprocess.TimeoutExpired):
         pass
+
+    return None
+
+
+def _device_contains_bsd(node: dict, disk_name: str) -> bool:
+    """Check if a device node or any of its children contains the target BSD Name."""
+    if node.get("BSD Name") == disk_name:
+        return True
+    for child in node.get("IORegistryEntryChildren", []):
+        if _device_contains_bsd(child, disk_name):
+            return True
+    return False
+
+
+def _extract_serial(node: dict) -> str | None:
+    """Extract Serial Number from a device node's Device Characteristics or USB properties."""
+    # IOBlockStorageDevice: Device Characteristics → Serial Number
+    dev_chars = node.get("Device Characteristics", {})
+    if isinstance(dev_chars, dict):
+        serial = dev_chars.get("Serial Number", "")
+        if serial and serial.strip():
+            return serial.strip()
+
+    # IOUSBHostDevice: USB Serial Number (direct property)
+    usb_serial = node.get("USB Serial Number")
+    if usb_serial and str(usb_serial).strip():
+        return str(usb_serial).strip()
+
+    # kUSBSerialNumberString
+    usb_serial2 = node.get("kUSBSerialNumberString")
+    if usb_serial2 and str(usb_serial2).strip():
+        return str(usb_serial2).strip()
 
     return None
 
@@ -401,6 +453,32 @@ def _candidate_available_for_match(row: sqlite3.Row, mount_path: Path, ids: Driv
         return True
     # Same-path re-recognition is allowed only with corroborating identifiers.
     return str(mount_path) == stored_mount and _has_identifier_overlap(row, ids)
+
+
+def _provably_different(row: sqlite3.Row, ids: DriveIdentifiers) -> bool:
+    """Return True when the new drive is provably NOT the stored row.
+
+    If both sides have a strong identifier set and they differ, the drives
+    cannot possibly be the same physical device. This lets the recognizer
+    skip ambiguous prompts and auto-register new drives.
+    """
+    # Different VolumeUUID → different volume, guaranteed
+    if ids.volume_uuid and row["uuid"] and ids.volume_uuid != row["uuid"]:
+        return True
+    # Different DiskUUID → different disk/container, guaranteed
+    if ids.disk_uuid and row["disk_uuid"] and ids.disk_uuid != row["disk_uuid"]:
+        return True
+    # Different device serial (same partition index) → different physical device
+    if (
+        ids.device_serial
+        and row["device_serial"]
+        and ids.device_serial != row["device_serial"]
+        and ids.partition_index is not None
+        and row["partition_index"] is not None
+        and ids.partition_index == row["partition_index"]
+    ):
+        return True
+    return False
 
 
 def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionResult:

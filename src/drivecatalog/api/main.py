@@ -14,7 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from drivecatalog.database import init_db
 
 from . import __version__
-from .routes import actions, bug_report, consolidation, copy, drives, duplicates, errors, files, folder_duplicates, insights, migrations, operations, search, status
+from .routes import actions, bug_report, consolidation, copy, drives, duplicates, errors, files, folder_duplicates, insights, migrations, operations, search, status, transfers
 
 
 @asynccontextmanager
@@ -56,6 +56,7 @@ app.include_router(insights.router)
 app.include_router(folder_duplicates.router)
 app.include_router(errors.router)
 app.include_router(bug_report.router)
+app.include_router(transfers.router)
 
 
 # Map HTTP error patterns to error codes for structured error responses.
