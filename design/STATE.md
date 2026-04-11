@@ -75,15 +75,13 @@ returns Drive A as probable match).
 - Browser GET shows Russian flower catalog content on same host.
 - Result: in-app bug reports do not reach GitHub issue creation backend from this domain.
 
-### Mitigation implemented 2026-04-08
-- App now falls back to opening a prefilled GitHub issue draft at
-  `https://github.com/tim-kal/catalog/issues/new` when backend submission fails.
-- Bug report UI now tells user whether it was submitted to backend, opened as GitHub draft,
-  or failed entirely.
-- Backend function now accepts both `log_snippet` and `backend_log` payload keys.
-- Verification:
-  - `uv run pytest -q tests/test_backend_endpoints.py` → 12 passed
-  - `xcodebuild ... build` (DriveCatalog scheme) → success
+### Fix implemented 2026-04-11: local backend → GitHub API directly
+- New `POST /bug-report` endpoint in local FastAPI backend (`src/drivecatalog/api/routes/bug_report.py`)
+- Reads `github_token` and `github_repo` from `~/.drivecatalog/config.yaml`
+- BetaService.swift now tries: (1) local backend → GitHub API, (2) Vercel (legacy), (3) browser draft
+- Rate limited to 5 reports/hour per device in-process
+- Tests: `uv run pytest -q tests/test_api_bug_report.py` → 3 passed
+- **Setup required**: user must add `github_token` and `github_repo` to `~/.drivecatalog/config.yaml`
 
 ### Phase 1 (DC-001..DC-007): synced to DB, ready for execution
 See `phases/PHASE-01-CORE-IMPROVEMENTS.md` and `phases/PHASE-02-MANAGE-PAGE.md`

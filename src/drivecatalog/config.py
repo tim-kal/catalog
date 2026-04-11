@@ -16,6 +16,8 @@ class Config:
 
     auto_scan_enabled: bool = True
     auto_scan_drives: list[str] | None = None  # None means all drives
+    github_token: str | None = None  # Fine-grained PAT for bug-report issue creation
+    github_repo: str | None = None  # e.g. "tim-kal/catalog"
 
 
 def get_config_path() -> Path:
@@ -62,6 +64,8 @@ def load_config() -> Config:
         return Config(
             auto_scan_enabled=data.get("auto_scan_enabled", True),
             auto_scan_drives=data.get("auto_scan_drives", None),
+            github_token=data.get("github_token"),
+            github_repo=data.get("github_repo"),
         )
     except (yaml.YAMLError, OSError):
         # On error, return defaults

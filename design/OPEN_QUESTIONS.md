@@ -26,9 +26,9 @@ Must capture real output before fixing. No point guessing.
 Implemented (a): fingerprint-only matches no longer auto-assign without corroboration.
 Also added AddDriveSheet disambiguation + force-new path and resolve-ambiguous safety guard.
 
-## Q7: Canonical beta API host
-Which hostname should replace `catalog-beta.vercel.app` as the long-term beta backend endpoint?
-Current app mitigation opens GitHub issue drafts, but proper API endpoint still needed for silent in-app submit.
+## Q7: Canonical beta API host — RESOLVED 2026-04-11
+Bypassed Vercel entirely. Bug reports now route through local FastAPI backend → GitHub API
+directly. Vercel endpoint kept as legacy fallback but is not depended on.
 
 ## Q8: Is fixed release actually active on affected machine?
 Local evidence shows `schema_version = 6` in `~/.drivecatalog/catalog.db`, which implies

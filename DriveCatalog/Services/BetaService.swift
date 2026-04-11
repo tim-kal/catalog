@@ -90,7 +90,7 @@ final class BetaService: ObservableObject {
     // MARK: - Bug Report
 
     /// Submit a bug report with optional log attachment and recent error codes.
-    /// Falls back to opening a prefilled GitHub issue draft when beta backend is unavailable.
+    /// Tries: (1) local backend → GitHub API, (2) Vercel backend, (3) browser GitHub draft.
     func submitBugReport(title: String, description: String, includeLog: Bool) async -> BugReportSubmissionResult {
         var body: [String: Any] = [
             "email": userEmail,
@@ -121,20 +121,57 @@ final class BetaService: ObservableObject {
             }
         }
 
+        // 1. Try local backend (routes through GitHub API via config token)
+        do {
+            let result = try await postLocal(path: "/bug-report", body: body)
+            if result["status"] as? String == "created" {
+                return .backend
+            }
+        } catch {
+            logger.warning("Local bug report failed: \(error.localizedDescription)")
+        }
+
+        // 2. Try Vercel backend (legacy — may be broken)
         do {
             let result = try await post(endpoint: "/bug-report", body: body)
             if result["success"] as? Bool == true || result["status"] as? String == "created" {
                 return .backend
             }
         } catch {
-            logger.warning("Backend bug report failed, trying GitHub draft fallback: \(error.localizedDescription)")
+            logger.warning("Vercel bug report also failed: \(error.localizedDescription)")
         }
 
+        // 3. Last resort — open prefilled GitHub issue in browser
         if openGitHubIssueDraft(title: title, description: description, payload: body) {
             return .githubDraft
         }
 
         return .failed
+    }
+
+    /// POST to the local FastAPI backend (same host as APIService).
+    private func postLocal(path: String, body: [String: Any]) async throws -> [String: Any] {
+        guard let url = URL(string: APIService.baseURL + path) else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        request.timeoutInterval = 15
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            let fallback = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+            let detail = fallback["detail"] as? String ?? "HTTP \(http.statusCode)"
+            throw NSError(
+                domain: "BetaService",
+                code: http.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: detail]
+            )
+        }
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 
     private func openGitHubIssueDraft(title: String, description: String, payload: [String: Any]) -> Bool {
