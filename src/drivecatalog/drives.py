@@ -548,26 +548,38 @@ def recognize_drive(conn: sqlite3.Connection, mount_path: Path) -> RecognitionRe
             (ids.fs_fingerprint,),
         ).fetchall()
 
-        # Fingerprint-only matching is collision-prone. Never auto-recognize without an
-        # additional corroborating identifier overlap.
-        candidates_not_mounted = [r for r in rows if _candidate_available_for_match(r, mount_path, ids)]
-        corroborated = [r for r in candidates_not_mounted if _has_identifier_overlap(r, ids)]
+        # Exclude candidates that are provably different drives (UUIDs differ).
+        # If we can prove every candidate is a different drive, this is a new drive — not ambiguous.
+        not_disproven = [r for r in rows if not _provably_different(r, ids)]
 
-        if len(corroborated) == 1:
-            drive = dict(corroborated[0])
-            _update_drive_identifiers(conn, drive["id"], mount_path, ids)
-            drive["mount_path"] = str(mount_path)
-            logger.warning(
-                "Drive '%s' recognized by FS fingerprint + corroborating signal (probable match)",
-                mount_path.name,
+        if not not_disproven:
+            # Every fingerprint match is provably a different drive.
+            # This is a genuinely new drive — fall through to "none" (step 7).
+            logger.info(
+                "Drive '%s' shares FS fingerprint with %d registered drive(s) but all are "
+                "provably different (distinct UUIDs). Treating as new drive.",
+                mount_path.name, len(rows),
             )
-            return RecognitionResult(drive=drive, confidence="probable")
+        else:
+            # Among the non-disproven candidates, check for corroborated match.
+            candidates_not_mounted = [r for r in not_disproven if _candidate_available_for_match(r, mount_path, ids)]
+            corroborated = [r for r in candidates_not_mounted if _has_identifier_overlap(r, ids)]
 
-        # Fingerprint match without corroboration (or multiple candidates) is ambiguous.
-        if rows:
+            if len(corroborated) == 1:
+                drive = dict(corroborated[0])
+                _update_drive_identifiers(conn, drive["id"], mount_path, ids)
+                drive["mount_path"] = str(mount_path)
+                logger.warning(
+                    "Drive '%s' recognized by FS fingerprint + corroborating signal (probable match)",
+                    mount_path.name,
+                )
+                return RecognitionResult(drive=drive, confidence="probable")
+
+            # Fingerprint match without corroboration — ambiguous, but only report
+            # non-disproven candidates (not the whole list).
             from drivecatalog.errors import log_error
-            log_error("DC-E010", {"mount_path": str(mount_path), "candidate_count": len(rows)})
-            candidates = [dict(r) for r in rows]
+            log_error("DC-E010", {"mount_path": str(mount_path), "candidate_count": len(not_disproven)})
+            candidates = [dict(r) for r in not_disproven]
             return RecognitionResult(
                 drive=None, confidence="ambiguous", candidates=candidates
             )

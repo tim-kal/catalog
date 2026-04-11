@@ -103,6 +103,13 @@ class TestCollectDriveIdentifiers:
 
     def test_apfs_all_fields(self, apfs_plist, parent_disk_plist):
         """APFS drive returns all identifiers."""
+        import plistlib as _plistlib
+
+        ioreg_plist = _plistlib.dumps([{
+            "Device Characteristics": {"Serial Number": "USB2.0 Flash Disk SN12345"},
+            "IORegistryEntryChildren": [{"BSD Name": "disk2"}],
+        }])
+
         def mock_run(cmd, **kwargs):
             class R:
                 returncode = 0
@@ -110,12 +117,9 @@ class TestCollectDriveIdentifiers:
             if cmd[:3] == ["diskutil", "info", "-plist"]:
                 r.stdout = _make_plist_bytes(apfs_plist)
             elif cmd[:4] == ["ioreg", "-r", "-c", "IOBlockStorageDevice"]:
-                r.stdout = '\n'.join([
-                    '"Serial Number" = "USB2.0 Flash Disk SN12345"',
-                    '"BSD Name" = "disk2"',
-                ])
+                r.stdout = ioreg_plist
             else:
-                r.stdout = ""
+                r.stdout = b""
             return r
 
         with patch("drivecatalog.drives.subprocess.run", side_effect=mock_run):
@@ -129,6 +133,13 @@ class TestCollectDriveIdentifiers:
 
     def test_fat32_no_volume_uuid(self, fat32_plist, parent_disk_plist):
         """FAT32 drive has no VolumeUUID but other identifiers work."""
+        import plistlib as _plistlib
+
+        ioreg_plist = _plistlib.dumps([{
+            "Device Characteristics": {"Serial Number": "USB2.0 Flash Disk SN12345"},
+            "IORegistryEntryChildren": [{"BSD Name": "disk3"}],
+        }])
+
         def mock_run(cmd, **kwargs):
             class R:
                 returncode = 0
@@ -136,12 +147,9 @@ class TestCollectDriveIdentifiers:
             if cmd[:3] == ["diskutil", "info", "-plist"]:
                 r.stdout = _make_plist_bytes(fat32_plist)
             elif cmd[:4] == ["ioreg", "-r", "-c", "IOBlockStorageDevice"]:
-                r.stdout = '\n'.join([
-                    '"Serial Number" = "USB2.0 Flash Disk SN12345"',
-                    '"BSD Name" = "disk3"',
-                ])
+                r.stdout = ioreg_plist
             else:
-                r.stdout = ""
+                r.stdout = b""
             return r
 
         with patch("drivecatalog.drives.subprocess.run", side_effect=mock_run):
@@ -155,6 +163,13 @@ class TestCollectDriveIdentifiers:
 
     def test_exfat_no_uuid_no_disk_uuid(self, exfat_plist, parent_disk_plist):
         """exFAT drive has no VolumeUUID and no DiskUUID."""
+        import plistlib as _plistlib
+
+        ioreg_plist = _plistlib.dumps([{
+            "Device Characteristics": {"Serial Number": "USB2.0 Flash Disk SN12345"},
+            "IORegistryEntryChildren": [{"BSD Name": "disk4"}],
+        }])
+
         def mock_run(cmd, **kwargs):
             class R:
                 returncode = 0
@@ -162,12 +177,9 @@ class TestCollectDriveIdentifiers:
             if cmd[:3] == ["diskutil", "info", "-plist"]:
                 r.stdout = _make_plist_bytes(exfat_plist)
             elif cmd[:4] == ["ioreg", "-r", "-c", "IOBlockStorageDevice"]:
-                r.stdout = '\n'.join([
-                    '"Serial Number" = "USB2.0 Flash Disk SN12345"',
-                    '"BSD Name" = "disk4"',
-                ])
+                r.stdout = ioreg_plist
             else:
-                r.stdout = ""
+                r.stdout = b""
             return r
 
         with patch("drivecatalog.drives.subprocess.run", side_effect=mock_run):
