@@ -140,11 +140,13 @@ struct TransferReportView: View {
                             }
                             .buttonStyle(.bordered)
                             .disabled(isVerifying)
+                            .accessibilityIdentifier("verifyAgainButton")
 
                             Button("Done") {
                                 onDismiss()
                             }
                             .buttonStyle(.borderedProminent)
+                            .accessibilityIdentifier("transferDoneButton")
                         }
                     }
                     .padding()

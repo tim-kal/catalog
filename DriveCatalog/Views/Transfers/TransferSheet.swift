@@ -37,6 +37,7 @@ struct TransferSheet: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
                 .disabled(selectedDestDrive == nil || isStarting)
+                .accessibilityIdentifier("startTransferButton")
             }
             .padding()
 

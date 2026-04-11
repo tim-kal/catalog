@@ -55,6 +55,7 @@ struct AddDriveSheet: View {
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(selectedVolume == nil || isSubmitting)
+                .accessibilityIdentifier("addDriveConfirmButton")
             }
             .padding()
 

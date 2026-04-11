@@ -31,8 +31,10 @@ struct Sidebar: View {
             List(visibleItems, selection: $selection) { item in
                 Label(item.title, systemImage: item.systemImage)
                     .tag(item)
+                    .accessibilityIdentifier("sidebar_\(item.rawValue)")
             }
             .listStyle(.sidebar)
+            .accessibilityIdentifier("sidebar")
 
             // Update banner
             if updater.isDownloading {

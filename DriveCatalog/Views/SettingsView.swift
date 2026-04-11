@@ -339,6 +339,7 @@ struct SettingsView: View {
                 } label: {
                     Label("Report a Bug", systemImage: "ladybug")
                 }
+                .accessibilityIdentifier("reportBugButton")
             }
         }
         .formStyle(.grouped)

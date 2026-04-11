@@ -1772,6 +1772,7 @@ struct DriveListView: View {
             ToolbarItem {
                 Button { showAddSheet = true } label: { Image(systemName: "plus") }
                     .help("Add Drive")
+                    .accessibilityIdentifier("addDriveButton")
             }
         }
     }

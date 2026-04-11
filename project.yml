@@ -41,3 +41,14 @@ targets:
       - script: |
           bash "${SRCROOT}/scripts/embed-python.sh"
         name: Embed Python Runtime
+
+  DriveCatalogUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - DriveCatalogUITests
+    dependencies:
+      - target: DriveCatalog
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.drivecatalog.uitests
+      GENERATE_INFOPLIST_FILE: true
