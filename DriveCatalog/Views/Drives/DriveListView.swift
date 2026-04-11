@@ -1415,6 +1415,10 @@ struct DriveListView: View {
     @State private var ambiguousMatch: AmbiguousMatchInfo?
     /// Weak recognition warning banner text.
     @State private var weakMatchBanner: String?
+    // Transfer flow
+    @State private var transferSourceDrive: DriveResponse?
+    @State private var activeTransferId: Int?
+    @State private var completedTransferId: Int?
 
     struct AmbiguousMatchInfo: Identifiable {
         let id = UUID()
@@ -1716,6 +1720,35 @@ struct DriveListView: View {
                 Task { await loadDrives() }
             }
         }
+        .sheet(item: $transferSourceDrive) { drive in
+            TransferSheet(sourceDrive: drive) { transfer in
+                transferSourceDrive = nil
+                activeTransferId = transfer.id
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { activeTransferId != nil },
+            set: { if !$0 { activeTransferId = nil } }
+        )) {
+            if let transferId = activeTransferId {
+                TransferProgressView(transferId: transferId) { completed in
+                    activeTransferId = nil
+                    completedTransferId = completed.id
+                } onCancelled: {
+                    activeTransferId = nil
+                }
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { completedTransferId != nil },
+            set: { if !$0 { completedTransferId = nil } }
+        )) {
+            if let transferId = completedTransferId {
+                TransferReportView(transferId: transferId) {
+                    completedTransferId = nil
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -1790,6 +1823,12 @@ struct DriveListView: View {
         )
         .contextMenu {
             if FileManager.default.fileExists(atPath: drive.mountPath) {
+                Button {
+                    transferSourceDrive = drive
+                } label: {
+                    Label("Transfer", systemImage: "arrow.left.arrow.right")
+                }
+
                 Button {
                     Task { await unmountDriveFromList(drive) }
                 } label: {

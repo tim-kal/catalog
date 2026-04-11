@@ -36,6 +36,11 @@ struct ContentView: View {
                     .opacity(selection == .queue ? 1 : 0)
                     .allowsHitTesting(selection == .queue)
 
+                TransferHistoryView()
+                    .zIndex(selection == .transfers ? 1 : 0)
+                    .opacity(selection == .transfers ? 1 : 0)
+                    .allowsHitTesting(selection == .transfers)
+
                 if showConsolidatePage {
                     ConsolidatePageView()
                         .zIndex(selection == .consolidate ? 1 : 0)

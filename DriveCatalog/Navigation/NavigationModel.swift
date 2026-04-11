@@ -6,6 +6,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case browser
     case manage
     case queue
+    case transfers
     case consolidate
     case settings
 
@@ -17,6 +18,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .browser: return "Files"
         case .manage: return "Manage"
         case .queue: return "Action Queue"
+        case .transfers: return "Transfer History"
         case .consolidate: return "Consolidate"
         case .settings: return "Settings"
         }
@@ -28,6 +30,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .browser: return "folder"
         case .manage: return "rectangle.3.group"
         case .queue: return "list.bullet.clipboard"
+        case .transfers: return "arrow.left.arrow.right"
         case .consolidate: return "arrow.triangle.merge"
         case .settings: return "gear"
         }

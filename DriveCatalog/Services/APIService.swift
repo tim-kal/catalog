@@ -607,6 +607,52 @@ actor APIService {
         return try await postEmpty(url: url)
     }
 
+    // MARK: - Transfer Endpoints
+
+    /// Create a new file transfer.
+    func createTransfer(sourceDrive: String, destDrive: String, paths: [String]?, destFolder: String?) async throws -> TransferResponse {
+        let url = try buildURL(path: "/transfers")
+        let request = CreateTransferRequest(sourceDrive: sourceDrive, destDrive: destDrive, paths: paths, destFolder: destFolder)
+        return try await post(url: url, body: request)
+    }
+
+    /// Fetch transfer status by ID.
+    func getTransferStatus(transferId: Int) async throws -> TransferResponse {
+        let url = try buildURL(path: "/transfers/\(transferId)")
+        return try await get(url: url)
+    }
+
+    /// Fetch the verification report for a completed transfer.
+    func getTransferReport(transferId: Int) async throws -> TransferReportResponse {
+        let url = try buildURL(path: "/transfers/\(transferId)/report")
+        return try await get(url: url)
+    }
+
+    /// Trigger re-verification of a completed transfer.
+    func verifyTransfer(transferId: Int) async throws -> OperationStartResponse {
+        let url = try buildURL(path: "/transfers/\(transferId)/verify")
+        return try await postEmpty(url: url)
+    }
+
+    /// Cancel a running transfer.
+    func cancelTransfer(transferId: Int) async throws {
+        let url = try buildURL(path: "/transfers/\(transferId)/cancel")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            let details = parseErrorDetails(from: data)
+            throw APIError.httpError((response as? HTTPURLResponse)?.statusCode ?? 0, details.message ?? "Unknown error", details.errorCode)
+        }
+    }
+
+    /// List all transfers.
+    func listTransfers() async throws -> TransferListResponse {
+        let url = try buildURL(path: "/transfers")
+        return try await get(url: url)
+    }
+
     // MARK: - Private Helpers
 
     /// Build a URL with the given path and optional query items.
