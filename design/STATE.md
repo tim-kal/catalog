@@ -41,30 +41,13 @@ returns Drive A as probable match).
   if drive is already mounted when app starts, ambiguous dialog never appears, and
   AddDriveSheet shows a dead-end message.
 
-### Samsung collision fix implemented 2026-04-08
-- `recognize_drive()` hardened:
-  - Same-path re-recognition now requires identifier overlap.
-  - `fs_fingerprint` no longer auto-recognizes without corroborating identifiers.
-- `POST /drives/resolve-ambiguous` now sanity-checks selected drive vs mounted volume and
-  rejects identity overwrites with HTTP 409 when no overlap exists.
-- Added migration v9 to clear stale non-unique `device_serial` placeholders (`% Media`,
-  `Untitled`, empty string) from old rows.
-- AddDriveSheet now allows resolving ambiguous drives directly and supports
-  "None of these — register as new drive" (`force_new=true` path).
-- Verification:
-  - `uv run pytest -q tests/test_drive_recognition.py tests/test_api_drives.py tests/test_migrations.py` → 38 passed
-  - `xcodebuild ... build` (DriveCatalog scheme) → success
-- Release shipped:
-  - `v1.4.2` (build `18`) published at
-    `https://github.com/tim-kal/catalog/releases/tag/v1.4.2`
-  - `updates/latest.json` updated to v1.4.2
-
-### Post-release verification note (local machine) 2026-04-08
-- Local DB at `~/.drivecatalog/catalog.db` still reports `schema_version = 6` and still
-  contains stale product-name serials (`Samsung PSSD T7 Media`, `Lexar ES5 Media`,
-  `LaCie Rugged Mini USB3 Media`) plus Samsung fingerprint collision.
-- Interpretation: this local installation has not yet run the v9 migration path from
-  release `v1.4.2` (or is still running an older app binary/backend).
+### Samsung collision — FULLY FIXED 2026-04-11
+- **v1.4.2** (build 18): corroboration requirement, ambiguous UI, migration v9, resolve-ambiguous guard
+- **7992542** (2026-04-11): ioreg parser rewritten with structured plist parsing (no more regex
+  sliding window). Falls back to IOUSBHostDevice. Auto-resolve: step 4 now excludes fingerprint
+  candidates that are provably different (both sides have UUIDs and they differ → new drive,
+  not ambiguous). No user click needed when identifiers prove it's a different drive.
+- **Remaining**: needs release build + rollout (v1.4.3). Local DB still at schema v8.
 
 ## Open Design Threads
 
