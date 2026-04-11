@@ -1,4 +1,3 @@
-| 2026-04-06 15:38 UTC | DC-009 | review:approved | All 23 acceptance criteria verified against actual code — backup, rollback, file-based progress, SQLite pre-check, failure UI, and all 5 required test scenarios implemented correctly. |
 | 2026-04-06 15:56 UTC | DC-011 | verified | verified |
 | 2026-04-06 15:57 UTC | DC-011 | review:changes_requested | Zero DC-011 acceptance criteria implemented — the diff contains only build-infrastructure changes (build stamping, Python embedding) unrelated to the structured error code system. |
 | 2026-04-06 16:07 UTC | DC-011 | verified | Implemented structured error codes (DC-E001..DC-E010) with JSONL error log, API endpoints, error_code in HTTP error responses, integration into backend try/except blocks, and frontend error display. |
@@ -8,3 +7,4 @@
 | 2026-04-11 12:20 UTC | DC-012 | verified | Made copy_file_verified() crash-safe, performant, and metadata-preserving. All data is now fsynced before close, written through an atomic .dctmp temp file, copied in 1MB chunks (was 64KB), and file metadata (timestamps, creation date, extended attributes) is preserved after verification. |
 | 2026-04-11 12:23 UTC | DC-012 | review:approved | All acceptance criteria verifiably met — fsync, atomic .dctmp write, 1MB buffer, metadata preservation (mtime/birthtime/xattrs), throttled progress, and all 5 required tests passing. |
 | 2026-04-11 12:25 UTC | DC-013 | verified | Added migration v10 creating the planned_actions table with indexes, bumped schema version to 10, and fixed actions.py SQL to match the table schema (removed non-existent `reason` column, added `transfer_id`/`error`/`started_at` fields). |
+| 2026-04-11 12:25 UTC | DC-014 | verified | No task file found at DriveSnapshots/TASKS/DC-014*.md. The task definition provided in the system instruction contains no goal, no acceptance criteria, no relevant files, and no handoff template. Cannot proceed without a defined task. |
