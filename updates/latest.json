@@ -1,7 +1,7 @@
 {
-  "version": "1.4.2",
-  "build": 18,
-  "url": "https://github.com/tim-kal/catalog/releases/download/v1.4.2/DriveCatalog.zip",
-  "notes": "Fix Samsung T7 recognition collisions: safer fingerprint matching, ambiguous resolution from Add Drive, and stale serial cleanup migration.",
+  "version": "1.5.0",
+  "build": 19,
+  "url": "https://github.com/tim-kal/catalog/releases/download/v1.5.0/DriveCatalog.zip",
+  "notes": "Safe verified transfers: batch copy with SHA-256 verification, fsync, atomic writes, metadata preservation, resume on interrupt. Samsung drive recognition: plist-based ioreg parser, auto-resolve provably different drives. Bug reports now route through local backend to GitHub API.",
   "min_os": "14.0"
 }
