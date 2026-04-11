@@ -1,5 +1,6 @@
-"""Tests for batch transfer engine (DC-014)."""
+"""Tests for batch transfer engine (DC-014, DC-015)."""
 
+import hashlib
 import sqlite3
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -10,10 +11,14 @@ from drivecatalog.copier import CopyResult
 from drivecatalog.transfer import (
     TransferManifest,
     TransferResult,
+    TransferVerificationReport,
     create_transfer,
     execute_transfer,
+    get_transfer_report,
     get_transfer_status,
+    list_transfers,
     resume_transfer,
+    verify_transfer,
 )
 
 
@@ -281,3 +286,150 @@ def test_directory_batched_ordering(db):
     # All photos should be contiguous
     if len(photo_indices) > 1:
         assert photo_indices[-1] - photo_indices[0] == len(photo_indices) - 1
+
+
+# ---------------------------------------------------------------------------
+# DC-015: Transfer verification report tests
+# ---------------------------------------------------------------------------
+
+
+def _execute_and_complete(db, manifest, tmp_path):
+    """Helper: execute a transfer with mocked copies that write real files."""
+    dst_mount = str(tmp_path / "dst_drive")
+
+    def mock_copy(src, dst, progress_callback=None):
+        # Write a real file at dest so verify can read it
+        dst = Path(dst)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        content = src.read_bytes()
+        dst.write_bytes(content)
+        file_hash = hashlib.sha256(content).hexdigest()
+        return CopyResult(
+            source_hash=file_hash,
+            dest_hash=file_hash,
+            verified=True,
+            bytes_copied=len(content),
+        )
+
+    with patch("drivecatalog.transfer.copy_file_verified", side_effect=mock_copy):
+        execute_transfer(db, manifest.transfer_id)
+
+
+def test_verify_correct_pass_fail_counts(db, tmp_path):
+    """verify_transfer: mock file reads, assert report has correct pass/fail counts."""
+    manifest = create_transfer(
+        db, "SrcDrive", "DstDrive",
+        ["photos/a.jpg", "photos/b.jpg", "videos/c.mov"],
+    )
+
+    _execute_and_complete(db, manifest, tmp_path)
+
+    # All 3 files should be completed and verifiable
+    report = verify_transfer(db, manifest.transfer_id)
+
+    assert isinstance(report, TransferVerificationReport)
+    assert report.total_files == 3
+    assert report.verified_ok == 3
+    assert report.verified_failed == 0
+    assert len(report.failures) == 0
+    assert report.duration_seconds >= 0
+
+
+def test_verify_missing_file(db, tmp_path):
+    """verify_transfer with missing file: appears in failures as file_missing."""
+    manifest = create_transfer(
+        db, "SrcDrive", "DstDrive",
+        ["photos/a.jpg", "photos/b.jpg", "videos/c.mov"],
+    )
+
+    _execute_and_complete(db, manifest, tmp_path)
+
+    # Delete one dest file to simulate missing
+    dst_mount = str(tmp_path / "dst_drive")
+    missing_file = Path(dst_mount) / "photos/a.jpg"
+    missing_file.unlink()
+
+    report = verify_transfer(db, manifest.transfer_id)
+
+    assert report.total_files == 3
+    assert report.verified_ok == 2
+    assert report.verified_failed == 1
+    assert len(report.failures) == 1
+    assert report.failures[0]["path"] == "photos/a.jpg"
+    assert report.failures[0]["reason"] == "file_missing"
+
+
+def test_report_endpoint_aggregation(db):
+    """get_transfer_report: insert test data, assert correct aggregation."""
+    manifest = create_transfer(
+        db, "SrcDrive", "DstDrive",
+        ["photos/a.jpg", "photos/b.jpg", "videos/c.mov"],
+    )
+
+    # Mark 2 completed, 1 failed
+    actions = db.execute(
+        "SELECT id FROM planned_actions WHERE transfer_id = ? ORDER BY id",
+        (manifest.transfer_id,),
+    ).fetchall()
+    db.execute(
+        "UPDATE planned_actions SET status = 'completed', started_at = '2026-04-11T10:00:00', completed_at = '2026-04-11T10:01:00' WHERE id = ?",
+        (actions[0]["id"],),
+    )
+    db.execute(
+        "UPDATE planned_actions SET status = 'completed', started_at = '2026-04-11T10:01:00', completed_at = '2026-04-11T10:02:00' WHERE id = ?",
+        (actions[1]["id"],),
+    )
+    db.execute(
+        "UPDATE planned_actions SET status = 'failed', error = 'IO error' WHERE id = ?",
+        (actions[2]["id"],),
+    )
+    db.commit()
+
+    report = get_transfer_report(db, manifest.transfer_id)
+
+    assert report is not None
+    assert report["transfer_id"] == manifest.transfer_id
+    assert report["total_files"] == 3
+    assert report["completed"] == 2
+    assert report["failed"] == 1
+    assert report["pending"] == 0
+    assert report["total_bytes"] == 8000
+    assert len(report["failures"]) == 1
+    assert report["failures"][0]["error"] == "IO error"
+
+
+def test_transfers_list(db):
+    """list_transfers: create 2 transfers, assert both appear with correct summaries."""
+    manifest1 = create_transfer(
+        db, "SrcDrive", "DstDrive",
+        ["photos/a.jpg", "photos/b.jpg"],
+    )
+    manifest2 = create_transfer(
+        db, "SrcDrive", "DstDrive",
+        ["videos/c.mov"],
+    )
+
+    # Complete all of manifest1
+    db.execute(
+        "UPDATE planned_actions SET status = 'completed' WHERE transfer_id = ?",
+        (manifest1.transfer_id,),
+    )
+    # Leave manifest2 pending
+    db.commit()
+
+    transfers = list_transfers(db)
+
+    assert len(transfers) >= 2
+
+    t1 = next(t for t in transfers if t["transfer_id"] == manifest1.transfer_id)
+    t2 = next(t for t in transfers if t["transfer_id"] == manifest2.transfer_id)
+
+    assert t1["total_files"] == 2
+    assert t1["completed"] == 2
+    assert t1["status"] == "completed"
+    assert t1["source_drive"] == "SrcDrive"
+    assert t1["dest_drive"] == "DstDrive"
+
+    assert t2["total_files"] == 1
+    assert t2["completed"] == 0
+    assert t2["status"] == "pending"

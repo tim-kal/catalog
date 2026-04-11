@@ -4,8 +4,10 @@ Enables transferring many files between drives in one operation,
 with per-file tracking, resume on interrupt, and overall progress.
 """
 
+import hashlib
 import logging
 import sqlite3
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -38,6 +40,21 @@ class TransferResult:
     files_skipped: int = 0
     bytes_copied: int = 0
     failures: list[dict] = field(default_factory=list)  # [{path, error}, ...]
+
+
+@dataclass
+class TransferVerificationReport:
+    """Result of re-verifying transferred files on disk."""
+
+    transfer_id: str
+    verified_at: str
+    total_files: int = 0
+    verified_ok: int = 0
+    verified_failed: int = 0
+    skipped: int = 0
+    failures: list[dict] = field(default_factory=list)
+    total_bytes_verified: int = 0
+    duration_seconds: float = 0
 
 
 def create_transfer(
@@ -363,6 +380,260 @@ def resume_transfer(
     conn.commit()
 
     return execute_transfer(conn, transfer_id, progress_callback, cancel_check)
+
+
+def verify_transfer(
+    conn: sqlite3.Connection,
+    transfer_id: str,
+    progress_callback=None,
+    cancel_check=None,
+) -> TransferVerificationReport:
+    """Re-verify all completed transfer files by reading from disk and recomputing SHA-256.
+
+    For each completed action, reads the destination file, computes its SHA-256,
+    and compares against the dest_hash stored in copy_operations.
+
+    Args:
+        conn: Database connection.
+        transfer_id: UUID of the transfer to verify.
+        progress_callback: Optional callback(files_done, files_total, bytes_done, bytes_total, current_file).
+        cancel_check: Optional callable returning True if cancelled.
+
+    Returns:
+        TransferVerificationReport with pass/fail counts and failure details.
+    """
+    start_time = time.monotonic()
+    report = TransferVerificationReport(
+        transfer_id=transfer_id,
+        verified_at=datetime.now().isoformat(),
+    )
+
+    # Get dest mount path
+    row = conn.execute(
+        "SELECT DISTINCT target_drive FROM planned_actions WHERE transfer_id = ?",
+        (transfer_id,),
+    ).fetchone()
+    if not row:
+        return report
+
+    dst_drive = conn.execute(
+        "SELECT id, mount_path FROM drives WHERE name = ?", (row["target_drive"],)
+    ).fetchone()
+    if not dst_drive:
+        return report
+    dst_mount = dst_drive["mount_path"]
+    dst_drive_id = dst_drive["id"]
+
+    # Get completed actions with their copy_operations dest_hash
+    actions = conn.execute(
+        """
+        SELECT pa.id, pa.source_path, pa.target_path, pa.estimated_bytes,
+               co.dest_hash, co.source_file_id
+        FROM planned_actions pa
+        LEFT JOIN copy_operations co
+            ON co.source_file_id = (
+                SELECT f.id FROM files f
+                JOIN drives d ON f.drive_id = d.id
+                WHERE d.name = pa.source_drive AND f.path = pa.source_path
+                LIMIT 1
+            )
+            AND co.dest_drive_id = ?
+            AND co.dest_path = pa.target_path
+        WHERE pa.transfer_id = ? AND pa.status = 'completed'
+        """,
+        (dst_drive_id, transfer_id),
+    ).fetchall()
+
+    report.total_files = len(actions)
+    files_done = 0
+    bytes_total = sum(a["estimated_bytes"] or 0 for a in actions)
+    bytes_done = 0
+
+    for action in actions:
+        if cancel_check and cancel_check():
+            break
+
+        dest_path = Path(dst_mount) / action["target_path"]
+        expected_hash = action["dest_hash"]
+        file_bytes = action["estimated_bytes"] or 0
+
+        if expected_hash is None:
+            # No copy_operations record — skip
+            report.skipped += 1
+            files_done += 1
+            if progress_callback:
+                progress_callback(files_done, report.total_files, bytes_done, bytes_total, action["target_path"])
+            continue
+
+        if not dest_path.exists():
+            report.verified_failed += 1
+            report.failures.append({
+                "path": action["target_path"],
+                "reason": "file_missing",
+            })
+            files_done += 1
+            if progress_callback:
+                progress_callback(files_done, report.total_files, bytes_done, bytes_total, action["target_path"])
+            continue
+
+        # Compute SHA-256 of dest file
+        sha = hashlib.sha256()
+        try:
+            with open(dest_path, "rb") as f:
+                while chunk := f.read(1024 * 1024):
+                    sha.update(chunk)
+            actual_hash = sha.hexdigest()
+        except OSError as e:
+            report.verified_failed += 1
+            report.failures.append({
+                "path": action["target_path"],
+                "reason": "read_error",
+                "error": str(e),
+            })
+            files_done += 1
+            if progress_callback:
+                progress_callback(files_done, report.total_files, bytes_done, bytes_total, action["target_path"])
+            continue
+
+        if actual_hash == expected_hash:
+            report.verified_ok += 1
+            report.total_bytes_verified += file_bytes
+        else:
+            report.verified_failed += 1
+            report.failures.append({
+                "path": action["target_path"],
+                "reason": "hash_mismatch",
+                "expected": expected_hash,
+                "actual": actual_hash,
+            })
+
+        files_done += 1
+        bytes_done += file_bytes
+        if progress_callback:
+            progress_callback(files_done, report.total_files, bytes_done, bytes_total, action["target_path"])
+
+    report.duration_seconds = round(time.monotonic() - start_time, 2)
+    return report
+
+
+def get_transfer_report(conn: sqlite3.Connection, transfer_id: str) -> dict | None:
+    """Get a transfer summary report without re-verifying (DB query only).
+
+    Returns:
+        Dict with file counts by status, total bytes, duration, and failure list,
+        or None if transfer not found.
+    """
+    counts = conn.execute(
+        """
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+            SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+            SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+            SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
+            COALESCE(SUM(estimated_bytes), 0) as total_bytes,
+            MIN(started_at) as first_started,
+            MAX(completed_at) as last_completed
+        FROM planned_actions
+        WHERE transfer_id = ?
+        """,
+        (transfer_id,),
+    ).fetchone()
+
+    if counts["total"] == 0:
+        return None
+
+    failures = conn.execute(
+        """
+        SELECT source_path, error
+        FROM planned_actions
+        WHERE transfer_id = ? AND status = 'failed'
+        """,
+        (transfer_id,),
+    ).fetchall()
+
+    # Compute duration from first start to last completion
+    duration = None
+    if counts["first_started"] and counts["last_completed"]:
+        try:
+            t0 = datetime.fromisoformat(counts["first_started"])
+            t1 = datetime.fromisoformat(counts["last_completed"])
+            duration = (t1 - t0).total_seconds()
+        except (ValueError, TypeError):
+            pass
+
+    return {
+        "transfer_id": transfer_id,
+        "total_files": counts["total"],
+        "completed": counts["completed"],
+        "failed": counts["failed"],
+        "pending": counts["pending"],
+        "cancelled": counts["cancelled"],
+        "total_bytes": counts["total_bytes"],
+        "duration_seconds": duration,
+        "failures": [
+            {"path": r["source_path"], "error": r["error"]} for r in failures
+        ],
+    }
+
+
+def list_transfers(conn: sqlite3.Connection) -> list[dict]:
+    """List all transfers with summary stats.
+
+    Returns:
+        List of dicts with transfer_id, source/dest drive, file counts, and derived status.
+    """
+    rows = conn.execute(
+        """
+        SELECT
+            transfer_id,
+            source_drive,
+            target_drive,
+            COUNT(*) as total_files,
+            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+            SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+            SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+            SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+            SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
+            MIN(created_at) as created_at
+        FROM planned_actions
+        GROUP BY transfer_id
+        ORDER BY MIN(created_at) DESC
+        """,
+    ).fetchall()
+
+    result = []
+    for r in rows:
+        total = r["total_files"]
+        completed = r["completed"]
+        failed = r["failed"]
+        in_progress = r["in_progress"]
+        pending = r["pending"]
+
+        # Derive status
+        if in_progress > 0 or (pending > 0 and completed > 0):
+            status = "in_progress"
+        elif completed == total:
+            status = "completed"
+        elif failed > 0 and pending == 0 and in_progress == 0:
+            status = "partial"
+        elif r["cancelled"] == total:
+            status = "cancelled"
+        else:
+            status = "pending"
+
+        result.append({
+            "transfer_id": r["transfer_id"],
+            "source_drive": r["source_drive"],
+            "dest_drive": r["target_drive"],
+            "total_files": total,
+            "completed": completed,
+            "failed": failed,
+            "created_at": r["created_at"],
+            "status": status,
+        })
+
+    return result
 
 
 def get_transfer_status(conn: sqlite3.Connection, transfer_id: str) -> dict:

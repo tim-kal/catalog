@@ -2,18 +2,6 @@
 
 Auto-captured system issues. Review periodically and close resolved items.
 
-## 2026-04-06 13:20 UTC — Reviewer changes_requested: DC-008
-**Category:** quality
-**Task:** DC-008
-**Impact:** Task needs rework
-**Details:** Zero acceptance criteria met — no code was implemented; diff contains only design file bookkeeping (ISSUES.md and SIGNALS.md updates).
-
-## 2026-04-06 13:33 UTC — Reviewer changes_requested: DC-008
-**Category:** quality
-**Task:** DC-008
-**Impact:** Task needs rework
-**Details:** Zero acceptance criteria met — executor self-reported "blocked" and produced no code; the only commit (1b62274) contains ISSUES.md and SIGNALS.md bookkeeping, not implementation.
-
 ## 2026-04-06 13:33 UTC — Executor failed: DC-008
 **Category:** operational
 **Task:** DC-008
@@ -181,4 +169,16 @@ Auto-captured system issues. Review periodically and close resolved items.
 **Task:** DC-016
 **Impact:** Task needs rework
 **Details:** Executor searched wrong path (DriveSnapshots/TASKS/) — task exists at migration/TASKS/DC-016/ticket.md with 6 acceptance-criteria groups; zero were attempted.
+
+## 2026-04-11 12:44 UTC — Reviewer blocked: DC-015
+**Category:** quality
+**Task:** DC-015
+**Impact:** Task blocked — needs human input
+**Details:** No task file exists for DC-015. A ticket with goal, acceptance criteria, and scope must be created before any implementation or review can proceed.
+
+## 2026-04-11 12:46 UTC — Reviewer changes_requested: DC-015
+**Category:** quality
+**Task:** DC-015
+**Impact:** Task needs rework
+**Details:** Executor searched wrong path (DriveSnapshots/TASKS/) — task definition exists at migration/TASKS/DC-015/ticket.md with 3 endpoints and 4 tests; zero acceptance criteria attempted.
 

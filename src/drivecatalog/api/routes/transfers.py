@@ -11,10 +11,14 @@ from pydantic import BaseModel
 from drivecatalog.database import get_connection
 from drivecatalog.transfer import (
     TransferResult,
+    TransferVerificationReport,
     create_transfer,
     execute_transfer,
+    get_transfer_report,
     get_transfer_status,
+    list_transfers,
     resume_transfer,
+    verify_transfer,
 )
 from drivecatalog.watcher import get_mounted_volumes
 
@@ -61,6 +65,29 @@ class TransferStatusResponse(BaseModel):
     total_bytes: int
     bytes_copied: int
     failed_files: list[dict]
+
+
+class TransferReportResponse(BaseModel):
+    transfer_id: str
+    total_files: int
+    completed: int
+    failed: int
+    pending: int
+    cancelled: int
+    total_bytes: int
+    duration_seconds: float | None
+    failures: list[dict]
+
+
+class TransferListItem(BaseModel):
+    transfer_id: str
+    source_drive: str
+    dest_drive: str
+    total_files: int
+    completed: int
+    failed: int
+    created_at: str
+    status: str
 
 
 # ---------------------------------------------------------------------------
@@ -283,6 +310,17 @@ async def resume_transfer_endpoint(
         conn.close()
 
 
+@router.get("", response_model=list[TransferListItem])
+async def list_all_transfers() -> list[TransferListItem]:
+    """List all transfers with summary stats."""
+    conn = get_connection()
+    try:
+        transfers = list_transfers(conn)
+        return [TransferListItem(**t) for t in transfers]
+    finally:
+        conn.close()
+
+
 @router.post("/{transfer_id}/cancel")
 async def cancel_transfer(transfer_id: str) -> dict:
     """Cancel a running transfer.
@@ -310,5 +348,97 @@ async def cancel_transfer(transfer_id: str) -> dict:
             "cancelled_actions": cancelled_count,
             "completed_actions": status["completed"],
         }
+    finally:
+        conn.close()
+
+
+def _run_verify(operation_id: str, transfer_id: str) -> None:
+    """Run verification in background thread."""
+    from datetime import datetime
+
+    conn = get_connection()
+    try:
+        update_operation(
+            operation_id,
+            status=OperationStatus.RUNNING,
+            started_at=datetime.now(),
+        )
+
+        def progress_cb(files_done, files_total, bytes_done, bytes_total, current_file):
+            update_progress(operation_id, files_done, files_total)
+
+        def cancel_check():
+            return is_cancelled(operation_id)
+
+        report = verify_transfer(conn, transfer_id, progress_cb, cancel_check)
+
+        update_operation(
+            operation_id,
+            status=OperationStatus.COMPLETED,
+            result={
+                "transfer_id": report.transfer_id,
+                "verified_at": report.verified_at,
+                "total_files": report.total_files,
+                "verified_ok": report.verified_ok,
+                "verified_failed": report.verified_failed,
+                "skipped": report.skipped,
+                "failures": report.failures,
+                "total_bytes_verified": report.total_bytes_verified,
+                "duration_seconds": report.duration_seconds,
+            },
+            completed_at=datetime.now(),
+        )
+    except Exception as e:
+        logger.exception("Verify transfer %s failed", transfer_id)
+        update_operation(
+            operation_id,
+            status=OperationStatus.FAILED,
+            error=str(e),
+            completed_at=datetime.now(),
+        )
+    finally:
+        conn.close()
+
+
+@router.post("/{transfer_id}/verify")
+async def verify_transfer_endpoint(
+    transfer_id: str,
+    background_tasks: BackgroundTasks,
+) -> dict:
+    """Re-verify all completed files for a transfer by reading from disk.
+
+    Runs as a background operation. Returns operation_id and poll_url immediately.
+    """
+    conn = get_connection()
+    try:
+        status = get_transfer_status(conn, transfer_id)
+        if status["total"] == 0:
+            raise HTTPException(404, f"Transfer '{transfer_id}' not found")
+
+        if status["completed"] == 0:
+            raise HTTPException(400, "No completed files to verify")
+
+        op = create_operation("verify", f"verify-{transfer_id[:8]}")
+        update_operation(op.id, files_total=status["completed"])
+
+        background_tasks.add_task(_run_verify, op.id, transfer_id)
+
+        return {
+            "operation_id": op.id,
+            "poll_url": f"/operations/{op.id}",
+        }
+    finally:
+        conn.close()
+
+
+@router.get("/{transfer_id}/report", response_model=TransferReportResponse)
+async def get_report(transfer_id: str) -> TransferReportResponse:
+    """Get a transfer summary report without re-verifying (DB query only)."""
+    conn = get_connection()
+    try:
+        report = get_transfer_report(conn, transfer_id)
+        if report is None:
+            raise HTTPException(404, f"Transfer '{transfer_id}' not found")
+        return TransferReportResponse(**report)
     finally:
         conn.close()
