@@ -1,7 +1,7 @@
 {
-  "version": "1.5.0",
-  "build": 19,
-  "url": "https://github.com/tim-kal/catalog/releases/download/v1.5.0/DriveCatalog.zip",
-  "notes": "Safe verified transfers: batch copy with SHA-256 verification, fsync, atomic writes, metadata preservation, resume on interrupt. Samsung drive recognition: plist-based ioreg parser, auto-resolve provably different drives. Bug reports now route through local backend to GitHub API.",
+  "version": "1.5.1",
+  "build": 20,
+  "url": "https://github.com/tim-kal/catalog/releases/download/v1.5.1/DriveCatalog.zip",
+  "notes": "Fix: bug reports now work without manual config \u2014 embedded fallback token. UI test target added.",
   "min_os": "14.0"
 }

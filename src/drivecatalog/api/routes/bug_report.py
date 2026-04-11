@@ -1,15 +1,21 @@
 """Bug report endpoint — creates GitHub issues directly via the GitHub API.
 
-Reads github_token and github_repo from ~/.drivecatalog/config.yaml.
+Token resolution order:
+1. ~/.drivecatalog/config.yaml (github_token, github_repo)
+2. App bundle Resources/.secrets/github_token (embedded at build time, never in git)
+3. If neither → 503
+
 Rate limited to 5 reports per hour in-process.
 """
 
 import json
 import logging
+import os
 import time
 import urllib.error
 import urllib.request
 from collections import defaultdict
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -17,6 +23,35 @@ from pydantic import BaseModel
 from drivecatalog.config import load_config
 
 logger = logging.getLogger(__name__)
+
+_FALLBACK_REPO = "tim-kal/catalog"
+
+
+def _load_bundle_token() -> str | None:
+    """Read the GitHub token embedded in the app bundle by scripts/embed-secrets.sh."""
+    # The app bundle is at .../DriveCatalog.app/Contents/Resources/.secrets/github_token
+    # The Python backend runs from within the app or from the source tree.
+    # Try multiple locations.
+    candidates = [
+        # Running inside app bundle (release)
+        Path(__file__).resolve().parents[4] / "Resources" / ".secrets" / "github_token",
+        # Source tree (dev builds via build script)
+        Path(__file__).resolve().parents[4] / ".secrets" / "github_token",
+    ]
+    # Also check the SRCROOT-relative path for xcodebuild builds
+    srcroot = os.environ.get("SRCROOT")
+    if srcroot:
+        candidates.append(Path(srcroot) / ".secrets" / "github_token")
+
+    for path in candidates:
+        if path.is_file():
+            try:
+                token = path.read_text().strip()
+                if token:
+                    return token
+            except OSError:
+                pass
+    return None
 
 router = APIRouter(prefix="/bug-report", tags=["bug-report"])
 
@@ -53,10 +88,13 @@ def _check_rate_limit(device_id: str) -> bool:
 async def create_bug_report(req: BugReportRequest) -> BugReportResponse:
     """Create a GitHub issue from an in-app bug report."""
     config = load_config()
-    if not config.github_token or not config.github_repo:
+    token = config.github_token or _load_bundle_token()
+    repo = config.github_repo or _FALLBACK_REPO
+
+    if not token:
         raise HTTPException(
             status_code=503,
-            detail="Bug reporting not configured. Set github_token and github_repo in ~/.drivecatalog/config.yaml",
+            detail="Bug reporting not configured. Set github_token in ~/.drivecatalog/config.yaml",
         )
 
     if not _check_rate_limit(req.device_id):
@@ -91,7 +129,7 @@ async def create_bug_report(req: BugReportRequest) -> BugReportResponse:
     issue_body = "\n".join(parts)
 
     # POST to GitHub API
-    url = f"https://api.github.com/repos/{config.github_repo}/issues"
+    url = f"https://api.github.com/repos/{repo}/issues"
     payload = json.dumps({
         "title": req.title,
         "body": issue_body,
@@ -103,7 +141,7 @@ async def create_bug_report(req: BugReportRequest) -> BugReportResponse:
         data=payload,
         method="POST",
         headers={
-            "Authorization": f"Bearer {config.github_token}",
+            "Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github+json",
             "Content-Type": "application/json",
             "X-GitHub-Api-Version": "2022-11-28",

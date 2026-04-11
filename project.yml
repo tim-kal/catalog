@@ -41,6 +41,9 @@ targets:
       - script: |
           bash "${SRCROOT}/scripts/embed-python.sh"
         name: Embed Python Runtime
+      - script: |
+          bash "${SRCROOT}/scripts/embed-secrets.sh"
+        name: Embed Secrets
 
   DriveCatalogUITests:
     type: bundle.ui-testing

@@ -2,7 +2,6 @@ import XCTest
 
 /// UI tests for DriveCatalog critical flows.
 ///
-/// These tests require the app to launch with a running backend.
 /// Run via: xcodebuild test -scheme DriveCatalog -only-testing DriveCatalogUITests
 final class DriveCatalogUITests: XCTestCase {
     var app: XCUIApplication!
@@ -25,24 +24,28 @@ final class DriveCatalogUITests: XCTestCase {
 
     func testSidebarExists() {
         let sidebar = app.outlines["sidebar"]
-        // Sidebar may render as a List, which on macOS is an outline
-        // Fall back to checking for sidebar items by identifier
-        let drivesItem = app.staticTexts["Drives"]
-        XCTAssertTrue(drivesItem.waitForExistence(timeout: 10), "Drives sidebar item should exist")
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 10), "Sidebar outline should exist")
     }
 
     func testSidebarNavigation() {
-        let tabs = ["Drives", "Files", "Manage", "Settings"]
+        // Use accessibility identifiers to avoid "multiple matches" with window titles
+        let tabs: [(id: String, label: String)] = [
+            ("sidebar_drives", "Drives"),
+            ("sidebar_browser", "Files"),
+            ("sidebar_manage", "Manage"),
+            ("sidebar_settings", "Settings"),
+        ]
+
         for tab in tabs {
-            let item = app.staticTexts[tab]
+            let item = app.staticTexts[tab.id]
             if item.waitForExistence(timeout: 5) {
                 item.click()
-                // Give the view time to load
                 Thread.sleep(forTimeInterval: 0.5)
             }
         }
+
         // Navigate back to Drives
-        let drives = app.staticTexts["Drives"]
+        let drives = app.staticTexts["sidebar_drives"]
         if drives.exists { drives.click() }
     }
 
@@ -50,9 +53,9 @@ final class DriveCatalogUITests: XCTestCase {
 
     func testAddDriveSheetOpens() {
         // Wait for app to finish loading
-        let addButton = app.buttons["addDriveButton"]
+        let addButton = app.buttons["addDriveButton"].firstMatch
         guard addButton.waitForExistence(timeout: 15) else {
-            // No add button in toolbar = drives already registered, which is fine
+            // No add button visible = may be on a different tab or drives already loaded
             return
         }
         addButton.click()
@@ -70,7 +73,7 @@ final class DriveCatalogUITests: XCTestCase {
     // MARK: - Settings & Bug Report
 
     func testSettingsPageLoads() {
-        let settings = app.staticTexts["Settings"]
+        let settings = app.staticTexts["sidebar_settings"]
         guard settings.waitForExistence(timeout: 10) else {
             XCTFail("Settings sidebar item not found")
             return
@@ -85,13 +88,13 @@ final class DriveCatalogUITests: XCTestCase {
     // MARK: - Transfer History
 
     func testTransferHistoryLoads() {
-        let transfers = app.staticTexts["Transfer History"]
+        let transfers = app.staticTexts["sidebar_transfers"]
         guard transfers.waitForExistence(timeout: 10) else {
-            // Transfer History might not be visible if sidebar is collapsed
             return
         }
         transfers.click()
         Thread.sleep(forTimeInterval: 1)
-        // Just verify navigation doesn't crash
+        // Verify navigation doesn't crash
+        XCTAssertTrue(app.windows.count > 0)
     }
 }

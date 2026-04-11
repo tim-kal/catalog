@@ -5,16 +5,33 @@ from unittest.mock import patch, MagicMock
 from drivecatalog.config import Config
 
 
-def test_bug_report_rejects_without_config(test_client):
-    """Returns 503 when github_token is not configured."""
-    with patch("drivecatalog.api.routes.bug_report.load_config", return_value=Config()):
+def test_bug_report_uses_bundle_token_without_config(test_client):
+    """Uses bundle-embedded token when config has no github_token."""
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = b'{"html_url": "https://github.com/tim-kal/catalog/issues/99", "number": 99}'
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+
+    with patch("drivecatalog.api.routes.bug_report.load_config", return_value=Config()), \
+         patch("drivecatalog.api.routes.bug_report._load_bundle_token", return_value="ghp_bundle_test"), \
+         patch("drivecatalog.api.routes.bug_report.urllib.request.urlopen", return_value=mock_resp):
         resp = test_client.post("/bug-report", json={
             "device_id": "dev-1",
             "title": "Test bug",
             "description": "Something broke",
         })
+    assert resp.status_code == 201
+
+
+def test_bug_report_503_when_no_token_anywhere(test_client):
+    """Returns 503 when neither config nor bundle has a token."""
+    with patch("drivecatalog.api.routes.bug_report.load_config", return_value=Config()), \
+         patch("drivecatalog.api.routes.bug_report._load_bundle_token", return_value=None):
+        resp = test_client.post("/bug-report", json={
+            "device_id": "dev-1",
+            "title": "Test bug",
+        })
     assert resp.status_code == 503
-    assert "github_token" in resp.json()["detail"]
 
 
 def test_bug_report_success(test_client):
