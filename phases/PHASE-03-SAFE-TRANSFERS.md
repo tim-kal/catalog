@@ -4,13 +4,11 @@ Goal: Users can transfer files between drives with cryptographic verification th
 
 ## Tasks
 
-| ID | Title | Depends On |
-|---|---|---|
-| DC-012 | Harden copier: fsync, atomic write, 1MB buffer, metadata | — |
-| DC-013 | Create planned_actions table (migration v10) | — |
-| DC-014 | Batch transfer engine | DC-012, DC-013 |
-| DC-015 | Transfer verification report | DC-014 |
-| DC-016 | Frontend: Transfer UI with progress and report | DC-015 |
+- [ ] DC-012 — Harden copier: fsync, atomic write, 1MB buffer, metadata preservation
+- [ ] DC-013 — Create planned_actions table (migration v10)
+- [ ] DC-014 — Batch transfer engine: manifest, execute, resume, cancel (depends: DC-012, DC-013)
+- [ ] DC-015 — Transfer verification report: re-verify, summary, history (depends: DC-014)
+- [ ] DC-016 — Frontend: Transfer UI with progress and verification report (depends: DC-015)
 
 ## Success Criteria
 - Two mounted drives → user selects files/folders → transfer completes → verification report shows 100% integrity
