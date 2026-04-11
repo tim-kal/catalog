@@ -230,3 +230,95 @@ def test_migrate_clear_stale_device_serials(migration_db):
     real = conn.execute("SELECT device_serial FROM drives WHERE name = 'RealSerial'").fetchone()[0]
     assert stale is None
     assert real == "SN-ABC-12345"
+
+
+class TestMigrationV10PlannedActions:
+    """Test: migration v10 creates planned_actions table with correct schema."""
+
+    def test_table_created(self, migration_db):
+        conn, db_file = migration_db
+        apply_migrations(conn, db_path=db_file)
+        tables = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        assert "planned_actions" in tables
+
+    def test_indexes_created(self, migration_db):
+        conn, db_file = migration_db
+        apply_migrations(conn, db_path=db_file)
+        indexes = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='index'"
+            ).fetchall()
+        }
+        assert "idx_planned_actions_status" in indexes
+        assert "idx_planned_actions_transfer_id" in indexes
+
+    def test_insert_and_query(self, migration_db):
+        conn, db_file = migration_db
+        conn.row_factory = sqlite3.Row
+        apply_migrations(conn, db_path=db_file)
+
+        conn.execute(
+            """
+            INSERT INTO planned_actions
+                (action_type, source_drive, source_path, target_drive,
+                 target_path, priority, estimated_bytes, transfer_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("copy", "DriveA", "/photos/img.jpg", "DriveB",
+             "/photos/img.jpg", 1, 4096, "batch-001"),
+        )
+        conn.commit()
+
+        row = conn.execute("SELECT * FROM planned_actions WHERE id = 1").fetchone()
+        assert row["action_type"] == "copy"
+        assert row["status"] == "pending"  # default
+        assert row["source_drive"] == "DriveA"
+        assert row["target_drive"] == "DriveB"
+        assert row["transfer_id"] == "batch-001"
+        assert row["priority"] == 1
+        assert row["estimated_bytes"] == 4096
+        assert row["created_at"] is not None
+        assert row["error"] is None
+        assert row["depends_on"] is None
+
+    def test_action_type_check_constraint(self, migration_db):
+        conn, db_file = migration_db
+        apply_migrations(conn, db_path=db_file)
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(
+                "INSERT INTO planned_actions (action_type, source_drive, source_path) "
+                "VALUES ('invalid', 'DriveA', '/path')"
+            )
+
+    def test_depends_on_chain(self, migration_db):
+        conn, db_file = migration_db
+        conn.row_factory = sqlite3.Row
+        apply_migrations(conn, db_path=db_file)
+
+        # Insert a copy action, then a delete that depends on it
+        conn.execute(
+            "INSERT INTO planned_actions (action_type, source_drive, source_path, "
+            "target_drive, target_path) VALUES ('copy', 'A', '/f.txt', 'B', '/f.txt')"
+        )
+        conn.execute(
+            "INSERT INTO planned_actions (action_type, source_drive, source_path, "
+            "depends_on) VALUES ('delete', 'A', '/f.txt', 1)"
+        )
+        conn.commit()
+
+        dep = conn.execute(
+            "SELECT depends_on FROM planned_actions WHERE id = 2"
+        ).fetchone()
+        assert dep["depends_on"] == 1
+
+    def test_schema_version_is_10(self, migration_db):
+        conn, db_file = migration_db
+        apply_migrations(conn, db_path=db_file)
+        version = _get_version(conn)
+        assert version == 10

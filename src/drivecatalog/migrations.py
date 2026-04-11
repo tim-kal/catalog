@@ -300,6 +300,37 @@ ALTER TABLE drives ADD COLUMN fs_fingerprint TEXT;
         sql="SELECT 1;",
         data_migration=lambda conn: _migrate_clear_stale_device_serials(conn),
     ),
+    # ------------------------------------------------------------------
+    # Version 10 — planned_actions queue table
+    # Brand-new table for the batch transfer engine (DC-014).
+    # No impact on existing scan data.
+    # ------------------------------------------------------------------
+    Migration(
+        version=10,
+        description="Add planned_actions table for batch transfer queue",
+        requires_rescan=False,
+        sql="""\
+CREATE TABLE IF NOT EXISTS planned_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action_type TEXT NOT NULL CHECK(action_type IN ('delete', 'copy', 'move')),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'ready', 'in_progress', 'completed', 'failed', 'cancelled')),
+    priority INTEGER NOT NULL DEFAULT 0,
+    source_drive TEXT NOT NULL,
+    source_path TEXT NOT NULL,
+    target_drive TEXT,
+    target_path TEXT,
+    estimated_bytes INTEGER,
+    transfer_id TEXT,
+    depends_on INTEGER REFERENCES planned_actions(id),
+    error TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    started_at TEXT,
+    completed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_planned_actions_status ON planned_actions(status);
+CREATE INDEX IF NOT EXISTS idx_planned_actions_transfer_id ON planned_actions(transfer_id);
+""",
+    ),
 ]
 
 # When adding a new migration, also update expectedSchemaVersion in

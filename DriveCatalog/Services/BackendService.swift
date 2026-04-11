@@ -20,7 +20,7 @@ final class BackendService: ObservableObject {
 
     /// Must match SCHEMA_VERSION (= len(MIGRATIONS)) in migrations.py.
     /// Update this whenever a new migration is added.
-    private let expectedSchemaVersion = 9
+    private let expectedSchemaVersion = 10
 
     private var process: Process?
     /// PID stored separately so forceStop can kill it from any isolation context.

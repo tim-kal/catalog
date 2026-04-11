@@ -26,12 +26,14 @@ class PlannedAction(BaseModel):
     source_path: str
     target_drive: str | None = None
     target_path: str | None = None
-    status: str  # pending, ready, in_progress, completed, cancelled
+    status: str  # pending, ready, in_progress, completed, failed, cancelled
     priority: int = 0
-    reason: str | None = None
     estimated_bytes: int = 0
+    transfer_id: str | None = None
     depends_on: int | None = None
+    error: str | None = None
     created_at: str
+    started_at: str | None = None
     completed_at: str | None = None
 
 
@@ -42,8 +44,8 @@ class CreateActionRequest(BaseModel):
     target_drive: str | None = None
     target_path: str | None = None
     priority: int = 0
-    reason: str | None = None
     estimated_bytes: int = 0
+    transfer_id: str | None = None
     depends_on: int | None = None
 
 
@@ -61,7 +63,6 @@ class ActionableResponse(BaseModel):
 class UpdateActionRequest(BaseModel):
     status: str | None = None
     priority: int | None = None
-    reason: str | None = None
     target_drive: str | None = None
     target_path: str | None = None
 
@@ -90,10 +91,12 @@ def _row_to_action(row) -> PlannedAction:
         target_path=row["target_path"],
         status=row["status"],
         priority=row["priority"],
-        reason=row["reason"],
         estimated_bytes=row["estimated_bytes"],
+        transfer_id=row["transfer_id"],
         depends_on=row["depends_on"],
+        error=row["error"],
         created_at=row["created_at"],
+        started_at=row["started_at"],
         completed_at=row["completed_at"],
     )
 
@@ -148,7 +151,7 @@ async def create_action(req: CreateActionRequest) -> PlannedAction:
             """
             INSERT INTO planned_actions
                 (action_type, source_drive, source_path, target_drive,
-                 target_path, priority, reason, estimated_bytes, depends_on)
+                 target_path, priority, estimated_bytes, transfer_id, depends_on)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -158,8 +161,8 @@ async def create_action(req: CreateActionRequest) -> PlannedAction:
                 req.target_drive,
                 req.target_path or req.source_path,
                 req.priority,
-                req.reason,
                 estimated,
+                req.transfer_id,
                 req.depends_on,
             ),
         )
@@ -266,14 +269,13 @@ async def update_action(action_id: int, req: UpdateActionRequest) -> PlannedActi
         if req.status is not None:
             updates.append("status = ?")
             params.append(req.status)
-            if req.status == "completed":
+            if req.status == "in_progress":
+                updates.append("started_at = datetime('now')")
+            elif req.status == "completed":
                 updates.append("completed_at = datetime('now')")
         if req.priority is not None:
             updates.append("priority = ?")
             params.append(req.priority)
-        if req.reason is not None:
-            updates.append("reason = ?")
-            params.append(req.reason)
         if req.target_drive is not None:
             updates.append("target_drive = ?")
             params.append(req.target_drive)
