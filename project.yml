@@ -32,6 +32,29 @@ targets:
           PLIST="${SRCROOT}/DriveCatalog/Info.plist"
           GIT_HASH=$(cd "${SRCROOT}" && git rev-parse --short=7 HEAD 2>/dev/null || echo "dev")
           BUILD_DATE=$(date +"%Y-%m-%d")
+
+          # Version: read from updates/latest.json, append -dev for debug builds
+          MANIFEST="${SRCROOT}/updates/latest.json"
+          if [ -f "$MANIFEST" ]; then
+            BASE_VERSION=$(python3 -c "import json; print(json.load(open('${MANIFEST}'))['version'])" 2>/dev/null || echo "0.0")
+            BASE_BUILD=$(python3 -c "import json; print(json.load(open('${MANIFEST}'))['build'])" 2>/dev/null || echo "0")
+          else
+            BASE_VERSION="0.0"
+            BASE_BUILD="0"
+          fi
+
+          # For debug: version = X.Y.Z-dev, build = latest_build + commits since
+          COMMITS_SINCE=$(cd "${SRCROOT}" && git rev-list --count HEAD 2>/dev/null || echo "0")
+          if [ "${CONFIGURATION}" = "Debug" ]; then
+            VERSION="${BASE_VERSION}-dev"
+            BUILD_NUM="${COMMITS_SINCE}"
+          else
+            VERSION="${BASE_VERSION}"
+            BUILD_NUM="${BASE_BUILD}"
+          fi
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD_NUM}" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :GitCommitHash string ${GIT_HASH}" "$PLIST" 2>/dev/null \
               || /usr/libexec/PlistBuddy -c "Set :GitCommitHash ${GIT_HASH}" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :BuildDate string ${BUILD_DATE}" "$PLIST" 2>/dev/null \
