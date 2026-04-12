@@ -55,9 +55,10 @@ struct TransferHistoryView: View {
                     Text("No transfers yet")
                         .font(.title3)
                         .foregroundStyle(.secondary)
-                    Text("Start a transfer from a drive's context menu")
+                    Text("To transfer files between drives, expand a drive on the\nDrives page and click \"Transfer Files\".\nAll transfers are verified with SHA-256 checksums.")
                         .font(.subheadline)
                         .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
                 }
                 Spacer()
             } else {

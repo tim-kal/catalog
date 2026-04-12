@@ -12,6 +12,7 @@ struct ActionQueueView: View {
     @State private var completionBanner: String?
     @State private var showRescanPrompt = false
     @State private var drivesToRescan: Set<String> = []
+    @State private var expandedDriveGroups: Set<String> = []
 
     enum ActionFilter: String, CaseIterable {
         case all = "All"
@@ -156,42 +157,80 @@ struct ActionQueueView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Action List
+    // MARK: - Action List (grouped by drive)
+
+    /// Groups actions by source drive for the current filter.
+    private var groupedActions: [(drive: String, actions: [PlannedAction])] {
+        let filtered = filteredActions
+        let grouped = Dictionary(grouping: filtered) { $0.sourceDrive }
+        return grouped.sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
+            .map { (drive: $0.key, actions: $0.value) }
+    }
 
     private var actionList: some View {
         List {
-            // Actionable section (drives mounted, ready to go)
-            if !actionableActions.isEmpty && filter != .completed && filter != .cancelled {
-                Section {
-                    ForEach(actionableActions) { action in
-                        actionRow(action, isActionable: true)
+            ForEach(groupedActions, id: \.drive) { group in
+                Section(isExpanded: Binding(
+                    get: { expandedDriveGroups.contains(group.drive) },
+                    set: { expanded in
+                        if expanded { expandedDriveGroups.insert(group.drive) }
+                        else { expandedDriveGroups.remove(group.drive) }
+                    }
+                )) {
+                    ForEach(group.actions) { action in
+                        let isActionable = actionableActions.contains(where: { $0.id == action.id })
+                        actionRow(action, isActionable: isActionable)
                     }
                 } header: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "bolt.fill")
-                            .foregroundStyle(.green)
-                        Text("Ready to Execute")
-                            .fontWeight(.medium)
-                        Text("— drives connected")
-                            .foregroundStyle(.tertiary)
-                    }
+                    driveGroupHeader(drive: group.drive, actions: group.actions)
                 }
+            }
+        }
+    }
+
+    private func driveGroupHeader(drive: String, actions: [PlannedAction]) -> some View {
+        let isMounted = mountedDrives.contains(drive)
+        let totalBytes = actions.reduce(Int64(0)) { $0 + $1.estimatedBytes }
+        let pendingCount = actions.filter { $0.status == "pending" }.count
+        let actionableCount = actionableActions.filter { $0.sourceDrive == drive }.count
+
+        return HStack(spacing: 8) {
+            Image(systemName: isMounted ? "externaldrive.fill" : "externaldrive")
+                .foregroundStyle(isMounted ? .blue : .secondary)
+
+            Text(drive)
+                .fontWeight(.semibold)
+
+            Text("·")
+                .foregroundStyle(.tertiary)
+
+            Text("\(actions.count) action\(actions.count == 1 ? "" : "s")")
+                .foregroundStyle(.secondary)
+
+            if totalBytes > 0 {
+                Text("·")
+                    .foregroundStyle(.tertiary)
+                Text(ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file))
+                    .foregroundStyle(.secondary)
             }
 
-            // Remaining actions
-            let filtered = filteredActions.filter { action in
-                !actionableActions.contains(where: { $0.id == action.id })
-            }
-            if !filtered.isEmpty {
-                Section {
-                    ForEach(filtered) { action in
-                        actionRow(action, isActionable: false)
-                    }
-                } header: {
-                    if !actionableActions.isEmpty {
-                        Text("Waiting")
-                    }
+            Spacer()
+
+            if actionableCount > 0 {
+                HStack(spacing: 3) {
+                    Image(systemName: "bolt.fill")
+                        .font(.caption2)
+                    Text("\(actionableCount) ready")
+                        .font(.caption)
                 }
+                .foregroundStyle(.green)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.green.opacity(0.1), in: Capsule())
+            } else if pendingCount > 0 && !isMounted {
+                Text("Connect to execute")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
             }
         }
     }
@@ -345,6 +384,10 @@ struct ActionQueueView: View {
         do {
             let response = try await APIService.shared.fetchActions()
             actions = response.actions
+            // Auto-expand all drive groups on first load
+            if expandedDriveGroups.isEmpty {
+                expandedDriveGroups = Set(actions.map(\.sourceDrive))
+            }
             ViewCache.save(actions, key: "actions")
             let actionable = try await APIService.shared.fetchActionableActions()
             actionableActions = actionable.actions
