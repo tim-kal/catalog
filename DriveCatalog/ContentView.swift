@@ -54,6 +54,7 @@ struct ContentView: View {
                     .allowsHitTesting(selection == .settings)
             }
             .environment(\.activeTab, selection)
+            .navigationTitle(titleForTab(selection))
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -78,6 +79,19 @@ struct ContentView: View {
                 )
             }
         } // ZStack
+    }
+
+    private func titleForTab(_ tab: SidebarItem?) -> String {
+        switch tab {
+        case .drives: return "Your Drive Catalog"
+        case .browser: return "Files"
+        case .manage: return "Manage"
+        case .queue: return "Action Queue"
+        case .transfers: return "Transfer History"
+        case .consolidate: return "Consolidate"
+        case .settings: return "Settings"
+        case nil: return "DriveCatalog"
+        }
     }
 }
 

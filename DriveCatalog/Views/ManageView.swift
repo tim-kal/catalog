@@ -111,7 +111,7 @@ struct ManageView: View {
                 }
             }
         }
-        .navigationTitle("Manage")
+
         .onReceive(NotificationCenter.default.publisher(for: .refreshCurrentPage)) { _ in
             if activeTab == .manage { Task { await loadData() } }
         }

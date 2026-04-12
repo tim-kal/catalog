@@ -81,7 +81,7 @@ struct BrowserView: View {
                     }
                 }
             }
-            .navigationTitle("Files")
+    
             .sheet(item: $selectedFile) { file in
                 FileDetailSheet(file: file)
             }

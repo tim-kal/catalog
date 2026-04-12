@@ -39,7 +39,7 @@ struct ActionQueueView: View {
                 actionList
             }
         }
-        .navigationTitle("Action Queue")
+
         .task {
             if actions.isEmpty, let cached = ViewCache.load([PlannedAction].self, key: "actions") {
                 actions = cached
