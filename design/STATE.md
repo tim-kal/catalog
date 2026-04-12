@@ -129,3 +129,10 @@ Follow-up note (2026-04-12):
 - Removed `#if DEBUG` guards around `debugExpandedDriveCardMockup` so the toggle is visible in all build configs.
 - New local build currently blocked by unrelated pre-existing compile errors in
   `DriveCatalog/Views/BrowserView.swift` (`copyDrives` missing, `createAction(request:)` signature mismatch).
+
+Expanded-card mockup refinement (2026-04-12):
+- Added unmount action directly in collapsed row header when drive is mounted.
+- Improved expanded mockup spacing/padding to match reviewed mockup preference.
+- Added explicit connection state line ("Connected now"/"Not mounted").
+- Added robust metrics row fallback even when live disk stats are unavailable.
+- Capacity warning copy is now action-aware (changes guidance when Verify is unavailable).

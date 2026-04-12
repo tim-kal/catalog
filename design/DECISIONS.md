@@ -37,3 +37,7 @@ Pattern: stream-hash source while writing + fsync + re-read dest hash (wie Chron
 Expanded drive-card redesign is implemented as a debug-only mockup path, not a release replacement.
 Gate: `@AppStorage("debugExpandedDriveCardMockup")`, toggled in Settings Features.
 Reason: enables rapid operator validation and instant rollback without code revert.
+
+## D12 — 2026-04-12: Collapsed row gets direct unmount action for mounted drives
+When a drive is mounted, collapsed row header now exposes a mini "Unmount" button.
+Reason: frequent operation should be one click without expand/context-menu.
