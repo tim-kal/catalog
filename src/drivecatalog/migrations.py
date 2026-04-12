@@ -331,6 +331,21 @@ CREATE INDEX IF NOT EXISTS idx_planned_actions_status ON planned_actions(status)
 CREATE INDEX IF NOT EXISTS idx_planned_actions_transfer_id ON planned_actions(transfer_id);
 """,
     ),
+    # ------------------------------------------------------------------
+    # Version 11 — performance indexes for file browsing
+    # The UNIQUE(drive_id, path) constraint on files already creates an
+    # implicit index, but an explicit covering index with commonly queried
+    # columns avoids table lookups for browse queries.
+    # ------------------------------------------------------------------
+    Migration(
+        version=11,
+        description="Add performance indexes for file browsing",
+        requires_rescan=False,
+        sql="""
+CREATE INDEX IF NOT EXISTS idx_files_drive_path ON files(drive_id, path, filename, size_bytes);
+CREATE INDEX IF NOT EXISTS idx_files_hash_drive ON files(partial_hash, drive_id);
+""",
+    ),
 ]
 
 # When adding a new migration, also update expectedSchemaVersion in

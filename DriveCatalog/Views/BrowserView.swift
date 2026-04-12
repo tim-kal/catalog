@@ -769,11 +769,18 @@ struct BrowserView: View {
     }
 
     private func loadBackupStatuses(drive: String, directories: [DirectoryEntry]) async {
-        for dir in directories {
-            if let status = try? await APIService.shared.fetchBackupStatus(
-                drive: drive, path: dir.path
-            ) {
-                backupCache[dir.path] = status
+        // Fetch all backup statuses concurrently instead of sequentially (N+1 fix)
+        await withTaskGroup(of: (String, BackupStatusResponse?).self) { group in
+            for dir in directories {
+                group.addTask {
+                    let status = try? await APIService.shared.fetchBackupStatus(
+                        drive: drive, path: dir.path
+                    )
+                    return (dir.path, status)
+                }
+            }
+            for await (path, status) in group {
+                if let status { backupCache[path] = status }
             }
         }
         // Persist to disk for instant display next time
