@@ -38,9 +38,11 @@
 		7282414F5C6512B19DE9BE8C /* BetaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0AA797D544808B9A8E91152 /* BetaService.swift */; };
 		76C5E36B4948299BB3CAAB1A /* AllDrivesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 715ED35AD9E04AF3F8E71FF3 /* AllDrivesView.swift */; };
 		7AA633608CEEAC7351D945A3 /* ActionDrillDownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73AEF1B7CB3577F2BF8212A3 /* ActionDrillDownView.swift */; };
+		7CBCF4BE48893B7C1550DB07 /* TransferFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A69C1601866B0A364F690656 /* TransferFlowUITests.swift */; };
 		7EEF44666E150AA35CBEF52B /* ErrorLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43CB47F2DC2AFFCDA1AAC342 /* ErrorLog.swift */; };
 		827F45F4C95261134FB07638 /* Migration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E84AFC19B9798C3BDCDE711 /* Migration.swift */; };
 		86FC264B2FA1C6D1570EEC89 /* NavigationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 716EA4D4C6A507FB8A1815BF /* NavigationModel.swift */; };
+		9E897077B74897A5C9842F7B /* DriveCatalogUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AAA6149991DB34F29F0A668 /* DriveCatalogUITests.swift */; };
 		9F13F7AD1A3B80C7CD58012A /* BetaRegistrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D7A708F8E0492021648297 /* BetaRegistrationView.swift */; };
 		A073C496B9E5CB0D855177D6 /* ManageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A73BF78035444254084B66C8 /* ManageView.swift */; };
 		A0FCD3CD49F52A8D4E0CFACB /* BugReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4E90B0D388AACF8C2194615 /* BugReportView.swift */; };
@@ -61,12 +63,23 @@
 		FDF434AAA90F236D0ED2144F /* DriveDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09B9C40A0DF1EA4466FC09D1 /* DriveDetailView.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		BCA712263A035C6676FF858D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 373680C4920B89643D0C7F51 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C98C566942194227AAB63EF0;
+			remoteInfo = DriveCatalog;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		09B9C40A0DF1EA4466FC09D1 /* DriveDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveDetailView.swift; sourceTree = "<group>"; };
 		0C1D42A42D1A9578DE13A8F7 /* TransferSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferSheet.swift; sourceTree = "<group>"; };
 		0DFF6064BB756B23FF9F9E98 /* AddDriveSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddDriveSheet.swift; sourceTree = "<group>"; };
 		10D0DA000E072B66193C09C0 /* DuplicateStatsHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateStatsHeader.swift; sourceTree = "<group>"; };
 		166288762D5E2F39B2996279 /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
+		1AAA6149991DB34F29F0A668 /* DriveCatalogUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveCatalogUITests.swift; sourceTree = "<group>"; };
 		1E84AFC19B9798C3BDCDE711 /* Migration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Migration.swift; sourceTree = "<group>"; };
 		1F2D8BC7DB01476D2FFB45AE /* SearchResultRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResultRow.swift; sourceTree = "<group>"; };
 		2018F3E2F8DCA71372D42638 /* DrivesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivesView.swift; sourceTree = "<group>"; };
@@ -101,6 +114,7 @@
 		98E01EF2230C98C056CF68BE /* BackendService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendService.swift; sourceTree = "<group>"; };
 		A4921D60431EEC0789B32AD2 /* FileDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDetailSheet.swift; sourceTree = "<group>"; };
 		A4D7A708F8E0492021648297 /* BetaRegistrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetaRegistrationView.swift; sourceTree = "<group>"; };
+		A69C1601866B0A364F690656 /* TransferFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferFlowUITests.swift; sourceTree = "<group>"; };
 		A73BF78035444254084B66C8 /* ManageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManageView.swift; sourceTree = "<group>"; };
 		B4AC7A455F19FCEFE67D3921 /* Operation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Operation.swift; sourceTree = "<group>"; };
 		B85B7F678706652476162A8C /* Browse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Browse.swift; sourceTree = "<group>"; };
@@ -115,6 +129,7 @@
 		E4E90B0D388AACF8C2194615 /* BugReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugReportView.swift; sourceTree = "<group>"; };
 		F26155781C3294F3B20D6C7C /* DriveCatalogApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveCatalogApp.swift; sourceTree = "<group>"; };
 		F5B918F7EBB853BFF3DC5043 /* TransferHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferHistoryView.swift; sourceTree = "<group>"; };
+		FB40BADB690267EAAFA03FBF /* DriveCatalogUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DriveCatalogUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		FCC5647942B3A47D07CD691D /* TransferReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferReportView.swift; sourceTree = "<group>"; };
 		FEB9FA39235B908432E86E33 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -135,8 +150,18 @@
 			isa = PBXGroup;
 			children = (
 				90874549670A464D8240079B /* DriveCatalog */,
+				22ECBB0E323BF22B24848CE2 /* DriveCatalogUITests */,
 				9004813217471C99BCF3FF4C /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		22ECBB0E323BF22B24848CE2 /* DriveCatalogUITests */ = {
+			isa = PBXGroup;
+			children = (
+				1AAA6149991DB34F29F0A668 /* DriveCatalogUITests.swift */,
+				A69C1601866B0A364F690656 /* TransferFlowUITests.swift */,
+			);
+			path = DriveCatalogUITests;
 			sourceTree = "<group>";
 		};
 		2963640239A3FB97AC02FCD7 /* Drives */ = {
@@ -205,6 +230,7 @@
 			isa = PBXGroup;
 			children = (
 				487489378D0D49107F0A3F8B /* DriveCatalog.app */,
+				FB40BADB690267EAAFA03FBF /* DriveCatalogUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -272,6 +298,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		54E578EE183A6CC4AB8A2872 /* DriveCatalogUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 54EAEE5FC0E57E02004FF8B6 /* Build configuration list for PBXNativeTarget "DriveCatalogUITests" */;
+			buildPhases = (
+				61D78FE280467551CC98C178 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F9E1D836FAC65DA359ACDAA3 /* PBXTargetDependency */,
+			);
+			name = DriveCatalogUITests;
+			packageProductDependencies = (
+			);
+			productName = DriveCatalogUITests;
+			productReference = FB40BADB690267EAAFA03FBF /* DriveCatalogUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		C98C566942194227AAB63EF0 /* DriveCatalog */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 2F181224FCF92501A4935BDB /* Build configuration list for PBXNativeTarget "DriveCatalog" */;
@@ -280,6 +324,7 @@
 				2B896EA8B7A69EEEE2AEFED5 /* Sources */,
 				50267CEF3575D0B25D39F725 /* Resources */,
 				3F8E31AB340E5AAE7B8FBD02 /* Embed Python Runtime */,
+				A43FE74E598E9BA1FF8CDAB0 /* Embed Secrets */,
 			);
 			buildRules = (
 			);
@@ -300,6 +345,11 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					54E578EE183A6CC4AB8A2872 = {
+						TestTargetID = C98C566942194227AAB63EF0;
+					};
+				};
 			};
 			buildConfigurationList = 4C0AA73EE2AFAA473E5FA633 /* Build configuration list for PBXProject "DriveCatalog" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -316,6 +366,7 @@
 			projectRoot = "";
 			targets = (
 				C98C566942194227AAB63EF0 /* DriveCatalog */,
+				54E578EE183A6CC4AB8A2872 /* DriveCatalogUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -367,6 +418,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "PLIST=\"${SRCROOT}/DriveCatalog/Info.plist\"\nGIT_HASH=$(cd \"${SRCROOT}\" && git rev-parse --short=7 HEAD 2>/dev/null || echo \"dev\")\nBUILD_DATE=$(date +\"%Y-%m-%d\")\n/usr/libexec/PlistBuddy -c \"Add :GitCommitHash string ${GIT_HASH}\" \"$PLIST\" 2>/dev/null \\\n    || /usr/libexec/PlistBuddy -c \"Set :GitCommitHash ${GIT_HASH}\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Add :BuildDate string ${BUILD_DATE}\" \"$PLIST\" 2>/dev/null \\\n    || /usr/libexec/PlistBuddy -c \"Set :BuildDate ${BUILD_DATE}\" \"$PLIST\"\n";
+		};
+		A43FE74E598E9BA1FF8CDAB0 /* Embed Secrets */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Secrets";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "bash \"${SRCROOT}/scripts/embed-secrets.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -429,9 +498,43 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		61D78FE280467551CC98C178 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9E897077B74897A5C9842F7B /* DriveCatalogUITests.swift in Sources */,
+				7CBCF4BE48893B7C1550DB07 /* TransferFlowUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		F9E1D836FAC65DA359ACDAA3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C98C566942194227AAB63EF0 /* DriveCatalog */;
+			targetProxy = BCA712263A035C6676FF858D /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		17FA8E9E097422DE53F60391 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.drivecatalog.uitests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = DriveCatalog;
+			};
+			name = Release;
+		};
 		1D6B4919E7627D966D6B8C1C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -569,6 +672,23 @@
 			};
 			name = Release;
 		};
+		8A866699FE124E5761C24AEB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.drivecatalog.uitests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = DriveCatalog;
+			};
+			name = Debug;
+		};
 		9B1CCD7AF1B121EBC6221B21 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -603,6 +723,15 @@
 			buildConfigurations = (
 				2C4E40A35FB0845F937E74E0 /* Debug */,
 				880628D7EE176D6AE715DCAE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		54EAEE5FC0E57E02004FF8B6 /* Build configuration list for PBXNativeTarget "DriveCatalogUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8A866699FE124E5761C24AEB /* Debug */,
+				17FA8E9E097422DE53F60391 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

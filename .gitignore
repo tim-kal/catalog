@@ -42,11 +42,8 @@ vendor/
 # Planning docs (internal)
 .planning/
 
-# Sheldon orchestration artifacts (auto-managed)
-./DriveSnapshots/EXECUTOR/
-./DriveSnapshots/HANDOFFS/
-./DriveSnapshots/LOGS/
-./DriveSnapshots/REVIEWS/
-./DriveSnapshots/.executor.lock
-./DriveSnapshots/.migrate.db-shm
-./DriveSnapshots/.migrate.db-wal
+# Orchestration artifacts (auto-managed)
+DriveSnapshots/
+
+# SwiftPM build artifacts
+mockups/**/.build/
