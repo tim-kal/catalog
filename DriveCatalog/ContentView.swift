@@ -2,6 +2,7 @@ import SwiftUI
 
 extension Notification.Name {
     static let refreshCurrentPage = Notification.Name("refreshCurrentPage")
+    static let openSettings = Notification.Name("openSettings")
 }
 
 struct ContentView: View {
@@ -68,6 +69,9 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 800, minHeight: 500)
+        .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
+            selection = .settings
+        }
 
             if backend.isMigrating || backend.migrationFailed {
                 MigrationOverlay(

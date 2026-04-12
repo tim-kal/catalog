@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DriveCatalog — Dashboard v2</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+    background: #e8e6e1;
+    color: #1d1d1f;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  .shell {
+    width: 100%;
+    max-width: 720px;
+    min-height: 100vh;
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border-left: 1px solid rgba(0,0,0,0.06);
+    border-right: 1px solid rgba(0,0,0,0.06);
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px 24px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    position: sticky;
+    top: 0;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 10;
+  }
+  .header h1 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: #1d1d1f;
+  }
+
+  .content { padding: 8px 0; }
+
+  /* ── Accordion Section ── */
+  .section {
+    margin: 6px 16px;
+    background: rgba(255,255,255,0.55);
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .section-header:hover { background: rgba(0,0,0,0.02); }
+
+  .section-icon {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #86868b;
+    font-size: 16px;
+  }
+
+  .section-title {
+    flex: 1;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+  }
+
+  .section-chevron {
+    color: #86868b;
+    font-size: 14px;
+    transition: transform 0.25s;
+  }
+  .section.open .section-chevron { transform: rotate(180deg); }
+
+  .section-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+  .section.open .section-body { max-height: 800px; }
+
+  .section-inner { padding: 0 20px 20px; }
+
+  /* ── Key-Value Rows ── */
+  .kv-group-label {
+    font-size: 14px;
+    color: #86868b;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    font-weight: 400;
+  }
+  .kv-group-label:first-child { margin-top: 0; }
+
+  .kv-row {
+    display: flex;
+    align-items: baseline;
+    padding: 5px 0;
+    gap: 16px;
+  }
+
+  .kv-key {
+    flex: 0 0 200px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: #86868b;
+  }
+
+  .kv-value {
+    flex: 1;
+    font-size: 14px;
+    color: #1d1d1f;
+    font-weight: 400;
+  }
+
+  .kv-value.mono {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Status Indicators ── */
+  .status-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .status-dot.green { background: #34c759; }
+  .status-dot.gray { background: #aeaeb2; }
+  .status-dot.orange { background: #ff9500; }
+  .status-dot.red { background: #ff3b30; }
+
+  /* ── Usage Bar ── */
+  .usage-bar-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .usage-track {
+    width: 100px;
+    height: 5px;
+    background: rgba(0,0,0,0.08);
+    border-radius: 3px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .usage-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: #007aff;
+  }
+  .usage-fill.warn { background: #ff9500; }
+  .usage-fill.danger { background: #ff3b30; }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.3px;
+  }
+  .badge.ok { background: rgba(52,199,89,0.12); color: #248a3d; }
+  .badge.warn { background: rgba(255,149,0,0.12); color: #c93400; }
+  .badge.info { background: rgba(0,122,255,0.1); color: #0055d4; }
+
+  /* ── Action Link ── */
+  .action-link {
+    font-size: 13px;
+    color: #007aff;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .action-link:hover { text-decoration: underline; }
+
+  /* ── Divider ── */
+  .kv-divider {
+    height: 1px;
+    background: rgba(0,0,0,0.06);
+    margin: 12px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="header">
+    <h1>DriveCatalog</h1>
+  </div>
+
+  <div class="content">
+
+    <!-- ── Storage Overview ── -->
+    <div class="section open">
+      <div class="section-header" onclick="toggle(this)">
+        <div class="section-icon">⊞</div>
+        <div class="section-title">Storage Overview</div>
+        <div class="section-chevron">⌃</div>
+      </div>
+      <div class="section-body">
+        <div class="section-inner">
+          <div class="kv-row">
+            <div class="kv-key">Total Drives</div>
+            <div class="kv-value mono">5</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Connected</div>
+            <div class="kv-value"><span class="status-dot green"></span>3 of 5</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Total Capacity</div>
+            <div class="kv-value mono">19 TB</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Used</div>
+            <div class="kv-value">
+              <span class="usage-bar-inline">
+                <span class="usage-track"><span class="usage-fill" style="width:76%"></span></span>
+                <span class="mono">14.4 TB (75.8%)</span>
+              </span>
+            </div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Files Cataloged</div>
+            <div class="kv-value mono">596,045</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Hash Coverage</div>
+            <div class="kv-value"><span class="badge ok">98.2%</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── A SSD ── -->
+    <div class="section open">
+      <div class="section-header" onclick="toggle(this)">
+        <div class="section-icon">💾</div>
+        <div class="section-title">A SSD</div>
+        <div class="section-chevron">⌃</div>
+      </div>
+      <div class="section-body">
+        <div class="section-inner">
+          <div class="kv-group-label">Connection</div>
+          <div class="kv-row">
+            <div class="kv-key">Status</div>
+            <div class="kv-value"><span class="status-dot green"></span>Connected</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Mount Path</div>
+            <div class="kv-value">/Volumes/A SSD</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Media Type</div>
+            <div class="kv-value">SSD · USB 3.2 Gen 2</div>
+          </div>
+
+          <div class="kv-group-label">Storage</div>
+          <div class="kv-row">
+            <div class="kv-key">Capacity</div>
+            <div class="kv-value mono">2 TB</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Used</div>
+            <div class="kv-value">
+              <span class="usage-bar-inline">
+                <span class="usage-track"><span class="usage-fill" style="width:72%"></span></span>
+                <span class="mono">1.45 TB (72%)</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="kv-group-label">Catalog</div>
+          <div class="kv-row">
+            <div class="kv-key">Files</div>
+            <div class="kv-value mono">42,381</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Last Scan</div>
+            <div class="kv-value">2 hours ago</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Integrity</div>
+            <div class="kv-value"><span class="badge ok">Verified</span></div>
+          </div>
+
+          <div class="kv-divider"></div>
+          <div class="kv-row">
+            <div class="kv-key"></div>
+            <div class="kv-value"><a class="action-link">Scan Now</a> · <a class="action-link">Transfer Files</a> · <a class="action-link">Browse</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B SSD ── -->
+    <div class="section">
+      <div class="section-header" onclick="toggle(this)">
+        <div class="section-icon">💾</div>
+        <div class="section-title">B SSD</div>
+        <div class="section-chevron">⌃</div>
+      </div>
+      <div class="section-body">
+        <div class="section-inner">
+          <div class="kv-group-label">Connection</div>
+          <div class="kv-row">
+            <div class="kv-key">Status</div>
+            <div class="kv-value"><span class="status-dot green"></span>Connected</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Media Type</div>
+            <div class="kv-value">SSD · Samsung T7 · USB 3.2</div>
+          </div>
+          <div class="kv-group-label">Storage</div>
+          <div class="kv-row">
+            <div class="kv-key">Capacity</div>
+            <div class="kv-value mono">4 TB</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Used</div>
+            <div class="kv-value">
+              <span class="usage-bar-inline">
+                <span class="usage-track"><span class="usage-fill" style="width:72%"></span></span>
+                <span class="mono">2.89 TB (72%)</span>
+              </span>
+            </div>
+          </div>
+          <div class="kv-group-label">Catalog</div>
+          <div class="kv-row">
+            <div class="kv-key">Files</div>
+            <div class="kv-value mono">128,744</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Last Scan</div>
+            <div class="kv-value">1 day ago</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Integrity</div>
+            <div class="kv-value"><span class="badge ok">Verified</span></div>
+          </div>
+          <div class="kv-divider"></div>
+          <div class="kv-row">
+            <div class="kv-key"></div>
+            <div class="kv-value"><a class="action-link">Scan Now</a> · <a class="action-link">Transfer Files</a> · <a class="action-link">Browse</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── C SSD (disconnected) ── -->
+    <div class="section">
+      <div class="section-header" onclick="toggle(this)">
+        <div class="section-icon" style="opacity:0.4">💾</div>
+        <div class="section-title" style="color:#86868b">C SSD</div>
+        <div class="section-chevron">⌃</div>
+      </div>
+      <div class="section-body">
+        <div class="section-inner">
+          <div class="kv-row">
+            <div class="kv-key">Status</div>
+            <div class="kv-value"><span class="status-dot gray"></span>Disconnected</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Capacity</div>
+            <div class="kv-value mono">4 TB</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Files</div>
+            <div class="kv-value mono">95,200</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Last Seen</div>
+            <div class="kv-value">3 days ago</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 1 HDD (disconnected) ── -->
+    <div class="section">
+      <div class="section-header" onclick="toggle(this)">
+        <div class="section-icon" style="opacity:0.4">🗄</div>
+        <div class="section-title" style="color:#86868b">1 HDD</div>
+        <div class="section-chevron">⌃</div>
+      </div>
+      <div class="section-body">
+        <div class="section-inner">
+          <div class="kv-row">
+            <div class="kv-key">Status</div>
+            <div class="kv-value"><span class="status-dot gray"></span>Disconnected</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Capacity</div>
+            <div class="kv-value mono">8 TB</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Files</div>
+            <div class="kv-value mono">312,500</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Last Seen</div>
+            <div class="kv-value">1 week ago</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── LX 1TB ── -->
+    <div class="section">
+      <div class="section-header" onclick="toggle(this)">
+        <div class="section-icon">💾</div>
+        <div class="section-title">LX 1TB</div>
+        <div class="section-chevron">⌃</div>
+      </div>
+      <div class="section-body">
+        <div class="section-inner">
+          <div class="kv-row">
+            <div class="kv-key">Status</div>
+            <div class="kv-value"><span class="status-dot green"></span>Connected</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Capacity</div>
+            <div class="kv-value mono">1 TB</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Used</div>
+            <div class="kv-value">
+              <span class="usage-bar-inline">
+                <span class="usage-track"><span class="usage-fill warn" style="width:78%"></span></span>
+                <span class="mono">780 GB (78%)</span>
+              </span>
+            </div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Files</div>
+            <div class="kv-value mono">18,220</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Last Scan</div>
+            <div class="kv-value">2 days ago</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Integrity</div>
+            <div class="kv-value"><span class="badge ok">Verified</span></div>
+          </div>
+          <div class="kv-divider"></div>
+          <div class="kv-row">
+            <div class="kv-key"></div>
+            <div class="kv-value"><a class="action-link">Scan Now</a> · <a class="action-link">Transfer Files</a> · <a class="action-link">Browse</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Integrity & Verification ── -->
+    <div class="section">
+      <div class="section-header" onclick="toggle(this)">
+        <div class="section-icon">🛡</div>
+        <div class="section-title">Integrity & Verification</div>
+        <div class="section-chevron">⌃</div>
+      </div>
+      <div class="section-body">
+        <div class="section-inner">
+          <div class="kv-row">
+            <div class="kv-key">Overall Status</div>
+            <div class="kv-value"><span class="badge ok">All Clear</span></div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Files Verified</div>
+            <div class="kv-value mono">596,045</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Hash Mismatches</div>
+            <div class="kv-value mono">0</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Last Full Check</div>
+            <div class="kv-value">2 hours ago</div>
+          </div>
+          <div class="kv-divider"></div>
+          <div class="kv-row">
+            <div class="kv-key"></div>
+            <div class="kv-value"><a class="action-link">Run Full Verify</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Duplicates ── -->
+    <div class="section">
+      <div class="section-header" onclick="toggle(this)">
+        <div class="section-icon">◫</div>
+        <div class="section-title">Duplicates</div>
+        <div class="section-chevron">⌃</div>
+      </div>
+      <div class="section-body">
+        <div class="section-inner">
+          <div class="kv-row">
+            <div class="kv-key">Duplicate Files</div>
+            <div class="kv-value mono">4,821</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Reclaimable Space</div>
+            <div class="kv-value"><span class="badge info">128 GB</span></div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Duplicate Folders</div>
+            <div class="kv-value mono">342</div>
+          </div>
+          <div class="kv-divider"></div>
+          <div class="kv-row">
+            <div class="kv-key"></div>
+            <div class="kv-value"><a class="action-link">Review Duplicates</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Backup Status ── -->
+    <div class="section">
+      <div class="section-header" onclick="toggle(this)">
+        <div class="section-icon">⛨</div>
+        <div class="section-title">Backup Status</div>
+        <div class="section-chevron">⌃</div>
+      </div>
+      <div class="section-body">
+        <div class="section-inner">
+          <div class="kv-row">
+            <div class="kv-key">Protection</div>
+            <div class="kv-value">87% of files on 2+ drives</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Unprotected Folders</div>
+            <div class="kv-value"><span class="badge warn">3 folders</span></div>
+          </div>
+
+          <div class="kv-group-label">Unprotected</div>
+          <div class="kv-row">
+            <div class="kv-key">A SSD / DCIM / 2026-03</div>
+            <div class="kv-value">1,240 files · <a class="action-link">Transfer →</a></div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">B SSD / Video / Project X</div>
+            <div class="kv-value">82 files · <a class="action-link">Transfer →</a></div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">LX 1TB / Imports / March</div>
+            <div class="kv-value">3,400 files · <a class="action-link">Transfer →</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Recent Transfers ── -->
+    <div class="section">
+      <div class="section-header" onclick="toggle(this)">
+        <div class="section-icon">⇄</div>
+        <div class="section-title">Recent Transfers</div>
+        <div class="section-chevron">⌃</div>
+      </div>
+      <div class="section-body">
+        <div class="section-inner">
+          <div class="kv-row">
+            <div class="kv-key">A SSD → B SSD</div>
+            <div class="kv-value">1,240 files · <span class="badge ok">Verified</span></div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">LX 1TB → C SSD</div>
+            <div class="kv-value">3,400 files · <span class="badge ok">Verified</span></div>
+          </div>
+          <div class="kv-divider"></div>
+          <div class="kv-row">
+            <div class="kv-key"></div>
+            <div class="kv-value"><a class="action-link">New Transfer</a> · <a class="action-link">View All History</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function toggle(header) {
+  header.parentElement.classList.toggle('open');
+}
+</script>
+
+</body>
+</html>

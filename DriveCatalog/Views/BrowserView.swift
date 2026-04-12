@@ -127,6 +127,8 @@ struct BrowserView: View {
                     showAllDrives = false
                     selectedDrive = drives.first { $0.name == name }
                     UserDefaults.standard.set(name, forKey: "browserSelectedDrive")
+                    columns = []  // Clear stale columns immediately
+                    expandedFileId = nil
                     kbColumn = 0
                     kbRow = -1
                     clearSearch()
@@ -422,16 +424,24 @@ struct BrowserView: View {
                     .lineLimit(1)
 
                 if let backup = backupCache[dir.path] {
-                    if backup.backupDrives.isEmpty {
-                        if backup.hashedFiles > 0 {
-                            // Hashed but no copies on other drives
-                            Image(systemName: "exclamationmark.shield.fill")
+                    let otherDriveCount = backup.backupDrives.filter { $0.driveName != selectedDrive?.name }.count
+                    if backup.hashedFiles > 0 {
+                        // Consistent badge: green checkmark for full backups, orange for partial, red for none
+                        HStack(spacing: 3) {
+                            Image(systemName: otherDriveCount == 0 ? "exclamationmark.shield" :
+                                  backup.backupDrives.filter({ $0.driveName != selectedDrive?.name }).allSatisfy({ $0.percentCoverage >= 100 }) ? "checkmark.shield.fill" : "shield.lefthalf.filled")
                                 .font(.caption2)
-                                .foregroundStyle(.red)
-                                .help("No backups — only on this drive")
+                            Text("\(otherDriveCount)")
+                                .font(.caption2)
+                                .fontWeight(.medium)
                         }
-                    } else {
-                        backupBadge(backup)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(otherDriveCount == 0 ? Color.red.opacity(0.15) :
+                                    backup.backupDrives.filter({ $0.driveName != selectedDrive?.name }).allSatisfy({ $0.percentCoverage >= 100 }) ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+                        .foregroundStyle(otherDriveCount == 0 ? .red :
+                                         backup.backupDrives.filter({ $0.driveName != selectedDrive?.name }).allSatisfy({ $0.percentCoverage >= 100 }) ? .green : .orange)
+                        .clipShape(Capsule())
                     }
                 }
 
@@ -458,19 +468,20 @@ struct BrowserView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
-                    // Backup info (exclude current drive from the list)
+                    // Backup info
                     if let backup = backupCache[dir.path] {
-                        let otherDrives = backup.backupDrives.filter { $0.driveName != selectedDrive?.name }
-                        if otherDrives.isEmpty {
-                            if backup.hashedFiles == 0 {
-                                Label("Not hashed yet", systemImage: "questionmark.circle")
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                            } else {
-                                Label("No copies on other drives — at risk", systemImage: "exclamationmark.shield.fill")
-                                    .font(.caption2)
-                                    .foregroundStyle(.red)
-                            }
+                        let currentDriveName = selectedDrive?.name ?? ""
+                        let otherDrives = backup.backupDrives.filter { $0.driveName != currentDriveName }
+                        let currentDriveBackup = backup.backupDrives.first { $0.driveName == currentDriveName }
+
+                        if backup.hashedFiles == 0 {
+                            Label("Not hashed yet — run a scan to detect copies", systemImage: "questionmark.circle")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        } else if otherDrives.isEmpty {
+                            Label("No copies on other drives — at risk", systemImage: "exclamationmark.shield.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.red)
                         } else {
                             Text("Also exists on \(otherDrives.count) other drive\(otherDrives.count == 1 ? "" : "s"):")
                                 .font(.caption2)
@@ -483,17 +494,29 @@ struct BrowserView: View {
                                     Text(bd.driveName)
                                         .fontWeight(.medium)
                                     Text("–")
-                                    if bd.percentCoverage >= 100 {
-                                        Text("complete (\(bd.fileCount) files)")
-                                            .foregroundStyle(.green)
-                                    } else {
-                                        Text("\(bd.fileCount) of \(backup.totalFiles) files (\(Int(bd.percentCoverage))%)")
-                                            .foregroundStyle(.orange)
-                                    }
+                                    Text("\(bd.fileCount) of \(backup.totalFiles) files (\(String(format: "%.1f", bd.percentCoverage))%)")
+                                        .foregroundStyle(bd.percentCoverage >= 100 ? .green : .orange)
                                 }
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                             }
+                        }
+
+                        // Current drive as last item in grey
+                        if backup.hashedFiles > 0 {
+                            let pct = backup.totalFiles > 0
+                                ? Double(currentDriveBackup?.fileCount ?? backup.totalFiles) / Double(backup.totalFiles) * 100
+                                : 0
+                            HStack(spacing: 4) {
+                                Image(systemName: "externaldrive.fill.badge.checkmark")
+                                    .foregroundStyle(.tertiary)
+                                Text("\(currentDriveName) (selected)")
+                                    .fontWeight(.medium)
+                                Text("–")
+                                Text("\(backup.totalFiles) of \(backup.totalFiles) files (\(String(format: "%.1f", pct))%)")
+                            }
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
                         }
                     }
                 }
@@ -569,9 +592,10 @@ struct BrowserView: View {
             // Expanded file detail — shows which drives have this file
             if isExpanded {
                 VStack(alignment: .leading, spacing: 6) {
-                    if let copies = file.copyCount, copies > 1, let drives = file.copyDrives {
+                    if let copies = file.copyCount, copies > 1 {
+                        let drives = file.copyDrives ?? []
                         let currentDrive = selectedDrive?.name ?? ""
-                        Text("This file exists on \(copies) drive\(copies == 1 ? "" : "s"):")
+                        Text("This file exists on \(copies) drive\(copies == 1 ? "" : "s")\(drives.isEmpty ? "" : ":"):")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                         ForEach(drives, id: \.self) { driveName in
@@ -651,7 +675,7 @@ struct BrowserView: View {
             } label: {
                 Label("Copy to...", systemImage: "doc.on.doc")
             }
-            if let copies = file.copyCount, copies > 2, let drives = file.copyDrives {
+            if let copies = file.copyCount, copies > 2, let drives = file.copyDrives, !drives.isEmpty {
                 Divider()
                 let currentDrive = selectedDrive?.name ?? ""
                 ForEach(drives.filter { $0 != currentDrive }, id: \.self) { driveName in
@@ -886,21 +910,26 @@ struct BrowserView: View {
     }
 
     private func loadBackupStatuses(drive: String, directories: [DirectoryEntry]) async {
-        // Fetch all backup statuses concurrently instead of sequentially (N+1 fix)
-        await withTaskGroup(of: (String, BackupStatusResponse?).self) { group in
-            for dir in directories {
-                group.addTask {
-                    let status = try? await APIService.shared.fetchBackupStatus(
-                        drive: drive, path: dir.path
-                    )
-                    return (dir.path, status)
+        // Fetch backup statuses with limited concurrency (4 at a time to avoid
+        // overwhelming the single-threaded uvicorn backend)
+        let batchSize = 4
+        for batch in stride(from: 0, to: directories.count, by: batchSize) {
+            let end = min(batch + batchSize, directories.count)
+            let slice = directories[batch..<end]
+            await withTaskGroup(of: (String, BackupStatusResponse?).self) { group in
+                for dir in slice {
+                    group.addTask {
+                        let status = try? await APIService.shared.fetchBackupStatus(
+                            drive: drive, path: dir.path
+                        )
+                        return (dir.path, status)
+                    }
+                }
+                for await (path, status) in group {
+                    if let status { backupCache[path] = status }
                 }
             }
-            for await (path, status) in group {
-                if let status { backupCache[path] = status }
-            }
         }
-        // Persist to disk for instant display next time
         ViewCache.save(backupCache, key: "browserBackupCache")
     }
 
@@ -987,107 +1016,6 @@ struct BrowserView: View {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 
-    @ViewBuilder
-    private func backupBadge(_ backup: BackupStatusResponse) -> some View {
-        BackupBadgeView(backup: backup)
-    }
-
-}
-
-/// Backup badge with hover popover — needs its own View for @State.
-private struct BackupBadgeView: View {
-    let backup: BackupStatusResponse
-    @Environment(\.activeTab) private var activeTab
-    @State private var isHovered = false
-
-    private var allFull: Bool {
-        backup.backupDrives.allSatisfy { $0.percentCoverage >= 100 }
-    }
-
-    var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: allFull ? "checkmark.shield.fill" : "shield.lefthalf.filled")
-                .font(.caption2)
-            Text("\(backup.backupDrives.count)")
-                .font(.caption2)
-                .fontWeight(.medium)
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(allFull ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
-        .foregroundStyle(allFull ? .green : .orange)
-        .clipShape(Capsule())
-        .onHover { hovering in
-            if activeTab == .browser { isHovered = hovering }
-        }
-        .popover(isPresented: $isHovered, arrowEdge: .bottom) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    Image(systemName: "shield.lefthalf.filled")
-                        .foregroundStyle(.blue)
-                    Text("Backup Status")
-                        .font(.callout)
-                        .fontWeight(.medium)
-                }
-
-                Divider()
-
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading) {
-                        Text("\(backup.totalFiles)")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                        Text("Total files")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                    VStack(alignment: .leading) {
-                        Text("\(backup.hashedFiles)")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                        Text("Hashed")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                    VStack(alignment: .leading) {
-                        Text("\(backup.backedUpFiles)")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                        Text("Backed up")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-
-                if !backup.backupDrives.isEmpty {
-                    Divider()
-                    Text("Copies on:")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    ForEach(backup.backupDrives, id: \.driveName) { bd in
-                        HStack(spacing: 6) {
-                            Image(systemName: "externaldrive.fill")
-                                .font(.caption)
-                                .foregroundStyle(bd.percentCoverage >= 100 ? .green : .orange)
-                            Text(bd.driveName)
-                                .font(.callout)
-                            Spacer()
-                            Text("\(bd.fileCount) files\(bd.totalBytes.map { " – \(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file))" } ?? "")")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("\(Int(bd.percentCoverage))%")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(bd.percentCoverage >= 100 ? .green : .orange)
-                        }
-                    }
-                }
-            }
-            .padding(12)
-            .frame(minWidth: 220)
-        }
-    }
 }
 
 #Preview {

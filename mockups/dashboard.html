@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DriveCatalog — Dashboard Mockup</title>
+<style>
+  :root {
+    --bg: #1c1c1e;
+    --surface: #2c2c2e;
+    --surface2: #3a3a3c;
+    --text: #f5f5f7;
+    --text2: #98989d;
+    --text3: #636366;
+    --border: #3a3a3c;
+    --accent: #0a84ff;
+    --green: #30d158;
+    --orange: #ff9f0a;
+    --red: #ff453a;
+    --purple: #bf5af2;
+    --pink: #ff375f;
+    --yellow: #ffd60a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* ── Icon Sidebar ── */
+  .sidebar {
+    width: 68px;
+    background: rgba(44,44,46,0.6);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 0;
+    gap: 4px;
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .sidebar-item {
+    width: 52px;
+    height: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text3);
+    transition: all 0.15s;
+    text-decoration: none;
+    font-size: 10px;
+  }
+  .sidebar-item:hover { color: var(--text2); background: var(--surface); }
+  .sidebar-item.active { color: #fff; background: var(--accent); }
+  .sidebar-item svg { width: 20px; height: 20px; }
+  .sidebar-divider { width: 32px; height: 1px; background: var(--border); margin: 8px 0; }
+  .sidebar-spacer { flex: 1; }
+  .sidebar-version { font-size: 9px; color: var(--text3); font-family: 'SF Mono', monospace; padding-bottom: 12px; }
+
+  /* ── Main Content ── */
+  .main { flex: 1; overflow-y: auto; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Hero Cards Row ── */
+  .hero-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    margin: 0;
+  }
+  .hero-card {
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: filter 0.15s;
+  }
+  .hero-card:hover { filter: brightness(1.1); }
+  .hero-card .icon { font-size: 32px; }
+  .hero-card .label {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+    text-align: center;
+  }
+  .hero-card .sublabel {
+    font-size: 12px;
+    opacity: 0.8;
+  }
+
+  .hero-card.drives { background: linear-gradient(135deg, #ff6b35, #ff9a56); color: #1c1c1e; }
+  .hero-card.scanning { background: linear-gradient(135deg, #e040a0, #ff6eb4); color: #1c1c1e; }
+  .hero-card.transfers { background: linear-gradient(135deg, #ff4545, #ff7676); color: #1c1c1e; }
+  .hero-card.managing { background: linear-gradient(135deg, #f0c030, #ffd866); color: #1c1c1e; }
+
+  /* ── Dashboard Grid ── */
+  .dashboard { padding: 20px; }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 20px;
+  }
+
+  .card-column {
+    padding: 24px;
+    border-right: 1px solid var(--border);
+  }
+  .card-column:last-child { border-right: none; }
+
+  .card-column .col-header {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 16px;
+  }
+
+  .card-column ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .card-column li {
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    padding: 4px 0;
+    transition: color 0.1s;
+  }
+  .card-column li:hover { color: var(--accent); }
+
+  .card-column .section-gap { margin-top: 24px; }
+
+  /* ── Status Cards ── */
+  .status-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  .status-card {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border);
+  }
+  .status-card .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-card .big-number {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    font-variant-numeric: tabular-nums;
+  }
+  .status-card .unit {
+    font-size: 14px;
+    color: var(--text2);
+    font-weight: 400;
+  }
+  .status-card .detail {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 4px;
+  }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.green { background: var(--green); }
+  .dot.orange { background: var(--orange); }
+  .dot.red { background: var(--red); }
+
+  /* ── Drive List ── */
+  .drive-list { margin-top: 20px; }
+  .drive-list-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .drive-row {
+    display: grid;
+    grid-template-columns: 8px 24px 1fr 100px 120px 60px 60px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border-radius: 8px;
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+  .drive-row .name { font-weight: 500; }
+  .drive-row .files { color: var(--text2); font-size: 12px; }
+  .drive-row .scan { color: var(--text3); font-size: 11px; }
+  .drive-row .size { color: var(--text2); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+  .drive-row .pct { color: var(--text2); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  .usage-bar {
+    height: 5px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .usage-bar .fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s;
+  }
+  .fill.blue { background: var(--accent); }
+  .fill.orange { background: var(--orange); }
+  .fill.red { background: var(--red); }
+
+  .drive-icon { color: var(--text3); font-size: 16px; }
+
+  /* ── Manage Tabs ── */
+  .manage-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+  }
+  .manage-tab {
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .manage-tab:hover { color: var(--text2); }
+  .manage-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+  .manage-content { padding: 20px; }
+
+  /* ── Action Items ── */
+  .action-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+  .action-item .priority {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    color: #fff;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .priority.high { background: var(--red); }
+  .priority.med { background: var(--orange); }
+  .priority.low { background: var(--accent); }
+  .action-item .action-text { flex: 1; }
+  .action-item .action-title { font-size: 13px; font-weight: 500; }
+  .action-item .action-detail { font-size: 12px; color: var(--text3); margin-top: 3px; }
+  .action-item button {
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-size: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .action-item button:hover { background: var(--surface2); }
+
+  /* ── Placeholder ── */
+  .placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 400px;
+    color: var(--text3);
+    gap: 12px;
+  }
+  .placeholder .ph-icon { font-size: 48px; }
+  .placeholder .ph-title { font-size: 18px; font-weight: 600; color: var(--text2); }
+  .placeholder .ph-desc { font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <a class="sidebar-item active" onclick="showPage('drives', this)" title="Drives">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="7" cy="12" r="1.5"/><line x1="12" y1="10" x2="19" y2="10"/><line x1="12" y1="14" x2="19" y2="14"/></svg>
+    Drives
+  </a>
+  <a class="sidebar-item" onclick="showPage('files', this)" title="Files">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7V5a2 2 0 012-2h4l2 2h8a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+    Files
+  </a>
+  <a class="sidebar-item" onclick="showPage('manage', this)" title="Manage">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Manage
+  </a>
+  <div class="sidebar-divider"></div>
+  <a class="sidebar-item" onclick="showPage('transfers', this)" title="Transfers">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 16l-4-4m0 0l4-4m-4 4h18"/><path d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+    Transfers
+  </a>
+  <a class="sidebar-item" onclick="showPage('settings', this)" title="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    Settings
+  </a>
+  <div class="sidebar-spacer"></div>
+  <div class="sidebar-version">v1.5.1</div>
+</nav>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- ═══ DRIVES PAGE ═══ -->
+  <div class="page active" id="page-drives">
+
+    <!-- Hero cards -->
+    <div class="hero-cards">
+      <div class="hero-card drives">
+        <div class="icon">⬇</div>
+        <div class="label">Drives &<br>Storage</div>
+        <div class="sublabel">3 of 5 connected</div>
+      </div>
+      <div class="hero-card scanning">
+        <div class="icon">⟲</div>
+        <div class="label">Scanning &<br>Hashing</div>
+        <div class="sublabel">98.2% cataloged</div>
+      </div>
+      <div class="hero-card transfers">
+        <div class="icon">⇄</div>
+        <div class="label">Transfers &<br>Verification</div>
+        <div class="sublabel">Last: 2 days ago</div>
+      </div>
+      <div class="hero-card managing">
+        <div class="icon">⬔</div>
+        <div class="label">Managing &<br>Protection</div>
+        <div class="sublabel">2 actions pending</div>
+      </div>
+    </div>
+
+    <!-- Feature columns -->
+    <div class="card-grid">
+      <div class="card-column">
+        <div class="col-header">Connected</div>
+        <ul>
+          <li>● A SSD — 2 TB</li>
+          <li>● B SSD — 4 TB</li>
+          <li>● LX 1TB — 1 TB</li>
+        </ul>
+        <div class="col-header section-gap">Disconnected</div>
+        <ul>
+          <li style="color: var(--text3)">○ C SSD — 4 TB</li>
+          <li style="color: var(--text3)">○ 1 HDD — 8 TB</li>
+        </ul>
+      </div>
+      <div class="card-column">
+        <div class="col-header">Scan Status</div>
+        <ul>
+          <li>A SSD — scanned 2h ago</li>
+          <li>B SSD — scanned 1d ago</li>
+          <li>LX 1TB — scanned 2d ago</li>
+        </ul>
+        <div class="col-header section-gap">Hashing</div>
+        <ul>
+          <li>596,045 files hashed</li>
+          <li>SHA-256 verification ready</li>
+          <li>xxHash partial dedup</li>
+        </ul>
+      </div>
+      <div class="card-column">
+        <div class="col-header">Recent Transfers</div>
+        <ul>
+          <li>A SSD → B SSD (1,240 files)</li>
+          <li>LX 1TB → C SSD (3,400 files)</li>
+        </ul>
+        <div class="col-header section-gap">Verification</div>
+        <ul>
+          <li>Post-copy SHA-256 verify</li>
+          <li>fsync + atomic writes</li>
+          <li>Metadata preservation</li>
+          <li>Resume on interrupt</li>
+        </ul>
+      </div>
+      <div class="card-column">
+        <div class="col-header">Backup Status</div>
+        <ul>
+          <li>3 unprotected folders</li>
+          <li>4,821 duplicate files</li>
+          <li>128 GB reclaimable</li>
+        </ul>
+        <div class="col-header section-gap">Quick Actions</div>
+        <ul>
+          <li>Back up unprotected files</li>
+          <li>Clean duplicates</li>
+          <li>Consolidate LX → B SSD</li>
+          <li>Verify integrity</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Status row -->
+    <div class="status-row">
+      <div class="status-card">
+        <div class="card-title"><span class="dot green"></span> Total Storage</div>
+        <div class="big-number">19 <span class="unit">TB</span></div>
+        <div class="detail">across 5 drives · 14.4 TB used (75.8%)</div>
+      </div>
+      <div class="status-card">
+        <div class="card-title"><span class="dot green"></span> Files Cataloged</div>
+        <div class="big-number">596,045</div>
+        <div class="detail">98.2% hashed · 0 integrity issues</div>
+      </div>
+      <div class="status-card">
+        <div class="card-title"><span class="dot orange"></span> Attention</div>
+        <div class="big-number">3</div>
+        <div class="detail">unprotected folders · no backup copies</div>
+      </div>
+    </div>
+
+    <!-- Drive list -->
+    <div class="drive-list">
+      <div class="drive-list-title">
+        All Drives
+        <button style="padding:5px 14px; border-radius:6px; border:none; background:var(--accent); color:#fff; font-size:12px; cursor:pointer;">+ Add Drive</button>
+      </div>
+      <div class="drive-row">
+        <span class="dot green"></span>
+        <span class="drive-icon">💾</span>
+        <span class="name">A SSD</span>
+        <span class="files">42,381 files</span>
+        <span class="scan">Scanned 2h ago</span>
+        <span class="usage-bar"><span class="fill blue" style="width:72%"></span></span>
+        <span class="pct">72%</span>
+        <span class="size">2 TB</span>
+      </div>
+      <div class="drive-row">
+        <span class="dot green"></span>
+        <span class="drive-icon">💾</span>
+        <span class="name">B SSD</span>
+        <span class="files">128,744 files</span>
+        <span class="scan">Scanned 1d ago</span>
+        <span class="usage-bar"><span class="fill blue" style="width:72%"></span></span>
+        <span class="pct">72%</span>
+        <span class="size">4 TB</span>
+      </div>
+      <div class="drive-row">
+        <span class="dot" style="background:var(--text3)"></span>
+        <span class="drive-icon">💾</span>
+        <span class="name" style="color:var(--text3)">C SSD</span>
+        <span class="files">95,200 files</span>
+        <span class="scan">Scanned 3d ago</span>
+        <span class="usage-bar"><span class="fill orange" style="width:78%"></span></span>
+        <span class="pct">78%</span>
+        <span class="size">4 TB</span>
+      </div>
+      <div class="drive-row">
+        <span class="dot" style="background:var(--text3)"></span>
+        <span class="drive-icon">🗄</span>
+        <span class="name" style="color:var(--text3)">1 HDD</span>
+        <span class="files">312,500 files</span>
+        <span class="scan">Scanned 1w ago</span>
+        <span class="usage-bar"><span class="fill orange" style="width:78%"></span></span>
+        <span class="pct">78%</span>
+        <span class="size">8 TB</span>
+      </div>
+      <div class="drive-row">
+        <span class="dot green"></span>
+        <span class="drive-icon">💾</span>
+        <span class="name">LX 1TB</span>
+        <span class="files">18,220 files</span>
+        <span class="scan">Scanned 2d ago</span>
+        <span class="usage-bar"><span class="fill orange" style="width:78%"></span></span>
+        <span class="pct">78%</span>
+        <span class="size">1 TB</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ MANAGE PAGE ═══ -->
+  <div class="page" id="page-manage">
+    <div class="manage-tabs">
+      <div class="manage-tab active" onclick="showManageTab(this, 'backup')">⛨ Backup Status</div>
+      <div class="manage-tab" onclick="showManageTab(this, 'duplicates')">◫ Duplicates</div>
+      <div class="manage-tab" onclick="showManageTab(this, 'actions')">💡 Recommended Actions</div>
+    </div>
+
+    <div class="manage-content" id="tab-backup">
+      <div class="status-row" style="margin-top:0">
+        <div class="status-card">
+          <div class="card-title"><span class="dot green"></span> Protected</div>
+          <div class="big-number">87<span class="unit">%</span></div>
+          <div class="detail">of files exist on 2+ drives</div>
+        </div>
+        <div class="status-card">
+          <div class="card-title"><span class="dot red"></span> Unprotected</div>
+          <div class="big-number">3</div>
+          <div class="detail">folders with no backup copies</div>
+        </div>
+        <div class="status-card">
+          <div class="card-title"><span class="dot green"></span> Last Backup</div>
+          <div class="big-number">2<span class="unit">d ago</span></div>
+          <div class="detail">A SSD → B SSD transfer</div>
+        </div>
+      </div>
+      <div style="margin-top: 20px;">
+        <div class="action-item">
+          <span class="priority high">HIGH</span>
+          <div class="action-text">
+            <div class="action-title">A SSD / DCIM / 2026-03</div>
+            <div class="action-detail">1,240 files · No copies on any other drive</div>
+          </div>
+          <button>Transfer →</button>
+        </div>
+        <div class="action-item">
+          <span class="priority high">HIGH</span>
+          <div class="action-text">
+            <div class="action-title">B SSD / Video / Project X</div>
+            <div class="action-detail">82 files · No copies on any other drive</div>
+          </div>
+          <button>Transfer →</button>
+        </div>
+        <div class="action-item">
+          <span class="priority med">MED</span>
+          <div class="action-text">
+            <div class="action-title">LX 1TB / Imports / March</div>
+            <div class="action-detail">3,400 files · Partial backup (68% covered)</div>
+          </div>
+          <button>Transfer →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="manage-content" id="tab-duplicates" style="display:none">
+      <div class="status-row" style="margin-top:0">
+        <div class="status-card">
+          <div class="card-title">Duplicate Files</div>
+          <div class="big-number">4,821</div>
+          <div class="detail">across all drives</div>
+        </div>
+        <div class="status-card">
+          <div class="card-title" style="color:var(--green)">Reclaimable</div>
+          <div class="big-number">128<span class="unit"> GB</span></div>
+          <div class="detail">safe to remove</div>
+        </div>
+        <div class="status-card">
+          <div class="card-title">Duplicate Folders</div>
+          <div class="big-number">342</div>
+          <div class="detail">exact hash matches</div>
+        </div>
+      </div>
+      <div style="margin-top:20px;">
+        <div class="action-item">
+          <span class="priority med">12.4 GB</span>
+          <div class="action-text">
+            <div class="action-title">Wedding_Final_v3.mov</div>
+            <div class="action-detail">2 copies: B SSD, C SSD</div>
+          </div>
+          <button>Review</button>
+        </div>
+        <div class="action-item">
+          <span class="priority med">8.2 GB</span>
+          <div class="action-text">
+            <div class="action-title">DJI_0042.MP4</div>
+            <div class="action-detail">2 copies: 1 HDD, B SSD</div>
+          </div>
+          <button>Review</button>
+        </div>
+        <div class="action-item">
+          <span class="priority low">890 MB</span>
+          <div class="action-text">
+            <div class="action-title">Lightroom Catalog.lrcat</div>
+            <div class="action-detail">4 copies: A SSD, B SSD, C SSD, LX 1TB</div>
+          </div>
+          <button>Review</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="manage-content" id="tab-actions" style="display:none">
+      <div class="action-item">
+        <span class="priority high">HIGH</span>
+        <div class="action-text">
+          <div class="action-title">Back up A SSD / DCIM / 2026-03</div>
+          <div class="action-detail">1,240 files with no copies on any other drive</div>
+        </div>
+        <button>Transfer</button>
+      </div>
+      <div class="action-item">
+        <span class="priority med">MED</span>
+        <div class="action-text">
+          <div class="action-title">Remove duplicates from 1 HDD</div>
+          <div class="action-detail">4,200 files (48 GB) already exist on B SSD with matching hashes</div>
+        </div>
+        <button>Review</button>
+      </div>
+      <div class="action-item">
+        <span class="priority med">MED</span>
+        <div class="action-text">
+          <div class="action-title">Consolidate LX 1TB → B SSD</div>
+          <div class="action-detail">All 18,220 files fit on B SSD (1.1 TB free). Drive can be retired.</div>
+        </div>
+        <button>Plan</button>
+      </div>
+      <div class="action-item">
+        <span class="priority low">LOW</span>
+        <div class="action-text">
+          <div class="action-title">Re-scan C SSD</div>
+          <div class="action-detail">Last scanned 3 days ago. 12 files may have changed.</div>
+        </div>
+        <button>Scan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ OTHER PAGES ═══ -->
+  <div class="page" id="page-files">
+    <div class="placeholder">
+      <div class="ph-icon">📁</div>
+      <div class="ph-title">Files</div>
+      <div class="ph-desc">Browse cataloged files across all drives</div>
+    </div>
+  </div>
+  <div class="page" id="page-transfers">
+    <div class="placeholder">
+      <div class="ph-icon">⇄</div>
+      <div class="ph-title">Transfer History</div>
+      <div class="ph-desc">View past transfers and verification reports</div>
+    </div>
+  </div>
+  <div class="page" id="page-settings">
+    <div class="placeholder">
+      <div class="ph-icon">⚙</div>
+      <div class="ph-title">Settings</div>
+      <div class="ph-desc">App preferences and configuration</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showPage(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function showManageTab(el, tab) {
+  document.querySelectorAll('.manage-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.manage-content').forEach(c => c.style.display = 'none');
+  document.getElementById('tab-' + tab).style.display = 'block';
+}
+</script>
+
+</body>
+</html>

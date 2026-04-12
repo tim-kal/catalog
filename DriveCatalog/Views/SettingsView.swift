@@ -7,6 +7,7 @@ struct SettingsView: View {
     @ObservedObject private var license = LicenseManager.shared
 
     @AppStorage("showConsolidatePage") private var showConsolidatePage = false
+    @AppStorage("debugExpandedDriveCardMockup") private var debugExpandedDriveCardMockup = false
     @State private var licenseKeyInput = ""
     @State private var showBugReport = false
     @State private var healthStatus: HealthStatusResponse?
@@ -207,6 +208,7 @@ struct SettingsView: View {
             // Features
             Section("Features") {
                 Toggle("Show Consolidate page", isOn: $showConsolidatePage)
+                Toggle("Use expanded drive card mockup (debug)", isOn: $debugExpandedDriveCardMockup)
             }
 
             // About

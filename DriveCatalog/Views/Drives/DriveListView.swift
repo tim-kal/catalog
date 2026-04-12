@@ -60,6 +60,7 @@ struct DriveCard: View {
     @State private var verificationReport: VerificationReport?
     @State private var isUnmounting = false
     @State private var unmountSuccess = false
+    @AppStorage("debugExpandedDriveCardMockup") private var debugExpandedDriveCardMockup = false
 
     // Change detection
     @State private var changeReport: ChangeReport?
@@ -141,7 +142,13 @@ struct DriveCard: View {
             if isExpanded {
                 Divider()
                     .padding(.horizontal)
-                expandedContent
+                Group {
+                    if debugExpandedDriveCardMockup {
+                        expandedContentMockup
+                    } else {
+                        expandedContent
+                    }
+                }
                     .padding()
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -237,6 +244,27 @@ struct DriveCard: View {
                 Text("Not scanned")
                     .font(.caption2)
                     .foregroundStyle(.orange)
+            }
+
+            if !isExpanded, isMounted {
+                Button {
+                    Task { await unmountDrive() }
+                } label: {
+                    HStack(spacing: 3) {
+                        if isUnmounting {
+                            ProgressView()
+                                .controlSize(.mini)
+                        } else {
+                            Image(systemName: "eject.fill")
+                        }
+                        Text("Unmount")
+                    }
+                    .font(.caption2)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .disabled(activeOperation != nil || isUnmounting)
+                .help(activeOperation != nil ? "Cannot unmount while an operation is running" : "Safely unmount this drive")
             }
 
             Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
@@ -637,6 +665,246 @@ struct DriveCard: View {
                 Text("This removes all \(drive.fileCount.formatted()) file records and hashes from the catalog.\n\nThe drive stays registered — you can re-scan it anytime. No files on the actual drive are affected.")
             }
 
+        }
+    }
+
+    /// Mockup layout for evaluating expanded-card hierarchy.
+    private var expandedContentMockup: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: isMounted ? "cable.connector" : "externaldrive")
+                    .foregroundStyle(isMounted ? .green : .secondary)
+                Text(isMounted ? "Connected now" : "Not mounted")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isMounted ? .green : .secondary)
+                if let lastConnected {
+                    Text("· connected \(ageString(lastConnected))")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            if let percent = currentUsedPercent, percent >= 90 {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Capacity risk")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                        Text(capacityRiskRecommendation(percent: percent))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.orange.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.orange.opacity(0.25), lineWidth: 1)
+                )
+            }
+
+            HStack(spacing: 10) {
+                mockInfoCard(
+                    title: "Mount",
+                    value: drive.mountPath,
+                    detail: isMounted ? "Mounted path" : "Expected mount path"
+                )
+
+                mockInfoCard(
+                    title: "Identity",
+                    value: drive.uuid ?? "No UUID",
+                    detail: "Volume UUID"
+                )
+
+                if let status {
+                    mockInfoCard(
+                        title: "Catalog",
+                        value: "\(status.fileCount.formatted()) files",
+                        detail: "\(status.videoCount.formatted()) video, \(status.imageCount.formatted()) image, \(status.audioCount.formatted()) audio"
+                    )
+                } else {
+                    mockInfoCard(
+                        title: "Catalog",
+                        value: "\(drive.fileCount.formatted()) files",
+                        detail: "Status loading"
+                    )
+                }
+            }
+
+            if let metric = mockupMetricSnapshot {
+                HStack(spacing: 22) {
+                    mockMetric(label: "Used", value: formattedSize(metric.usedBytes), color: .blue)
+                    mockMetric(label: "Free", value: formattedSize(metric.freeBytes), color: .green)
+                    mockMetric(label: "Total", value: formattedSize(metric.totalBytes), color: .secondary)
+                    if let status {
+                        mockMetric(label: "Hash", value: "\(Int(status.hashCoveragePercent))%", color: .purple)
+                    } else {
+                        mockMetric(label: "Hash", value: "—", color: .secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 11)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(.controlBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                )
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    Task { await triggerScan() }
+                } label: {
+                    Label(scanButtonText, systemImage: scanButtonIcon)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!isMounted || activeOperation != nil)
+
+                Button {
+                    Task { await triggerVerifyIntegrity() }
+                } label: {
+                    Label("Verify", systemImage: "checkmark.shield")
+                }
+                .buttonStyle(.bordered)
+                .disabled(!isMounted || activeOperation != nil || drive.fileCount == 0)
+
+                Menu {
+                    Button {
+                        Task { await unmountDrive() }
+                    } label: {
+                        Label("Unmount", systemImage: "eject.fill")
+                    }
+                    .disabled(!isMounted || activeOperation != nil)
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        showClearConfirmation = true
+                    } label: {
+                        Label("Clear Scan Data", systemImage: "trash")
+                    }
+                    .disabled(drive.fileCount == 0 || activeOperation != nil)
+                } label: {
+                    Label("More Actions", systemImage: "ellipsis.circle")
+                }
+                .menuStyle(.borderlessButton)
+                .buttonStyle(.bordered)
+
+                Spacer()
+            }
+            .alert("Clear Scan Data for \"\(drive.name)\"?", isPresented: $showClearConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Clear Data", role: .destructive) {
+                    Task { await clearScanData() }
+                }
+            } message: {
+                Text("This removes all \(drive.fileCount.formatted()) file records and hashes from the catalog.\n\nThe drive stays registered — you can re-scan it anytime. No files on the actual drive are affected.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func mockInfoCard(title: String, value: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption.weight(.medium))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Text(detail)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(.controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private func mockMetric(label: String, value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.callout.weight(.medium))
+                .foregroundStyle(color)
+        }
+    }
+
+    private var currentUsedPercent: Double? {
+        if let space = diskSpace, space.totalBytes > 0 {
+            return space.usedPercent
+        }
+        if let used = drive.usedBytes, drive.totalBytes > 0 {
+            return Double(used) / Double(drive.totalBytes) * 100
+        }
+        return nil
+    }
+
+    private var canVerifyNow: Bool {
+        isMounted && activeOperation == nil && drive.fileCount > 0
+    }
+
+    private func capacityRiskRecommendation(percent: Double) -> String {
+        if canVerifyNow {
+            return "\(Int(percent))% used. Consider verify + cleanup before next ingest."
+        }
+        if !isMounted {
+            return "\(Int(percent))% used. Mount drive to verify or rescan before next ingest."
+        }
+        if drive.fileCount == 0 {
+            return "\(Int(percent))% used. Run scan first, then verify before next ingest."
+        }
+        return "\(Int(percent))% used. Finish current operation, then verify + cleanup."
+    }
+
+    private var mockupMetricSnapshot: (usedBytes: Int64, freeBytes: Int64, totalBytes: Int64)? {
+        if let space = diskSpace, space.totalBytes > 0 {
+            return (space.usedBytes, space.freeBytes, space.totalBytes)
+        }
+        if let used = drive.usedBytes, drive.totalBytes > 0 {
+            return (used, max(0, drive.totalBytes - used), drive.totalBytes)
+        }
+        return nil
+    }
+
+    private var scanButtonText: String {
+        if let status, status.lastScan != nil, status.hashCoveragePercent < 100 {
+            return status.hashCoveragePercent > 0 ? "Continue Hashing" : "Hash"
+        } else if let status, status.lastScan != nil, status.hashCoveragePercent >= 100 {
+            return "Re-Scan & Hash"
+        } else {
+            return "Scan & Hash"
+        }
+    }
+
+    private var scanButtonIcon: String {
+        if let status, status.lastScan != nil, status.hashCoveragePercent < 100 {
+            return "number"
+        } else if let status, status.lastScan != nil, status.hashCoveragePercent >= 100 {
+            return "arrow.clockwise"
+        } else {
+            return "magnifyingglass"
         }
     }
 
