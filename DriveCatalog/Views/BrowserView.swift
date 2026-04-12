@@ -41,6 +41,7 @@ struct BrowserView: View {
     @State private var errorMessage: String?
     @State private var selectedFile: FileResponse?
     @State private var fileToCopy: FileResponse?
+    @State private var expandedFileId: Int?
     @State private var showCopySheet = false
     @State private var backupCache: [String: BackupStatusResponse] = [:]
 
@@ -457,28 +458,38 @@ struct BrowserView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
-                    // Backup info
+                    // Backup info (exclude current drive from the list)
                     if let backup = backupCache[dir.path] {
-                        if backup.backupDrives.isEmpty {
+                        let otherDrives = backup.backupDrives.filter { $0.driveName != selectedDrive?.name }
+                        if otherDrives.isEmpty {
                             if backup.hashedFiles == 0 {
                                 Label("Not hashed yet", systemImage: "questionmark.circle")
                                     .font(.caption2)
                                     .foregroundStyle(.tertiary)
                             } else {
-                                Label("No backups", systemImage: "exclamationmark.shield.fill")
+                                Label("No copies on other drives — at risk", systemImage: "exclamationmark.shield.fill")
                                     .font(.caption2)
                                     .foregroundStyle(.red)
                             }
                         } else {
-                            Text("Copies found:")
+                            Text("Also exists on \(otherDrives.count) other drive\(otherDrives.count == 1 ? "" : "s"):")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
-                            ForEach(backup.backupDrives, id: \.driveName) { bd in
+                            ForEach(otherDrives, id: \.driveName) { bd in
                                 HStack(spacing: 4) {
                                     Image(systemName: bd.percentCoverage >= 100
-                                          ? "checkmark.circle.fill" : "externaldrive.fill")
+                                          ? "checkmark.circle.fill" : "circle.lefthalf.filled")
                                         .foregroundStyle(bd.percentCoverage >= 100 ? .green : .orange)
-                                    Text("\(bd.driveName) – \(bd.fileCount) of \(backup.totalFiles) files\(bd.totalBytes.map { " – \(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file))" } ?? "")")
+                                    Text(bd.driveName)
+                                        .fontWeight(.medium)
+                                    Text("–")
+                                    if bd.percentCoverage >= 100 {
+                                        Text("complete (\(bd.fileCount) files)")
+                                            .foregroundStyle(.green)
+                                    } else {
+                                        Text("\(bd.fileCount) of \(backup.totalFiles) files (\(Int(bd.percentCoverage))%)")
+                                            .foregroundStyle(.orange)
+                                    }
                                 }
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -506,49 +517,128 @@ struct BrowserView: View {
     }
 
     private func fileRow(file: FileResponse) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: file.isMedia ? "film.fill" : "doc.fill")
-                .foregroundStyle(file.isMedia ? .orange : .secondary)
-                .frame(width: 18)
-                .onTapGesture {
-                    revealInFinder(relativePath: file.path, isDirectory: false)
-                }
-                .help("Open in Finder")
-            Text(file.filename)
-                .lineLimit(1)
+        let isExpanded = expandedFileId == file.id
 
-            Spacer()
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: file.isMedia ? "film.fill" : "doc.fill")
+                    .foregroundStyle(file.isMedia ? .orange : .secondary)
+                    .frame(width: 18)
+                    .onTapGesture {
+                        revealInFinder(relativePath: file.path, isDirectory: false)
+                    }
+                    .help("Open in Finder")
+                Text(file.filename)
+                    .lineLimit(1)
 
-            Text(ByteCountFormatter.string(fromByteCount: file.sizeBytes, countStyle: .file))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Spacer()
 
-            if let copies = file.copyCount, copies > 1 {
-                HStack(spacing: 2) {
-                    Image(systemName: "externaldrive.fill")
+                Text(ByteCountFormatter.string(fromByteCount: file.sizeBytes, countStyle: .file))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if let copies = file.copyCount, copies > 1 {
+                    HStack(spacing: 2) {
+                        Image(systemName: "externaldrive.fill")
+                            .font(.caption2)
+                        Text("\(copies)")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                    }
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(copies >= 3 ? Color.blue.opacity(0.15) : Color.green.opacity(0.15))
+                    .foregroundStyle(copies >= 3 ? .blue : .green)
+                    .clipShape(Capsule())
+                    .help("Exists on \(copies) drives (click to expand)")
+                } else if file.copyCount == 1 {
+                    Image(systemName: "exclamationmark.triangle.fill")
                         .font(.caption2)
-                    Text("\(copies)")
-                        .font(.caption2)
-                        .fontWeight(.medium)
+                        .foregroundStyle(.red)
+                        .help("Only on this drive — no backup")
                 }
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
-                .background(copies >= 3 ? Color.blue.opacity(0.15) : Color.green.opacity(0.15))
-                .foregroundStyle(copies >= 3 ? .blue : .green)
-                .clipShape(Capsule())
-                .help("Exists on \(copies) drives")
-            } else if file.copyCount == 1 {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.red)
-                    .help("Only on this drive — no backup")
+            }
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    expandedFileId = isExpanded ? nil : file.id
+                }
+            }
+
+            // Expanded file detail — shows which drives have this file
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 6) {
+                    if let copies = file.copyCount, copies > 1, let drives = file.copyDrives {
+                        let currentDrive = selectedDrive?.name ?? ""
+                        Text("This file exists on \(copies) drive\(copies == 1 ? "" : "s"):")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        ForEach(drives, id: \.self) { driveName in
+                            HStack(spacing: 6) {
+                                Image(systemName: driveName == currentDrive ? "externaldrive.fill.badge.checkmark" : "externaldrive.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(driveName == currentDrive ? .blue : .secondary)
+                                Text(driveName)
+                                    .font(.caption)
+                                    .fontWeight(driveName == currentDrive ? .semibold : .regular)
+                                if driveName == currentDrive {
+                                    Text("(this drive)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
+                                Spacer()
+                                if driveName != currentDrive && copies > 2 {
+                                    Button {
+                                        queueDeleteFromDrive(file: file, driveName: driveName)
+                                    } label: {
+                                        Text("Queue delete")
+                                            .font(.caption2)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.mini)
+                                }
+                            }
+                        }
+                    } else if file.copyCount == 1 {
+                        Label("Only exists on this drive — consider backing up", systemImage: "exclamationmark.shield")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                    } else {
+                        Label("Not hashed yet — run a scan to detect copies", systemImage: "questionmark.circle")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    HStack(spacing: 8) {
+                        Button {
+                            selectedFile = file
+                        } label: {
+                            Label("Details", systemImage: "info.circle")
+                                .font(.caption2)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+
+                        Button {
+                            fileToCopy = file
+                            showCopySheet = true
+                        } label: {
+                            Label("Copy to...", systemImage: "doc.on.doc")
+                                .font(.caption2)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                    }
+                    .padding(.top, 2)
+                }
+                .padding(.leading, 26)
+                .padding(.vertical, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(.vertical, 2)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            selectedFile = file
-        }
+        .background(isExpanded ? Color.accentColor.opacity(0.08) : Color.clear)
+        .cornerRadius(4)
         .contextMenu {
             Button {
                 revealInFinder(relativePath: file.path, isDirectory: false)
@@ -561,6 +651,33 @@ struct BrowserView: View {
             } label: {
                 Label("Copy to...", systemImage: "doc.on.doc")
             }
+            if let copies = file.copyCount, copies > 2, let drives = file.copyDrives {
+                Divider()
+                let currentDrive = selectedDrive?.name ?? ""
+                ForEach(drives.filter { $0 != currentDrive }, id: \.self) { driveName in
+                    Button {
+                        queueDeleteFromDrive(file: file, driveName: driveName)
+                    } label: {
+                        Label("Queue delete from \(driveName)", systemImage: "trash")
+                    }
+                }
+            }
+        }
+    }
+
+    private func queueDeleteFromDrive(file: FileResponse, driveName: String) {
+        Task {
+            let req = CreateActionRequest(
+                actionType: "delete",
+                sourceDrive: driveName,
+                sourcePath: file.path,
+                targetDrive: nil,
+                targetPath: nil,
+                priority: 0,
+                reason: "Redundant copy — file exists on \(file.copyCount ?? 1) drives",
+                estimatedBytes: file.sizeBytes
+            )
+            _ = try? await APIService.shared.createAction(req)
         }
     }
 

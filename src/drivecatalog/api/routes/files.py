@@ -252,24 +252,32 @@ async def browse_directory(
                 for r in root_rows
             ]
 
-        # Compute copy_count for hashed files (how many drives have this file)
+        # Compute copy_count and copy_drives for hashed files
         hashed_files = [f for f in direct_files if f.partial_hash]
         if hashed_files:
             hashes = list({f.partial_hash for f in hashed_files})
             placeholders = ",".join("?" * len(hashes))
-            count_rows = conn.execute(
+            # Get count + drive names per hash
+            drive_rows = conn.execute(
                 f"""
-                SELECT partial_hash, COUNT(DISTINCT drive_id) as drive_count
-                FROM files
-                WHERE partial_hash IN ({placeholders})
-                GROUP BY partial_hash
+                SELECT f.partial_hash, d.name as drive_name
+                FROM files f
+                JOIN drives d ON f.drive_id = d.id
+                WHERE f.partial_hash IN ({placeholders})
+                GROUP BY f.partial_hash, d.id
                 """,
                 hashes,
             ).fetchall()
-            hash_counts = {r["partial_hash"]: r["drive_count"] for r in count_rows}
+            # Build hash → {count, drive_names}
+            from collections import defaultdict
+            hash_drives: dict[str, list[str]] = defaultdict(list)
+            for r in drive_rows:
+                hash_drives[r["partial_hash"]].append(r["drive_name"])
             for f in direct_files:
                 if f.partial_hash:
-                    f.copy_count = hash_counts.get(f.partial_hash, 1)
+                    drives = hash_drives.get(f.partial_hash, [])
+                    f.copy_count = len(drives) if drives else 1
+                    f.copy_drives = sorted(drives) if drives else None
 
         return BrowseResponse(
             drive=drive,

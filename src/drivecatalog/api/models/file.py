@@ -20,6 +20,7 @@ class FileResponse(BaseModel):
     partial_hash: str | None
     is_media: bool
     copy_count: int | None = None  # total copies across all drives (if computed)
+    copy_drives: list[str] | None = None  # drive names that have this file
 
 
 class FileListResponse(BaseModel):

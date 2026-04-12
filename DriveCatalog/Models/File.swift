@@ -12,6 +12,7 @@ struct FileResponse: Codable, Identifiable {
     let partialHash: String?
     let isMedia: Bool
     let copyCount: Int?
+    let copyDrives: [String]?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -24,6 +25,7 @@ struct FileResponse: Codable, Identifiable {
         case partialHash = "partial_hash"
         case isMedia = "is_media"
         case copyCount = "copy_count"
+        case copyDrives = "copy_drives"
     }
 }
 
