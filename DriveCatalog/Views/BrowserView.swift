@@ -102,7 +102,9 @@ struct BrowserView: View {
             .onReceive(NotificationCenter.default.publisher(for: .refreshCurrentPage)) { _ in
                 if activeTab == .browser {
                     Task {
-                        if let sel = selectedDrive {
+                        await loadDrives()
+                        columns = []
+                        if selectedDrive != nil {
                             await loadColumn(path: "", depth: 0)
                         }
                     }

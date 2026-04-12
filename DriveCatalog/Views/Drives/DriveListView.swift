@@ -1364,7 +1364,6 @@ enum DriveSortOption: String, CaseIterable {
     case lastScanned = "Last Scanned"
     case size = "Size"
     case usage = "Usage"
-    case fileCount = "Files"
 
     var icon: String {
         switch self {
@@ -1372,7 +1371,6 @@ enum DriveSortOption: String, CaseIterable {
         case .lastScanned: "clock"
         case .size: "internaldisk"
         case .usage: "chart.bar.fill"
-        case .fileCount: "doc"
         }
     }
 }
@@ -1489,14 +1487,12 @@ struct DriveListView: View {
         case .size:
             sorted = drives.sorted { $0.totalBytes > $1.totalBytes }
         case .usage:
-            // Sort by used percentage (fullest first) — uses live disk space
+            // Sort by used percentage (fullest first) — uses stored total/used bytes
             sorted = drives.sorted { (a: DriveResponse, b: DriveResponse) -> Bool in
-                let pctA = DiskSpace.read(path: a.mountPath)?.usedPercent ?? 0
-                let pctB = DiskSpace.read(path: b.mountPath)?.usedPercent ?? 0
+                let pctA = a.totalBytes > 0 ? Double(a.usedBytes ?? 0) / Double(a.totalBytes) : 0
+                let pctB = b.totalBytes > 0 ? Double(b.usedBytes ?? 0) / Double(b.totalBytes) : 0
                 return pctA > pctB
             }
-        case .fileCount:
-            sorted = drives.sorted { $0.fileCount > $1.fileCount }
         }
         let result: [DriveResponse] = sortAscending ? sorted : Array(sorted.reversed())
 
