@@ -34,3 +34,10 @@ directly. Vercel endpoint kept as legacy fallback but is not depended on.
 Local evidence shows `schema_version = 6` in `~/.drivecatalog/catalog.db`, which implies
 the v9 migration from release `v1.4.2` has not been applied there yet. Need to confirm the
 running app build and backend process version before judging dialog UX/fix effectiveness.
+
+## Q9: Drives page UI direction priority
+For the Drives list redesign, which should ship first:
+(a) attention-first summary/command bar,
+(b) row-level explicit CTA + risk badge,
+or (c) state-grouped list sections?
+All three improve triage speed, but implementing one first keeps risk and scope controlled.

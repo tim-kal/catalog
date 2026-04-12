@@ -77,3 +77,20 @@ See `phases/PHASE-03-SAFE-TRANSFERS.md` and `design/RESEARCH-safe-transfers.md`
 - DC-015: Transfer verification report (depends on DC-014)
 - DC-016: Frontend transfer UI (depends on DC-015)
 - All task tickets written to `migration/TASKS/DC-01{2..6}/ticket.md`
+
+## UI Review — Drives List Page (2026-04-12)
+
+Source reviewed: screenshot from operator + `DriveCatalog/Views/Drives/DriveListView.swift`.
+
+Intent inferred:
+- Single-screen operational triage for many drives: identify risk quickly, then run the next action (scan/hash/transfer/unmount).
+
+Findings:
+- Summary bar is metric-dense but action-poor; it hides mounted count when all are mounted and does not surface "critical drives" count.
+- Row header packs capacity, usage, scan status, and recency into low-contrast micro-elements; risk is visible only after parsing text.
+- Next actions are mostly hidden behind expand/context-menu, increasing clicks for common workflows.
+
+Proposed UI directions (mocked):
+- Attention-first command bar (critical count + one-click actions).
+- Row-level risk/status badges with explicit CTA in-row.
+- Grouping long lists into state buckets (Needs Attention / Healthy / Offline).
