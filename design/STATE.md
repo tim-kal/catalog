@@ -94,3 +94,24 @@ Proposed UI directions (mocked):
 - Attention-first command bar (critical count + one-click actions).
 - Row-level risk/status badges with explicit CTA in-row.
 - Grouping long lists into state buckets (Needs Attention / Healthy / Offline).
+
+## UI Review — Expanded Drive Card (2026-04-12)
+
+Source reviewed: screenshot of expanded row + `expandedContent` in
+`DriveCatalog/Views/Drives/DriveListView.swift`.
+
+Intent inferred:
+- Expanded state should answer three questions immediately:
+  (1) Is this drive healthy and up to date?
+  (2) What exactly is on it (inventory/hash state)?
+  (3) What is the safest next action?
+
+Findings:
+- Expanded content is comprehensive but visually flat; mount path, UUID, capacity, inventory, and actions all compete at similar weight.
+- Action row gives destructive and non-destructive operations similar prominence.
+- Detail density is high even when user only needs "overview + next step".
+
+Proposed UI directions (mocked):
+- Compact info-card hierarchy (identity/mount/catalog split).
+- Strong action hierarchy with separated danger zone.
+- Progressive detail tabs (Overview/Catalog Health/Operations).

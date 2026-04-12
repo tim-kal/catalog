@@ -41,3 +41,9 @@ For the Drives list redesign, which should ship first:
 (b) row-level explicit CTA + risk badge,
 or (c) state-grouped list sections?
 All three improve triage speed, but implementing one first keeps risk and scope controlled.
+
+## Q10: Expanded card default complexity
+Should expanded rows default to:
+(a) a concise Overview with progressive tabs for deeper diagnostics,
+or (b) keep full-detail single-pane as today?
+This impacts perceived speed and scanability when users expand many rows in one session.
