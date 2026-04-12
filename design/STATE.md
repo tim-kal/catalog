@@ -124,3 +124,8 @@ Implementation note (2026-04-12):
 - Files changed:
   - `DriveCatalog/Views/Drives/DriveListView.swift`
   - `DriveCatalog/Views/SettingsView.swift`
+
+Follow-up note (2026-04-12):
+- Removed `#if DEBUG` guards around `debugExpandedDriveCardMockup` so the toggle is visible in all build configs.
+- New local build currently blocked by unrelated pre-existing compile errors in
+  `DriveCatalog/Views/BrowserView.swift` (`copyDrives` missing, `createAction(request:)` signature mismatch).
