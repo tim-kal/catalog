@@ -24,8 +24,16 @@ Wenn Beta-API fehlschlägt (Domain falsch/dead), öffnet die App einen vorbefül
 ## D8 — 2026-04-08: Samsung-Kollision fixen ohne Fingerprint-Autoassign
 `fs_fingerprint` darf ohne corroborating identifier nicht mehr automatisch erkennen. Ambiguous wird explizit auflösbar (AddDriveSheet), `resolve-ambiguous` bekommt 409-Sicherheitscheck gegen falsches Überschreiben, und Migration v9 löscht alte Produktnamen-Serials (`% Media`, `Untitled`, leer).
 
-## D9 — 2026-04-11: Dashboard UI nur in Debug
+## D9 — 2026-04-12: Dashboard-Redesign verworfen, stattdessen gezielte UX-Fixes
+NordVPN/Mux Dashboard-Mockups verworfen. Stattdessen: (a) Manage-Seite mit 3 Tabs (Backups, Redundant Data, Consolidate Drives) — implementiert. (b) Files-Browser UX-Verbesserungen: Ordner-Backup-Anzeige ohne aktuelle Drive, File-Level Expansion mit Drive-Liste, Multi-Select + Right-Click für Action Queue.
+
+## D10 — 2026-04-11: Dashboard UI nur in Debug
 NordVPN-style Dashboard (icon-only sidebar, card panels) für Drive-Page und Manage-Page (drei Tabs: Backup-Status, Duplikate, Empfohlene Aktionen per D2). Entwicklung nur im Debug-Build hinter `#if DEBUG` Flag. Release-Build behält aktuelle UI bis Dashboard stabil. Rollback jederzeit möglich.
 
 ## D10 — 2026-04-11: Safe Transfer Architektur
 Pattern: stream-hash source while writing + fsync + re-read dest hash (wie ChronoSync/CCC). Atomic temp-file (.dctmp) + rename. 1MB Buffer statt 64KB. Metadata via shutil.copystat + xattr. Batch-Engine über planned_actions Tabelle mit transfer_id Gruppierung. Sequentielle I/O (kein Parallel-Copy — schlechter auf HDD). SHA-256 für Verifikation, xxHash bleibt für Dedup.
+
+## D11 — 2026-04-12: Expanded-card redesign ships as debug-toggle first
+Expanded drive-card redesign is implemented as a debug-only mockup path, not a release replacement.
+Gate: `@AppStorage("debugExpandedDriveCardMockup")`, toggled in Settings Features.
+Reason: enables rapid operator validation and instant rollback without code revert.

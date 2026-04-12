@@ -115,3 +115,12 @@ Proposed UI directions (mocked):
 - Compact info-card hierarchy (identity/mount/catalog split).
 - Strong action hierarchy with separated danger zone.
 - Progressive detail tabs (Overview/Catalog Health/Operations).
+
+Implementation note (2026-04-12):
+- Added a debug-only expanded-card Swift mockup path behind
+  `@AppStorage("debugExpandedDriveCardMockup")`.
+- Toggle exposed in Settings → Features as
+  "Use expanded drive card mockup (debug)".
+- Files changed:
+  - `DriveCatalog/Views/Drives/DriveListView.swift`
+  - `DriveCatalog/Views/SettingsView.swift`
