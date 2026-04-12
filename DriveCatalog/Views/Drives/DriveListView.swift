@@ -1830,6 +1830,7 @@ struct DriveListView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .shadow(radius: 8)
                         .transition(.move(edge: .top).combined(with: .opacity))
+                        .padding(.top, 4)
                     }
                     if let warning = weakMatchBanner {
                         HStack(spacing: 8) {
@@ -1904,7 +1905,7 @@ struct DriveListView: View {
                         } else {
                             withAnimation(.easeInOut) { connectionBanner = "\(driveName) connected" }
                             Task {
-                                try? await Task.sleep(for: .seconds(4))
+                                try? await Task.sleep(for: .seconds(10))
                                 withAnimation(.easeOut) { connectionBanner = nil }
                             }
                         }
@@ -1931,11 +1932,14 @@ struct DriveListView: View {
                                 // No need for transient banner if unchanged
                                 driveQuickChecks[driveName] = DriveCheckInfo(date: Date(), passed: true)
                             } else {
+                                // Changes detected — auto-scan immediately
+                                driveQuickChecks[driveName] = DriveCheckInfo(date: Date(), passed: false)
                                 quickCheckMessages.append(
                                     QuickCheckMessage(driveName: driveName, passed: false)
                                 )
-                                driveQuickChecks[driveName] = DriveCheckInfo(date: Date(), passed: false)
                                 clearQuickCheckAfterDelay()
+                                // Trigger automatic rescan so catalog updates without user intervention
+                                _ = try? await APIService.shared.triggerAutoScan(driveName: driveName)
                             }
                         } else {
                             _ = try? await APIService.shared.triggerAutoScan(driveName: driveName)
@@ -1950,7 +1954,7 @@ struct DriveListView: View {
                 if let drive = drives.first(where: { $0.mountPath == volumeURL.path }) {
                     withAnimation(.easeInOut) { connectionBanner = "\(drive.name) disconnected" }
                     Task {
-                        try? await Task.sleep(for: .seconds(4))
+                        try? await Task.sleep(for: .seconds(10))
                         withAnimation(.easeOut) { connectionBanner = nil }
                     }
                     activityLog.insert(ActivityLogEntry(date: Date(), driveName: drive.name, type: .disconnected, passed: nil), at: 0)
@@ -2726,9 +2730,13 @@ struct DriveListView: View {
     }
 
     private func clearQuickCheckAfterDelay() {
+        // Only clear passed (no-changes) messages after 30s.
+        // Failed (changes-detected) messages stay until user rescans.
         Task {
-            try? await Task.sleep(for: .seconds(8))
-            withAnimation { quickCheckMessages.removeAll() }
+            try? await Task.sleep(for: .seconds(30))
+            withAnimation {
+                quickCheckMessages.removeAll(where: { $0.passed })
+            }
         }
     }
 
