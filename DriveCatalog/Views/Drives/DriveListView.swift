@@ -234,12 +234,21 @@ struct DriveCard: View {
                         .foregroundStyle(.tertiary)
                 }
             } else if drive.lastScan != nil {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.green)
-                Text(lastScanText(drive.lastScan))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                if lastQuickCheckPassed == false {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                    Text("Changes detected")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                } else {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.green)
+                    Text(lastScanText(drive.lastScan))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
             } else {
                 Text("Not scanned")
                     .font(.caption2)
@@ -247,6 +256,20 @@ struct DriveCard: View {
             }
 
             if !isExpanded, isMounted {
+                if lastQuickCheckPassed == false {
+                    Button {
+                        Task { await triggerScan() }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                            Text("Update")
+                        }
+                        .font(.caption2)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+                    .controlSize(.small)
+                }
                 Button {
                     Task { await unmountDrive() }
                 } label: {
@@ -310,7 +333,13 @@ struct DriveCard: View {
         let isScanning = activeOperation != nil && (activeOperationType == "scan" || activeOperationType == "smart-scan")
         let fullyHashed = status.hashCoveragePercent >= 100 && !isHashing
 
-        if scanned && fullyHashed && !isScanning {
+        if lastQuickCheckPassed == false && !isScanning {
+            // Quick-check detected changes — show warning
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption2)
+                .foregroundStyle(.orange)
+                .help("Changes detected since last scan")
+        } else if scanned && fullyHashed && !isScanning {
             // Both complete — single green checkmark
             Image(systemName: "checkmark.circle.fill")
                 .font(.caption2)
