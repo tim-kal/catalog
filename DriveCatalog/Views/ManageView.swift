@@ -1,9 +1,16 @@
 import SwiftUI
 
-/// Unified Manage page combining backup status, duplicates/space savings, and recommended actions.
+/// Unified Manage page with three tabs: Backups, Redundant Data, Consolidate Drives.
 struct ManageView: View {
+    enum ManageTab: String, CaseIterable {
+        case backups = "Backups"
+        case redundant = "Redundant Data"
+        case consolidate = "Consolidate Drives"
+    }
+
     @Environment(\.activeTab) private var activeTab
     @ObservedObject private var backend = BackendService.shared
+    @State private var selectedManageTab: ManageTab = .backups
     @State private var insightsData: InsightsResponse?
     @State private var folderDuplicates: FolderDuplicateResponse?
     @State private var recommendations: ConsolidationRecommendationsResponse?
@@ -66,27 +73,41 @@ struct ManageView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
             } else if let data = insightsData {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        // Section 1: Backup Status
-                        backupStatusSection(data.health)
-
-                        Divider()
-
-                        // Section 2: Duplikate & Platzgewinn
-                        duplicatesSection(data)
-
-                        Divider()
-
-                        // Section 3: Consolidation Recommendations
-                        recommendationsSection
-
-                        Divider()
-
-                        // Section 4: Empfohlene Aktionen
-                        actionsSection(data.actions)
+                VStack(spacing: 0) {
+                    // Tab bar
+                    Picker("", selection: $selectedManageTab) {
+                        ForEach(ManageTab.allCases, id: \.self) { tab in
+                            Text(tab.rawValue).tag(tab)
+                        }
                     }
-                    .padding(20)
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+
+                    // Tab content
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
+                            switch selectedManageTab {
+                            case .backups:
+                                backupStatusSection(data.health)
+                                if !data.actions.filter({ $0.actionType == "backup" }).isEmpty {
+                                    Divider()
+                                    actionsSection(data.actions.filter { $0.actionType == "backup" })
+                                }
+                            case .redundant:
+                                duplicatesSection(data)
+                                if let redundant = data.actions.first(where: { $0.id == "trim_redundant" }),
+                                   let sameDrive = data.actions.first(where: { $0.id == "clean_same_drive_dupes" }) {
+                                    Divider()
+                                    actionsSection([redundant, sameDrive])
+                                }
+                            case .consolidate:
+                                recommendationsSection
+                            }
+                        }
+                        .padding(20)
+                    }
                 }
             }
         }
