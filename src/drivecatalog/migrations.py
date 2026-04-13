@@ -328,8 +328,8 @@ CREATE TABLE IF NOT EXISTS planned_actions (
     completed_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_planned_actions_status ON planned_actions(status);
-CREATE INDEX IF NOT EXISTS idx_planned_actions_transfer_id ON planned_actions(transfer_id);
 """,
+        data_migration=lambda conn: _migrate_planned_actions_add_columns(conn),
     ),
     # ------------------------------------------------------------------
     # Version 11 — performance indexes for file browsing
@@ -402,6 +402,22 @@ def _migrate_repopulate_drive_identifiers(conn: sqlite3.Connection) -> None:
             (ids.volume_uuid, ids.disk_uuid, ids.device_serial,
              ids.partition_index, ids.fs_fingerprint, row[0]),
         )
+    conn.commit()
+
+
+def _migrate_planned_actions_add_columns(conn: sqlite3.Connection) -> None:
+    """Add missing columns to planned_actions if the table was created by an older schema."""
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(planned_actions)").fetchall()}
+    additions = [
+        ("transfer_id", "TEXT"),
+        ("error", "TEXT"),
+        ("started_at", "TEXT"),
+    ]
+    for col, typ in additions:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE planned_actions ADD COLUMN {col} {typ}")
+    # Ensure the transfer_id index exists
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_planned_actions_transfer_id ON planned_actions(transfer_id)")
     conn.commit()
 
 
