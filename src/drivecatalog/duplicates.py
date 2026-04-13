@@ -530,10 +530,26 @@ def get_duplicate_clusters(conn: Connection) -> list[dict]:
 
 
 def get_duplicate_stats(conn: Connection) -> dict:
-    """Legacy: get aggregate duplicate statistics."""
+    """Legacy: get aggregate duplicate statistics.
+
+    total_clusters = number of hashes that exist on 2+ drives (actual cross-drive duplicates).
+    """
     stats = get_protection_stats(conn)
+
+    # Count hashes appearing on multiple drives (true duplicate clusters)
+    row = conn.execute("""
+        SELECT COUNT(*) as cnt FROM (
+            SELECT partial_hash
+            FROM files
+            WHERE partial_hash IS NOT NULL
+            GROUP BY partial_hash
+            HAVING COUNT(DISTINCT drive_id) > 1
+        )
+    """).fetchone()
+    duplicate_clusters = row["cnt"] if row else 0
+
     return {
-        "total_clusters": stats["unique_hashes"],
+        "total_clusters": duplicate_clusters,
         "total_duplicate_files": stats["same_drive_duplicate_count"]
             + stats["backed_up_files"]
             + stats["over_backed_up_files"],

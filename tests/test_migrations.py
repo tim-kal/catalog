@@ -317,8 +317,9 @@ class TestMigrationV10PlannedActions:
         ).fetchone()
         assert dep["depends_on"] == 1
 
-    def test_schema_version_is_10(self, migration_db):
+    def test_schema_version_matches(self, migration_db):
         conn, db_file = migration_db
         apply_migrations(conn, db_path=db_file)
+        from drivecatalog.migrations import SCHEMA_VERSION
         version = _get_version(conn)
-        assert version == 10
+        assert version == SCHEMA_VERSION

@@ -1,4 +1,4 @@
-"""Tests for API duplicates endpoints."""
+"""Tests for API duplicates (protection) endpoints."""
 
 
 def _setup_duplicates(client):
@@ -35,46 +35,55 @@ def _setup_duplicates(client):
         conn.close()
 
 
-def test_list_duplicates_empty(test_client):
-    """GET /duplicates returns empty when no duplicates."""
+def test_list_groups_empty(test_client):
+    """GET /duplicates returns empty groups when no files."""
     resp = test_client.get("/duplicates")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["clusters"] == []
-    assert data["stats"]["total_clusters"] == 0
+    assert data["groups"] == []
+    assert data["stats"]["total_files"] == 0
 
 
-def test_list_duplicates_with_data(test_client):
-    """GET /duplicates returns clusters."""
+def test_list_groups_with_data(test_client):
+    """GET /duplicates returns file groups with protection status."""
     _setup_duplicates(test_client)
     resp = test_client.get("/duplicates")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data["clusters"]) == 1
-    assert data["clusters"][0]["count"] == 2
+    # Should have groups for hashed files
+    assert len(data["groups"]) >= 1
+    # The duplicate hash should appear as a group with 2 copies
+    dup_group = next((g for g in data["groups"] if g["partial_hash"] == "dup_hash_1"), None)
+    assert dup_group is not None
+    assert dup_group["total_copies"] == 2
+    assert dup_group["drive_count"] == 2
 
 
-def test_list_duplicates_sort_by_count(test_client):
-    """GET /duplicates?sort_by=count works."""
+def test_list_groups_sort_by_copies(test_client):
+    """GET /duplicates?sort_by=copies works."""
     _setup_duplicates(test_client)
-    resp = test_client.get("/duplicates?sort_by=count")
+    resp = test_client.get("/duplicates?sort_by=copies")
     assert resp.status_code == 200
 
 
-def test_duplicate_stats(test_client):
-    """GET /duplicates/stats returns aggregate stats."""
+def test_stats(test_client):
+    """GET /duplicates/stats returns protection statistics."""
     _setup_duplicates(test_client)
     resp = test_client.get("/duplicates/stats")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["total_clusters"] == 1
-    assert data["total_duplicate_files"] == 2
-    assert data["reclaimable_bytes"] == 500_000
+    # Should have standard ProtectionStats fields
+    assert "total_files" in data
+    assert "unique_hashes" in data
+    assert "backup_coverage_percent" in data
+    assert data["total_files"] == 3
+    assert data["unique_hashes"] == 2  # dup_hash_1 + unique_hash
 
 
-def test_duplicate_stats_empty(test_client):
-    """GET /duplicates/stats returns zeros when no duplicates."""
+def test_stats_empty(test_client):
+    """GET /duplicates/stats returns zeros when no files."""
     resp = test_client.get("/duplicates/stats")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["total_clusters"] == 0
+    assert data["total_files"] == 0
+    assert data["unique_hashes"] == 0
