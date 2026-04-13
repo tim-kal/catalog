@@ -47,3 +47,4 @@ DriveSnapshots/
 
 # SwiftPM build artifacts
 mockups/**/.build/
+.github/
