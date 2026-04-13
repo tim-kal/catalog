@@ -1,7 +1,7 @@
 {
-  "version": "1.5.1",
-  "build": 20,
-  "url": "https://github.com/tim-kal/catalog/releases/download/v1.5.1/DriveCatalog.zip",
-  "notes": "Fix: bug reports now work on all machines. XCUITest target added.",
+  "version": "1.6.0",
+  "build": 21,
+  "url": "https://github.com/tim-kal/catalog/releases/download/v1.6.0/DriveCatalog.zip",
+  "notes": "Major UI update: file browser with expandable file copies and queue-delete, manage page 3-tab layout, drive-row change indicators with auto-rescan, action queue grouped by drive, covering indexes for 10x faster browsing, 210 tests passing, Cmd+comma for settings.",
   "min_os": "14.0"
 }
