@@ -162,23 +162,45 @@ final class UpdateService: ObservableObject {
 
     private func launchReplacer(newApp: String, oldApp: String) throws {
         let pid = ProcessInfo.processInfo.processIdentifier
+        let logFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("drivecatalog_update.log").path
         let script = """
         #!/bin/bash
+        exec > "\(logFile)" 2>&1
+        echo "Update started at $(date)"
+        echo "PID to wait for: \(pid)"
+        echo "Old app: \(oldApp)"
+        echo "New app: \(newApp)"
+
         # Wait for the old app to fully quit (poll by PID, max 30s)
         for i in $(seq 1 60); do
             if ! kill -0 \(pid) 2>/dev/null; then
+                echo "Old app exited after ${i} polls"
                 break
             fi
             sleep 0.5
         done
-        # Replace old app with new (use cp+rm instead of mv for cross-volume safety)
-        rm -rf "\(oldApp)"
-        cp -R "\(newApp)" "\(oldApp)"
+
+        # Replace old app with new
+        if ! rm -rf "\(oldApp)"; then
+            echo "ERROR: Failed to remove old app"
+            exit 1
+        fi
+        if ! cp -R "\(newApp)" "\(oldApp)"; then
+            echo "ERROR: Failed to copy new app"
+            exit 1
+        fi
+        echo "App replaced successfully"
+
         rm -rf "\(newApp)"
         # Remove quarantine attribute
         xattr -cr "\(oldApp)" 2>/dev/null
+        echo "Quarantine removed"
+
         # Relaunch
         open "\(oldApp)"
+        echo "Relaunch triggered"
+
         # Cleanup
         rm -f "$0"
         """

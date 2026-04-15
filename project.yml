@@ -43,18 +43,16 @@ targets:
             BASE_BUILD="0"
           fi
 
-          # For debug: version = X.Y.Z-dev, build = latest_build + commits since
+          # Only stamp version in Debug builds. Release builds are stamped by
+          # build-release.sh BEFORE xcodebuild runs — the pre-build script must
+          # NOT overwrite those values (latest.json still has the previous release).
           COMMITS_SINCE=$(cd "${SRCROOT}" && git rev-list --count HEAD 2>/dev/null || echo "0")
           if [ "${CONFIGURATION}" = "Debug" ]; then
             VERSION="${BASE_VERSION}-dev"
             BUILD_NUM="${COMMITS_SINCE}"
-          else
-            VERSION="${BASE_VERSION}"
-            BUILD_NUM="${BASE_BUILD}"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "$PLIST"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD_NUM}" "$PLIST"
           fi
-
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD_NUM}" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :GitCommitHash string ${GIT_HASH}" "$PLIST" 2>/dev/null \
               || /usr/libexec/PlistBuddy -c "Set :GitCommitHash ${GIT_HASH}" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :BuildDate string ${BUILD_DATE}" "$PLIST" 2>/dev/null \
