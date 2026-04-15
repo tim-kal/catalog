@@ -1,7 +1,7 @@
 {
-  "version": "1.6.0",
-  "build": 21,
-  "url": "https://github.com/tim-kal/catalog/releases/download/v1.6.0/DriveCatalog.zip",
-  "notes": "Major UI update: file browser with expandable file copies and queue-delete, manage page 3-tab layout, drive-row change indicators with auto-rescan, action queue grouped by drive, covering indexes for 10x faster browsing, 210 tests passing, Cmd+comma for settings.",
+  "version": "1.6.1",
+  "build": 22,
+  "url": "https://github.com/tim-kal/catalog/releases/download/v1.6.1/DriveCatalog.zip",
+  "notes": "Fix: update loop where app kept showing update available after installing. Build version now stamped correctly in release builds.",
   "min_os": "14.0"
 }
